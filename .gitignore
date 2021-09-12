@@ -1,0 +1,9 @@
+.DS_Store
+credentials/*.cfg
+
+log.*
+tmp*
+
+# oss
+.ossutil_checkpoint
+ossutil_output
