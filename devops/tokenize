@@ -6,20 +6,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--backend', choices = ['sentencepiece'], default = 'sentencepiece')
     parser.add_argument('config', type = str)
-    parser.add_argument('input', type = str)
-    parser.add_argument('odir', type = str)
+    parser.add_argument('text', type = str)
+    parser.add_argument('model_dir', type = str)
     args = parser.parse_args()
     print(args)
 
-    if not os.path.isdir(args.odir):
-        os.mkdir(args.odir)
+    if not os.path.isdir(args.model_dir):
+        os.mkdir(args.model_dir)
 
     if args.backend == 'sentencepiece':
         import sentencepiece as spm
 
         options = (
-            F'--input={args.input} '
-            F'--model_prefix={os.path.join(args.odir, "tokenizer")} '
+            F'--input={args.text} '
+            F'--model_prefix={os.path.join(args.model_dir, "tokenizer")} '
         )
         spm_cfg = OmegaConf.load(args.config)['sentencepiece']
         for e in spm_cfg:
