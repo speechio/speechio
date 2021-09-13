@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+import sys, os
+import argparse
+from contextlib import contextmanager
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--backend', choices = ['sentencepiece'], default = 'sentencepiece')
+    parser.add_argument('--model', type = str)
+    parser.add_argument('--input', type = str, default = '-')
+    parser.add_argument('--output', type = str, default = '-')
+    parser.add_argument('--output_format', choices=['piece', 'id'], default = 'piece')
+    args = parser.parse_args()
+    print(args, file=sys.stderr)
+
+    if args.backend == 'sentencepiece':
+        import sentencepiece as spm
+        # https://colab.research.google.com/github/google/sentencepiece/blob/master/python/sentencepiece_python_module_example.ipynb
+
+        sp = spm.SentencePieceProcessor()
+        sp.load(os.path.join(args.model + '.model'))
+
+        @contextmanager
+        def istream(stream_name):
+            if stream_name == '-':
+                yield sys.stdin
+            else:
+                yield open(stream_name, 'r', encoding='utf8')
+
+        @contextmanager
+        def ostream(stream_name):
+            if stream_name == '-':
+                yield sys.stdout
+            else:
+                yield open(stream_name, 'w+', encoding='utf8')
+
+        with istream(args.input) as istream, ostream(args.output) as ostream:
+            for l in istream:
+                if args.output_format == 'piece':
+                    tokens = sp.EncodeAsPieces(l.strip())
+                elif args.output_format == 'id':
+                    tokens = sp.EncodeAsIds(l.strip())
+            
+                print(' '.join([ str(x) for x in tokens]), file = ostream)
+
+    else:
+        raise NotImplementedError(F'Unsupported tokenizer backend: {args.backend}')

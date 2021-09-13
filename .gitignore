@@ -7,3 +7,5 @@ tmp*
 # oss
 .ossutil_checkpoint
 ossutil_output
+
+misc/*
