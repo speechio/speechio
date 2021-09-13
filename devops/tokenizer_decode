@@ -36,11 +36,9 @@ if __name__ == "__main__":
         with open_istream(args.input) as istream, open_ostream(args.output) as ostream:
             for l in istream:
                 if args.input_format == "piece":
-                    tokens = l.strip().split()
-                    decoded = ''.join(sp.DecodePieces(tokens))     
+                    decoded = ''.join(sp.DecodePieces(l.strip().split()))     
                 elif args.input_format == "id":
-                    tokens = [ int(x) for x in l.strip().split() ]
-                    decoded = ''.join(sp.DecodeIds(tokens))
+                    decoded = ''.join(sp.DecodeIds([ int(x) for x in l.strip().split() ]))
                 else:
                     raise NotImplementedError
             

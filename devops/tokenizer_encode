@@ -38,10 +38,14 @@ if __name__ == '__main__':
             for l in istream:
                 if args.output_format == 'piece':
                     tokens = sp.EncodeAsPieces(l.strip())
+                    encoded = ' '.join(tokens)
                 elif args.output_format == 'id':
                     tokens = sp.EncodeAsIds(l.strip())
-            
-                print(' '.join([ str(x) for x in tokens]), file = ostream)
+                    encoded = ' '.join([ str(x) for x in tokens ])
+                else:
+                    raise NotImplementedError
+
+                print(encoded, file = ostream)
 
     else:
         raise NotImplementedError(F'Unsupported tokenizer backend: {args.backend}')
