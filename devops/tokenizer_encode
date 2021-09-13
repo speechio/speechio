@@ -13,28 +13,28 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args, file=sys.stderr)
 
+    @contextmanager
+    def open_istream(fname):
+        if fname == '-':
+            yield sys.stdin
+        else:
+            yield open(fname, 'r', encoding='utf8')
+
+    @contextmanager
+    def open_ostream(fname):
+        if fname == '-':
+            yield sys.stdout
+        else:
+            yield open(fname, 'w+', encoding='utf8')
+
     if args.backend == 'sentencepiece':
         import sentencepiece as spm
         # https://colab.research.google.com/github/google/sentencepiece/blob/master/python/sentencepiece_python_module_example.ipynb
 
         sp = spm.SentencePieceProcessor()
-        sp.load(os.path.join(args.model + '.model'))
+        sp.load(args.model + '.model')
 
-        @contextmanager
-        def istream(stream_name):
-            if stream_name == '-':
-                yield sys.stdin
-            else:
-                yield open(stream_name, 'r', encoding='utf8')
-
-        @contextmanager
-        def ostream(stream_name):
-            if stream_name == '-':
-                yield sys.stdout
-            else:
-                yield open(stream_name, 'w+', encoding='utf8')
-
-        with istream(args.input) as istream, ostream(args.output) as ostream:
+        with open_istream(args.input) as istream, open_ostream(args.output) as ostream:
             for l in istream:
                 if args.output_format == 'piece':
                     tokens = sp.EncodeAsPieces(l.strip())
