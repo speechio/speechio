@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2021 Jiayu DU
+# All rights reserved.
+
 import sys, os
 import argparse
 from contextlib import contextmanager
@@ -36,9 +39,11 @@ if __name__ == "__main__":
         with open_istream(args.input) as istream, open_ostream(args.output) as ostream:
             for l in istream:
                 if args.input_format == "piece":
-                    decoded = ''.join(sp.DecodePieces(l.strip().split()))     
+                    pieces = l.strip().split()
+                    decoded = sp.DecodePieces(pieces)
                 elif args.input_format == "id":
-                    decoded = ''.join(sp.DecodeIds([ int(x) for x in l.strip().split() ]))
+                    ids = [ int(x) for x in l.strip().split() ]
+                    decoded = sp.DecodeIds(ids)
                 else:
                     raise NotImplementedError
             
