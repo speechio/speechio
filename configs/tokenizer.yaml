@@ -10,6 +10,6 @@ sentencepiece:
   eos_id:  2
   unk_piece: <unk>  # <UNK> for Kaldi 
   max_sentencepiece_length: 16
-  add_dummy_prefix: true
+  add_dummy_prefix: false
   train_extremely_large_corpus: false
   num_threads: 16
