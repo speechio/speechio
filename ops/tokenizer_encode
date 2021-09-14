@@ -17,27 +17,24 @@ if __name__ == '__main__':
     print(args, file=sys.stderr)
 
     @contextmanager
-    def open_istream(fname):
+    def open_stream(fname, mode):
         if fname == '-':
-            yield sys.stdin
+            if mode == 'r':
+                yield sys.stdin
+            elif mode == 'w+':
+                yield sys.stdout
+            else:
+                raise NotImplementedError
         else:
-            yield open(fname, 'r', encoding='utf8')
-
-    @contextmanager
-    def open_ostream(fname):
-        if fname == '-':
-            yield sys.stdout
-        else:
-            yield open(fname, 'w+', encoding='utf8')
+            yield open(fname, mode, encoding='utf8')
 
     if args.backend == 'sentencepiece':
         import sentencepiece as spm
-        # https://colab.research.google.com/github/google/sentencepiece/blob/master/python/sentencepiece_python_module_example.ipynb
 
         sp = spm.SentencePieceProcessor()
         sp.load(args.model + '.model')
 
-        with open_istream(args.input) as istream, open_ostream(args.output) as ostream:
+        with open_stream(args.input, 'r') as istream, open_stream(args.output, 'w+') as ostream:
             for l in istream:
                 if args.output_format == 'piece':
                     pieces = sp.EncodeAsPieces(l.strip())
