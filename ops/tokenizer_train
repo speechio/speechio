@@ -6,7 +6,7 @@ import sys, os
 import argparse
 from omegaconf import OmegaConf
 
-def SentencePieceTrain(config, text, model):
+def SentencePieceTrain(config, text, language, model):
     import sentencepiece as spm
     # https://colab.research.google.com/github/google/sentencepiece/blob/master/python/sentencepiece_python_module_example.ipynb
     
@@ -14,7 +14,7 @@ def SentencePieceTrain(config, text, model):
     if not os.path.isdir(dst):
         os.mkdir(dst)
 
-    config = OmegaConf.load(config)['sentencepiece']
+    config = OmegaConf.load(config)['sentencepiece'][language]
     trainer_spec = (
         F' --input={text} '
         F' --model_prefix={model} '
@@ -25,6 +25,7 @@ def SentencePieceTrain(config, text, model):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--backend', choices = ['sentencepiece'], default = 'sentencepiece')
+    parser.add_argument('--language', choices = ['EN', 'ZH'], default = 'ZH')
     parser.add_argument('--config', type = str, required = True)
     parser.add_argument('--input', type = str, required = True)
     parser.add_argument('--model', type = str, required = True)
@@ -32,6 +33,6 @@ if __name__ == '__main__':
     print(args, file=sys.stderr)
 
     if args.backend == 'sentencepiece':
-        SentencePieceTrain(args.config, args.input, args.model)
+        SentencePieceTrain(args.config, args.input, args.language, args.model)
     else:
         raise NotImplementedError(F'Unsupported tokenizer backend: {args.backend}')
