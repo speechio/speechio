@@ -1,5 +1,5 @@
 .DS_Store
-credentials/*.cfg
+credential/*.cfg
 
 log.*
 tmp*
@@ -9,3 +9,5 @@ tmp*
 ossutil_output
 
 misc/*
+test/*
+dataset/*

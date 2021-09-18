@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+# coding = utf8
+#
+# Copyright (c) 2021 Jiayu DU
+# All rights reserved.
+#
+
+import os, sys
+import argparse
+import csv
+from omegaconf import OmegaConf
+
+import torch
+
+class SpeechRecognitionDataset:
+    def __init__(
+            self,
+            dataset_tsv_list: list[str],
+            select_fields: list[str],
+            min_utt_duration: float = 0.5,
+            max_utt_duration: float = 20.0,
+        ) :
+
+        self.samples = []
+
+        for tsv in dataset_tsv_list:
+            with open(tsv, 'r', encoding='utf8') as f:
+                sample_reader = csv.DictReader(f, delimiter='\t')
+                for s in sample_reader:
+                    # sample filter
+                    if float(s['DURATION']) <= min_utt_duration:
+                        continue
+                    if float(s['DURATION']) >= max_utt_duration:
+                        continue
+
+                    # only extract selected fields
+                    self.samples.append({ f:s[f] for f in select_fields })
+    
+    def __getitem__(self, index: int):
+        return self.samples[index]
+    
+    def __len__(self):
+        return len(self.samples)
+
+
+class DataProcessingPipeline:
+    def __init__(self):
+        self.processors = []
+
+    def __call__(self, minibatch):
+        return minibatch
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    args = parser.parse_args()
+    print(args, file=sys.stderr)
+
+    config = OmegaConf.load('config/train.yaml')
+
+    train_list = ['test/SPEECHIO_ASR_ZH00000/metadata.tsv', 'test/MINI/metadata.tsv']
+    valid_list = []
+    test_list = []
+
+    train_dataset = SpeechRecognitionDataset(
+        train_list,
+        select_fields = ['ID', 'AUDIO', 'DURATION', 'TEXT'],
+        min_utt_duration = config.dataset.min_utt_duration,
+        max_utt_duration = config.dataset.max_utt_duration,
+    )
+
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset, 
+        shuffle = True, 
+        batch_size = config.dataset.batch_size, 
+        drop_last = config.dataset.drop_last,
+        collate_fn = DataProcessingPipeline(),
+    )
+
+    for e in range(config.train.num_epochs):
+        for b, batch in enumerate(train_dataloader):
+            print(F'<{e}.{b}>')
+            print(batch)
+            print()
