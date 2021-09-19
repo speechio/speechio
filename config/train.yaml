@@ -1,3 +1,5 @@
+system_sample_rate: 16000
+
 dataset:
   min_utt_duration: 0.5
   max_utt_duration: 20.0
@@ -14,4 +16,3 @@ feature:
 train:
   num_epochs: 1
 
-system_sample_rate: 16000

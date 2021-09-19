@@ -8,7 +8,7 @@
 import os, sys
 import argparse
 import csv
-from copy import deepcopy
+import copy
 
 import math
 import torch
@@ -78,7 +78,7 @@ def ReadAndResampleAudio(audio_sample: dict, target_sample_rate: int) :
     # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
     # torchaudio.info():
     #   -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
-    info = torchaudio.info(audio_path) 
+    info = torchaudio.info(audio_path)
     sample_rate = info.sample_rate
     entire_audio_duration = float(info.num_frames) / float(info.sample_rate)
 
@@ -127,14 +127,14 @@ class DataProcessingPipeline:
     def __call__(self, minibatch):
         new_minibatch = []
         for sample in minibatch:
-            # create new deep-copy so batched samples will be garbage-collected after minibatch training
-            s = deepcopy(sample)
+            # create new copy so batched samples here will be garbage-collected after minibatch training
+            s = copy.deepcopy(sample)
 
             # raw audio loading and resampling
-            s['WAVE'], s['SAMPLE_RATE'] = ReadAndResampleAudio(s, self.config.system_sample_rate)
+            s['WAVEFORM'], s['SAMPLE_RATE'] = ReadAndResampleAudio(s, target_sample_rate = self.config.system_sample_rate)
             
             # feature extraction
-            s['FEAT'] = ExtractFeature(s['WAVE'], s['SAMPLE_RATE'], self.config)
+            s['FEAT'] = ExtractFeature(s['WAVEFORM'], s['SAMPLE_RATE'], self.config)
 
             # transcription tokenization
             s['TOKEN_PIECES'] = self.tokenizer.EncodeAsPieces(s['TEXT'])
