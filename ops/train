@@ -35,16 +35,23 @@ class SpeechRecognitionDataset:
 
         for tsv in dataset_tsv_list:
             with open(tsv, 'r', encoding='utf8') as f:
-                sample_reader = csv.DictReader(f, delimiter='\t')
-                for s in sample_reader:
+                tsv_reader = csv.DictReader(f, delimiter='\t')
+                for item in tsv_reader:
                     # sample filter
-                    if float(s['DURATION']) <= min_utt_duration:
+                    if float(item['DURATION']) <= min_utt_duration:
                         continue
-                    if float(s['DURATION']) >= max_utt_duration:
+                    if float(item['DURATION']) >= max_utt_duration:
                         continue
 
                     # only extract selected fields
-                    self.samples.append({ f: (float(s[f]) if f == 'DURATION' else s[f]) for f in pick_fields })
+                    sample = {}
+                    for x in pick_fields:
+                        if x == 'DURATION':
+                            sample[x] = float(item[x])
+                        else:
+                            sample[x] = item[x]
+
+                    self.samples.append(sample)
     
     def __getitem__(self, index: int):
         return self.samples[index]
@@ -53,7 +60,7 @@ class SpeechRecognitionDataset:
         return len(self.samples)
 
 
-def ReadAndResampleAudio(sample: dict, target_sample_rate: int) :
+def ReadAndResampleAudio(audio_sample: dict, target_sample_rate: int) :
     '''
     sample:
     {
@@ -67,7 +74,7 @@ def ReadAndResampleAudio(sample: dict, target_sample_rate: int) :
     NOTE: the usage of multi-channel hasn't been tested yet.
 
     '''
-    audio_path = sample['AUDIO']
+    audio_path = audio_sample['AUDIO']
     # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
     # torchaudio.info():
     #   -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
@@ -75,8 +82,8 @@ def ReadAndResampleAudio(sample: dict, target_sample_rate: int) :
     sample_rate = info.sample_rate
     entire_audio_duration = float(info.num_frames) / float(info.sample_rate)
 
-    begin = sample.get("BEGIN", 0.0)
-    duration = sample.get("DURATION", entire_audio_duration)
+    begin = audio_sample.get("BEGIN", 0.0)
+    duration = audio_sample.get("DURATION", entire_audio_duration)
 
     waveform, _ = torchaudio.load(
         audio_path,
@@ -166,6 +173,7 @@ def train():
     for e in range(config.train.num_epochs):
         for b, batch in enumerate(train_dataloader):
             print(F'<{e}.{b}>')
+            print(batch)
             print([len(s['WAVE'][0])/config.system_sample_rate for s in batch])
             print()
 
