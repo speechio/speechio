@@ -1,10 +1,15 @@
-
-
 dataset:
-  batch_size: 16
-  drop_last: False
   min_utt_duration: 0.5
   max_utt_duration: 20.0
+
+dataloader:
+  shuffle: True
+  batch_size: 16
+  drop_last: False
+
+feature:
+  num_bins: 80
+  dither: 1.0
 
 train:
   num_epochs: 1
