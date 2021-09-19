@@ -100,7 +100,8 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, feature_config):
     torchaudio default: energy_floor=1.0 
         (https://pytorch.org/audio/stable/compliance.kaldi.html)
 
-    `energy_floor` should only affect results when use_energy = `True`, where in both toolkits, use_energy defaults to `False`
+    `energy_floor` should only affect results when use_energy = `True`,
+    where in both toolkits, use_energy are switched to `False` by default
     for safety we just set it to EPSILON
     '''
     return torchaudio.compliance.kaldi.fbank(
