@@ -77,23 +77,21 @@ def ReadAudioSegment(segment_descriptor : dict) :
     begin = segment_descriptor.get("BEGIN", 0.0)
     duration = segment_descriptor.get("DURATION", entire_audio_duration)
 
-    wave, _ = torchaudio.load(
+    return torchaudio.load(
         audio_path,
         frame_offset = int(begin * sample_rate),
         num_frames = int(duration * sample_rate),
         channels_first = True,
-    )
-
-    return wave, sample_rate
+    ) # -> (wave, sample_rate)
 
 def ExtractFeature(wave: torch.Tensor, sample_rate: int, feature_config):
     return torchaudio.compliance.kaldi.fbank(
         wave,
-        sample_frequency = sample_rate, 
-        num_mel_bins = feature_config.num_bins, # Kaldi calls this "num_bins" and torchaudio calls this "num_mel_bins"
+        sample_frequency = sample_rate,
+        num_mel_bins = feature_config.num_mel_bins,
         dither = feature_config.dither,
-        # kaldi energy_floor default = 0.0 (https://github.com/kaldi-asr/kaldi/blob/master/src/feat/feature-fbank.h#L56)
-        # torchaudio energy_floor default = 1.0 (https://pytorch.org/audio/stable/compliance.kaldi.html)
+        # kaldi default: energy_floor=0.0 (https://github.com/kaldi-asr/kaldi/blob/master/src/feat/feature-fbank.h#L56)
+        # torchaudio default: energy_floor=1.0 (https://pytorch.org/audio/stable/compliance.kaldi.html)
         # this option should only affect results when use_energy = `True`, where in both toolkits, use_energy defaults to `False`
         # for safety we just set it to EPSILON
         energy_floor = G_EPSILON,
@@ -107,8 +105,8 @@ class DataProcessingPipeline:
     def __call__(self, minibatch):
         new_minibatch = []
         for sample in minibatch:
-            # here we make a new deep copy so that batched samples can be garbage-collected
-            # instead of consuming huge amount of memory due to old samples retained in dataset
+            # raw samples have global life-time because dataset object has ownerships
+            # so here we make a deep copy of batched samples, which will be garbage-collected after minibatch training
             s = deepcopy(sample)
             s['WAVE'], s['SAMPLE_RATE'] = ReadAudioSegment(s)
             s['FEAT'] = ExtractFeature(s['WAVE'], s['SAMPLE_RATE'], self.config.feature)
@@ -118,15 +116,17 @@ class DataProcessingPipeline:
 
 def train():
     parser = argparse.ArgumentParser()
+
+    parser.add_argument('--train_data', nargs='+')
+    parser.add_argument('--valid_data', nargs='*')
+    parser.add_argument('--test_data', nargs='*')
+    parser.add_argument('--config', type = str)
+
     args = parser.parse_args()
     print(args, file=sys.stderr)
 
-    config = OmegaConf.load('config/train.yaml')
-
-    train_list = ['dataset/SPEECHIO_ASR_ZH00000/metadata.tsv', 'dataset/MINI/metadata.tsv']
-    #train_list = ['dataset/MINI/metadata.tsv']
-    valid_list = []
-    test_list = []
+    train_list, valid_list, test_list = args.train_data, args.valid_data, args.test_data
+    config = OmegaConf.load(args.config)
 
     train_dataset = SpeechRecognitionDataset(
         train_list,
@@ -147,7 +147,7 @@ def train():
     for e in range(config.train.num_epochs):
         for b, batch in enumerate(train_dataloader):
             print(F'<{e}.{b}>')
-            print(batch)
+            #print(batch)
             print()
 
 def test():

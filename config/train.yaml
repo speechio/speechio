@@ -8,7 +8,7 @@ dataloader:
   drop_last: False
 
 feature:
-  num_bins: 80
+  num_mel_bins: 80
   dither: 1.0
 
 train:
