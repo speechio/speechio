@@ -11,12 +11,14 @@ import csv
 from omegaconf import OmegaConf
 
 import torch
+import torchaudio
+#torchaudio.set_audio_backend('sox_io')
 
 class SpeechRecognitionDataset:
     def __init__(
             self,
             dataset_tsv_list: list[str],
-            select_fields: list[str],
+            pick_fields: list[str],
             min_utt_duration: float = 0.5,
             max_utt_duration: float = 20.0,
         ) :
@@ -34,7 +36,7 @@ class SpeechRecognitionDataset:
                         continue
 
                     # only extract selected fields
-                    self.samples.append({ f:s[f] for f in select_fields })
+                    self.samples.append({ f: (float(s[f]) if f == 'DURATION' else s[f]) for f in pick_fields })
     
     def __getitem__(self, index: int):
         return self.samples[index]
@@ -43,28 +45,87 @@ class SpeechRecognitionDataset:
         return len(self.samples)
 
 
+def ReadAudioSegment(segment_descriptor : dict) :
+    '''
+    segment_descriptor:
+    {
+        'AUDIO': '/path/to/audio.xxx'
+        'BEGIN': 0.5,
+        'DURATION': 1.2,
+    }
+    `BEGIN` is optional, with 0.0 as default value
+    `DURATION` is optional, with the duration of entire audio file as default value
+
+    NOTE: the usage of multi-channel hasn't been tested yet.
+
+    '''
+    audio_path = segment_descriptor['AUDIO']
+    meta = torchaudio.info(audio_path) # sample return -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
+    sample_rate = meta.sample_rate
+    entire_duration = float(meta.num_frames) / float(meta.sample_rate)
+
+    begin = segment_descriptor.get("BEGIN", 0.0)
+    duration = segment_descriptor.get("DURATION", entire_duration)
+
+    wave, _ = torchaudio.load(
+        audio_path,
+        frame_offset = int(begin * sample_rate),
+        num_frames = int(duration * sample_rate),
+        channels_first = True,
+    )
+
+    return wave, sample_rate
+
+def ExtractFeature(wave_tensor, sample_rate):
+    return torchaudio.compliance.kaldi.fbank(
+        wave_tensor,
+        num_mel_bins=80,
+        dither=0.0,
+        sample_frequency=sample_rate
+    )
+
+def test_DataProcessor():
+    sample = {
+        'AUDIO': 'test/test.wav',
+        'DURATION': 1.0,
+    }
+    sample['WAVE'], sample['SAMPLE_RATE'] = ReadAudioSegment(sample)
+    sample['FEAT'] = ExtractFeature(sample['WAVE'], sample['SAMPLE_RATE'])
+    print(sample['FEAT'].shape)
+    print(sample)
+
 class DataProcessingPipeline:
     def __init__(self):
         self.processors = []
 
     def __call__(self, minibatch):
-        return minibatch
+        for sample in minibatch:
+            sample['WAVE'], sample['SAMPLE_RATE'] = ReadAudioSegment(sample)
+            sample['FEAT'] = ExtractFeature(sample['WAVE'], sample['SAMPLE_RATE'])
+        
+        collated_minibatch = { 'ID': [], 'FEAT': [], 'TEXT': [] }
+        for sample in minibatch:
+            collated_minibatch['ID'].append(sample['ID'])
+            collated_minibatch['FEAT'].append(sample['FEAT'])
+            collated_minibatch['TEXT'].append(sample['TEXT'])
 
+        return collated_minibatch
 
-if __name__ == '__main__':
+def train():
     parser = argparse.ArgumentParser()
     args = parser.parse_args()
     print(args, file=sys.stderr)
 
     config = OmegaConf.load('config/train.yaml')
 
-    train_list = ['test/SPEECHIO_ASR_ZH00000/metadata.tsv', 'test/MINI/metadata.tsv']
+    train_list = ['dataset/SPEECHIO_ASR_ZH00000/metadata.tsv', 'dataset/MINI/metadata.tsv']
+    #train_list = ['dataset/MINI/metadata.tsv']
     valid_list = []
     test_list = []
 
     train_dataset = SpeechRecognitionDataset(
         train_list,
-        select_fields = ['ID', 'AUDIO', 'DURATION', 'TEXT'],
+        pick_fields = ['ID', 'AUDIO', 'DURATION', 'TEXT'],
         min_utt_duration = config.dataset.min_utt_duration,
         max_utt_duration = config.dataset.max_utt_duration,
     )
@@ -75,6 +136,7 @@ if __name__ == '__main__':
         batch_size = config.dataset.batch_size, 
         drop_last = config.dataset.drop_last,
         collate_fn = DataProcessingPipeline(),
+        num_workers = 4,
     )
 
     for e in range(config.train.num_epochs):
@@ -82,3 +144,10 @@ if __name__ == '__main__':
             print(F'<{e}.{b}>')
             print(batch)
             print()
+
+def test():
+    test_DataProcessor()
+
+if __name__ == '__main__':
+    train()
+    #test()
