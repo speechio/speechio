@@ -11,3 +11,4 @@ ossutil_output
 misc/*
 test/*
 dataset/*
+model/*

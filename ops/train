@@ -12,9 +12,9 @@ from copy import deepcopy
 
 import math
 import torch
-import torchaudio
-#torchaudio.set_audio_backend('sox_io')
+import torchaudio#; torchaudio.set_audio_backend('sox_io')
 
+import sentencepiece as spm
 from omegaconf import OmegaConf
 
 # Global Constants
@@ -99,7 +99,7 @@ def ReadAndResampleAudio(audio_sample: dict, target_sample_rate: int) :
     return waveform, target_sample_rate
 
 
-def ExtractFeature(waveform: torch.Tensor, sample_rate: int, feature_config):
+def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
     '''
     kaldi default: energy_floor=0.0 
         (https://github.com/kaldi-asr/kaldi/blob/master/src/feat/feature-fbank.h#L56)
@@ -114,15 +114,15 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, feature_config):
     return torchaudio.compliance.kaldi.fbank(
         waveform,
         sample_frequency = sample_rate,
-        num_mel_bins = feature_config.num_mel_bins,
-        dither = feature_config.dither,
+        num_mel_bins = config.feature.num_mel_bins,
+        dither = config.feature.dither,
         energy_floor = G_EPSILON,
     )
 
 class DataProcessingPipeline:
-    def __init__(self, config):
-        self.processors = []
+    def __init__(self, config, tokenizer):
         self.config = config
+        self.tokenizer = tokenizer
 
     def __call__(self, minibatch):
         new_minibatch = []
@@ -134,7 +134,11 @@ class DataProcessingPipeline:
             s['WAVE'], s['SAMPLE_RATE'] = ReadAndResampleAudio(s, self.config.system_sample_rate)
             
             # feature extraction
-            s['FEAT'] = ExtractFeature(s['WAVE'], s['SAMPLE_RATE'], self.config.feature)
+            s['FEAT'] = ExtractFeature(s['WAVE'], s['SAMPLE_RATE'], self.config)
+
+            # transcription tokenization
+            s['TOKEN_PIECES'] = self.tokenizer.EncodeAsPieces(s['TEXT'])
+            s['TOKEN_IDS'] = self.tokenizer.EncodeAsIds(s['TEXT'])
 
             new_minibatch.append(s)
 
@@ -146,7 +150,8 @@ def train():
     parser.add_argument('--train_data', nargs='+')
     parser.add_argument('--valid_data', nargs='*')
     parser.add_argument('--test_data', nargs='*')
-    parser.add_argument('--config', type = str)
+    parser.add_argument('--tokenizer', type = str, required = True)
+    parser.add_argument('--config', type = str, required = True)
 
     args = parser.parse_args()
     print(args, file=sys.stderr)
@@ -154,6 +159,11 @@ def train():
     train_list, valid_list, test_list = args.train_data, args.valid_data, args.test_data
     config = OmegaConf.load(args.config)
 
+    # tokenizer
+    tokenizer = spm.SentencePieceProcessor()
+    tokenizer.load(args.tokenizer)
+
+    # dataloaders
     train_dataset = SpeechRecognitionDataset(
         train_list,
         pick_fields = ['ID', 'AUDIO', 'DURATION', 'TEXT'],
@@ -161,21 +171,20 @@ def train():
         max_utt_duration = config.dataset.max_utt_duration,
     )
 
+    # datasets
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, 
         shuffle = config.dataloader.shuffle,
         batch_size = config.dataloader.batch_size, 
         drop_last = config.dataloader.drop_last,
-        collate_fn = DataProcessingPipeline(config),
+        collate_fn = DataProcessingPipeline(config, tokenizer = tokenizer),
         num_workers = 4,
     )
 
     for e in range(config.train.num_epochs):
         for b, batch in enumerate(train_dataloader):
-            print(F'<{e}.{b}>')
+            print(F'----- {e}.{b} -----')
             print(batch)
-            print([len(s['WAVE'][0])/config.system_sample_rate for s in batch])
-            print()
 
 def test():
     pass
