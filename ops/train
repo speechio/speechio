@@ -53,7 +53,7 @@ class SpeechRecognitionDataset:
         return len(self.samples)
 
 
-def ReadAudioSegment(segment_descriptor : dict) :
+def ReadAndResampleAudio(segment_descriptor : dict, target_sample_rate: int) :
     '''
     segment_descriptor:
     {
@@ -68,7 +68,8 @@ def ReadAudioSegment(segment_descriptor : dict) :
 
     '''
     audio_path = segment_descriptor['AUDIO']
-    # torchaudio.info() sample return:
+    # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
+    # torchaudio.info():
     #   -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
     info = torchaudio.info(audio_path) 
     sample_rate = info.sample_rate
@@ -77,23 +78,34 @@ def ReadAudioSegment(segment_descriptor : dict) :
     begin = segment_descriptor.get("BEGIN", 0.0)
     duration = segment_descriptor.get("DURATION", entire_audio_duration)
 
-    return torchaudio.load(
+    waveform, _ = torchaudio.load(
         audio_path,
         frame_offset = int(begin * sample_rate),
         num_frames = int(duration * sample_rate),
         channels_first = True,
-    ) # -> (wave, sample_rate)
+    )
 
-def ExtractFeature(wave: torch.Tensor, sample_rate: int, feature_config):
+    if sample_rate != target_sample_rate:
+        '''
+        https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#resampling
+        '''
+        waveform = torchaudio.transforms.Resample(sample_rate, target_sample_rate)(waveform)
+    
+    return waveform, target_sample_rate
+
+
+def ExtractFeature(waveform: torch.Tensor, sample_rate: int, feature_config):
+    '''
+    kaldi default: energy_floor=0.0 (https://github.com/kaldi-asr/kaldi/blob/master/src/feat/feature-fbank.h#L56)
+    torchaudio default: energy_floor=1.0 (https://pytorch.org/audio/stable/compliance.kaldi.html)
+    this option should only affect results when use_energy = `True`, where in both toolkits, use_energy defaults to `False`
+    for safety we just set it to EPSILON
+    '''
     return torchaudio.compliance.kaldi.fbank(
-        wave,
+        waveform,
         sample_frequency = sample_rate,
         num_mel_bins = feature_config.num_mel_bins,
         dither = feature_config.dither,
-        # kaldi default: energy_floor=0.0 (https://github.com/kaldi-asr/kaldi/blob/master/src/feat/feature-fbank.h#L56)
-        # torchaudio default: energy_floor=1.0 (https://pytorch.org/audio/stable/compliance.kaldi.html)
-        # this option should only affect results when use_energy = `True`, where in both toolkits, use_energy defaults to `False`
-        # for safety we just set it to EPSILON
         energy_floor = G_EPSILON,
     )
 
@@ -108,8 +120,13 @@ class DataProcessingPipeline:
             # raw samples have global life-time because dataset object has ownerships
             # so here we make a deep copy of batched samples, which will be garbage-collected after minibatch training
             s = deepcopy(sample)
-            s['WAVE'], s['SAMPLE_RATE'] = ReadAudioSegment(s)
+
+            # raw audio loading and resampling
+            s['WAVE'], s['SAMPLE_RATE'] = ReadAndResampleAudio(s, self.config.system_sample_rate)
+            
+            # feature extraction
             s['FEAT'] = ExtractFeature(s['WAVE'], s['SAMPLE_RATE'], self.config.feature)
+
             new_minibatch.append(s)
 
         return new_minibatch
@@ -147,7 +164,7 @@ def train():
     for e in range(config.train.num_epochs):
         for b, batch in enumerate(train_dataloader):
             print(F'<{e}.{b}>')
-            #print(batch)
+            print([len(s['WAVE'][0])/config.system_sample_rate for s in batch])
             print()
 
 def test():
