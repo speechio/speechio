@@ -9,6 +9,8 @@ import os, sys
 import argparse
 import csv
 import copy
+from typing import Optional, Any
+from dataclasses import dataclass
 
 import math
 import torch
@@ -22,36 +24,65 @@ G_INT16MAX = 32768
 G_EPSILON = 1e-10
 G_LOG_EPSILON = math.log(G_EPSILON)
 
-class SpeechRecognitionDataset:
-    def __init__(
-            self,
-            dataset_tsv_list: list[str],
-            pick_fields: list[str],
-            min_utt_duration: float = 0.5,
-            max_utt_duration: float = 20.0,
-        ) :
+@dataclass
+class Sample:
+    id: str = ''
+    audio: str = ''
+    begin: float = 0.0
+    duration: float = 0.0
+    text: str = ''
+    speaker: Any = None
+    # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
+    # torchaudio.info(sample.audio)
+    #   -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
+    audio_info: Any = None                    
 
+
+class SampleLoader:
+    ''' SampleLoader is a callable to load one sample from one utterance_info object,
+        where `utterance_info` is a small dict from .tsv .jsonl .yaml reader.
+        return None if a sample doesn't satisfy certain constraints, e.g. duration
+    '''
+    def __init__(self, sample_loader_config):
+        self.config = sample_loader_config
+    
+    def __call__(self, utterance_info: dict) -> Optional[Sample] :
+        sample = Sample()
+        for f, c in self.config.field_map.items():
+            assert hasattr(sample, f), F'field:{f} <- column:{c} mapping failed, no such field'
+            v = utterance_info.get(c, None)
+            if v:
+                if c in ['DURATION', 'BEGIN', ]:
+                    v = float(v)
+                else:
+                    v = v
+                setattr(sample, f, v)
+        
+        sample.audio_info = torchaudio.info(sample.audio)
+        
+        if sample.duration == 0.0:
+            entire_audio_duration = float(sample.audio_info.num_frames) / float(sample.audio_info.sample_rate)
+            sample.duration = entire_audio_duration
+
+        if float(sample.duration) < self.config.min_duration:
+            return None
+        if float(sample.duration) > self.config.max_duration:
+            return None
+
+        return sample
+
+
+class SpeechRecognitionDataset:
+    def __init__(self, datasets: list[str], sample_loader: callable) :
         self.samples = []
 
-        for tsv in dataset_tsv_list:
-            with open(tsv, 'r', encoding='utf8') as f:
-                tsv_reader = csv.DictReader(f, delimiter='\t')
-                for item in tsv_reader:
-                    # sample filter
-                    if float(item['DURATION']) <= min_utt_duration:
-                        continue
-                    if float(item['DURATION']) >= max_utt_duration:
-                        continue
-
-                    # only extract selected fields
-                    sample = {}
-                    for x in pick_fields:
-                        if x == 'DURATION':
-                            sample[x] = float(item[x])
-                        else:
-                            sample[x] = item[x]
-
-                    self.samples.append(sample)
+        for dataset in datasets:
+            with open(dataset, 'r', encoding='utf8') as f:
+                items = csv.DictReader(f, delimiter='\t')
+                for item in items:
+                    sample = sample_loader(item)
+                    if sample != None:
+                        self.samples.append(sample)
     
     def __getitem__(self, index: int):
         return self.samples[index]
@@ -60,41 +91,17 @@ class SpeechRecognitionDataset:
         return len(self.samples)
 
 
-def ReadAndResampleAudio(audio_sample: dict, target_sample_rate: int) :
-    '''
-    sample:
-    {
-        'AUDIO': '/path/to/audio.xxx'
-        'BEGIN': 0.5,
-        'DURATION': 1.2,
-    }
-    `BEGIN` is optional, with 0.0 as default value
-    `DURATION` is optional, with the duration of entire audio file as default value
-
-    NOTE: the usage of multi-channel hasn't been tested yet.
-
-    '''
-    audio_path = audio_sample['AUDIO']
-    # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
-    # torchaudio.info():
-    #   -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
-    info = torchaudio.info(audio_path)
-    sample_rate = info.sample_rate
-    entire_audio_duration = float(info.num_frames) / float(info.sample_rate)
-
-    begin = audio_sample.get("BEGIN", 0.0)
-    duration = audio_sample.get("DURATION", entire_audio_duration)
-
+def ReadAndResampleAudio(sample: Sample, target_sample_rate: int) :
     waveform, _ = torchaudio.load(
-        audio_path,
-        frame_offset = int(begin * sample_rate),
-        num_frames = int(duration * sample_rate),
+        sample.audio,
+        frame_offset = int(sample.audio_info.sample_rate * sample.begin),
+        num_frames   = int(sample.audio_info.sample_rate * sample.duration),
         channels_first = True,
     )
 
-    if sample_rate != target_sample_rate:
+    if sample.audio_info.sample_rate != target_sample_rate:
         # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#resampling
-        waveform = torchaudio.transforms.Resample(sample_rate, target_sample_rate)(waveform)
+        waveform = torchaudio.transforms.Resample(sample.audio_info.sample_rate, target_sample_rate)(waveform)
     
     return waveform, target_sample_rate
 
@@ -119,57 +126,63 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
         energy_floor = G_EPSILON,
     )
 
+
 class DataProcessingPipeline:
-    def __init__(self, config, tokenizer):
+    def __init__(self, config, tokenizer = None, text_normalizer = None):
         self.config = config
+        self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
 
-    def __call__(self, minibatch):
-        new_minibatch = []
-        for sample in minibatch:
-            # create new copy so batched samples here will be garbage-collected after minibatch training
-            s = copy.deepcopy(sample)
-
+    def __call__(self, minibatch_samples):
+        minibatch = []
+        for sample in minibatch_samples:
             # raw audio loading and resampling
-            s['WAVEFORM'], s['SAMPLE_RATE'] = ReadAndResampleAudio(s, target_sample_rate = self.config.system_sample_rate)
+            waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.system_sample_rate)
+
+            # speed perturbation
+
+            # volumn perturbation
+
+            # reverb
+
+            # add noise
             
             # feature extraction
-            s['FEAT'] = ExtractFeature(s['WAVEFORM'], s['SAMPLE_RATE'], self.config)
+            feature = ExtractFeature(waveform, sample_rate, self.config)
 
-            # transcription tokenization
-            s['TOKEN_PIECES'] = self.tokenizer.EncodeAsPieces(s['TEXT'])
-            s['TOKEN_IDS'] = self.tokenizer.EncodeAsIds(s['TEXT'])
+            # specaug
 
-            new_minibatch.append(s)
+            text = sample.text
+            # text normalization
+            if self.text_normalizer:
+                text = self.text_normalizer(text)
 
-        return new_minibatch
+            # tokenization
+            token_pieces = self.tokenizer.EncodeAsPieces(text)
+            token_ids = self.tokenizer.EncodeAsIds(text)
+
+            minibatch.append(
+                (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
+            )
+
+        return minibatch
+
 
 def train():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument('--train_data', nargs='+')
-    parser.add_argument('--valid_data', nargs='*')
-    parser.add_argument('--test_data', nargs='*')
-    parser.add_argument('--tokenizer', type = str, required = True)
     parser.add_argument('--config', type = str, required = True)
-
     args = parser.parse_args()
     print(args, file=sys.stderr)
 
-    train_list, valid_list, test_list = args.train_data, args.valid_data, args.test_data
     config = OmegaConf.load(args.config)
+
+    # dataloaders
+    sampler_loader = SampleLoader(config.sample_loader)
+    train_dataset = SpeechRecognitionDataset(config.train_list, sampler_loader)
 
     # tokenizer
     tokenizer = spm.SentencePieceProcessor()
-    tokenizer.load(args.tokenizer)
-
-    # dataloaders
-    train_dataset = SpeechRecognitionDataset(
-        train_list,
-        pick_fields = ['ID', 'AUDIO', 'DURATION', 'TEXT'],
-        min_utt_duration = config.dataset.min_utt_duration,
-        max_utt_duration = config.dataset.max_utt_duration,
-    )
+    tokenizer.load(config.tokenizer.model)
 
     # datasets
     train_dataloader = torch.utils.data.DataLoader(
@@ -178,7 +191,7 @@ def train():
         batch_size = config.dataloader.batch_size, 
         drop_last = config.dataloader.drop_last,
         collate_fn = DataProcessingPipeline(config, tokenizer = tokenizer),
-        num_workers = 4,
+        #num_workers = 4,
     )
 
     for e in range(config.train.num_epochs):
@@ -188,6 +201,7 @@ def train():
 
 def test():
     pass
+
 
 if __name__ == '__main__':
     train()

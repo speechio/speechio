@@ -1,8 +1,26 @@
 system_sample_rate: 16000
 
+train_list:
+  - dataset/MINI/metadata.tsv
+
+sample_loader:
+  field_map:
+    id: ID
+    audio: AUDIO
+    begin: BEGIN
+    duration: DURATION
+    text: TEXT
+    speaker: SPEAKER
+
+  min_duration: 0.5
+  max_duration: 20.0
+
 dataset:
-  min_utt_duration: 0.5
-  max_utt_duration: 20.0
+  max_num_samples: 1e10
+
+tokenizer:
+  model: model/tokenizer/sentencepiece.model
+  vocab: model/tokenizer/sentencepiece.vocab
 
 dataloader:
   shuffle: True
@@ -15,4 +33,3 @@ feature:
 
 train:
   num_epochs: 1
-
