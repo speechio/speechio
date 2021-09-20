@@ -26,6 +26,7 @@ dataloader:
   shuffle: True
   batch_size: 16
   drop_last: False
+  num_workers: 0
 
 feature:
   num_mel_bins: 80

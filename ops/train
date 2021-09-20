@@ -128,7 +128,7 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
     )
 
 
-class DataProcessingPipeline:
+class DataPipeline:
     def __init__(self, config, tokenizer = None, text_normalizer = None):
         self.config = config
         self.text_normalizer = text_normalizer
@@ -169,7 +169,7 @@ class DataProcessingPipeline:
         return minibatch
 
 
-def train():
+def run():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type = str, required = True)
     args = parser.parse_args()
@@ -191,8 +191,8 @@ def train():
         shuffle = config.dataloader.shuffle,
         batch_size = config.dataloader.batch_size, 
         drop_last = config.dataloader.drop_last,
-        collate_fn = DataProcessingPipeline(config, tokenizer = tokenizer),
-        #num_workers = 4,
+        collate_fn = DataPipeline(config, tokenizer = tokenizer),
+        num_workers = config.dataloader.num_workers,
     )
 
     for e in range(config.train.num_epochs):
@@ -200,10 +200,11 @@ def train():
             print(F'----- {e}.{b} -----')
             print(batch)
 
+
 def test():
     pass
 
 
 if __name__ == '__main__':
-    train()
+    run()
     #test()
