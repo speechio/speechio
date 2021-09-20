@@ -40,8 +40,8 @@ class Sample:
 
 class SampleLoader:
     ''' callable wrapper class to load one dataset sample from a dict object containing info of an utterance,
-        input dict object are typically yielded by standard .tsv .jsonl .yaml reader.
-        
+        input info object is typically yielded by .tsv .jsonl .yaml file reader.
+
         return None if an utterance doesn't satisfy certain constraints, e.g. duration too short or too long
     '''
     def __init__(self, sample_loader_config):
