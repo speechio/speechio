@@ -191,16 +191,15 @@ def run():
     else:
         logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
-    # dataloaders
+    # data sets
     sample_loader = SampleLoader(config.sample_loader)
     train_dataset = Dataset(config.train_list, sample_loader)
 
-    # tokenizer
+    # data pipline
     tokenizer = Tokenizer(config.tokenizer)
-
     data_pipeline = DataPipeline(config, tokenizer = tokenizer)
 
-    # datasets
+    # data loaders
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, 
         shuffle = config.dataloader.shuffle,
@@ -210,6 +209,7 @@ def run():
         collate_fn = data_pipeline,
     )
 
+    # nnet training loop
     for e in range(config.training.num_epochs):
         for b, batch in enumerate(train_dataloader):
             logging.info(F'Epoch={e}, Batch={b}')
