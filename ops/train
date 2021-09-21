@@ -32,10 +32,7 @@ class Sample:
     duration: float = 0.0
     text: str = ''
     speaker: Any = None
-    # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
-    # torchaudio.info(sample.audio)
-    #   -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
-    audio_info: Any = None                    
+    audio_info: Any = None  # a place to hold entire-audio info such as codec, bit-width, sample_rate, num_channels etc.
 
 
 class SampleLoader:
@@ -59,6 +56,9 @@ class SampleLoader:
                     v = v
                 setattr(sample, f, v)
         
+        # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
+        # torchaudio.info(sample.audio)
+        #   -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
         sample.audio_info = torchaudio.info(sample.audio)
         
         if sample.duration == 0.0:
@@ -101,7 +101,6 @@ def ReadAndResampleAudio(sample: Sample, target_sample_rate: int) :
     )
 
     if sample.audio_info.sample_rate != target_sample_rate:
-        # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#resampling
         waveform = torchaudio.transforms.Resample(sample.audio_info.sample_rate, target_sample_rate)(waveform)
     
     return waveform, target_sample_rate
@@ -109,22 +108,19 @@ def ReadAndResampleAudio(sample: Sample, target_sample_rate: int) :
 
 def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
     '''
-    kaldi default: energy_floor=0.0 
-        (https://github.com/kaldi-asr/kaldi/blob/master/src/feat/feature-fbank.h#L56)
+    kaldi:
+        https://github.com/kaldi-asr/kaldi/blob/master/src/feat/mel-computations.h#L60
+        https://github.com/kaldi-asr/kaldi/blob/master/src/feat/feature-fbank.h#L62
 
-    torchaudio default: energy_floor=1.0 
-        (https://pytorch.org/audio/stable/compliance.kaldi.html)
-
-    `energy_floor` should only affect results when use_energy = `True`,
-    where in both toolkits, use_energy are switched to `False` by default
-    for safety we just set it to EPSILON
+    torchaudio:
+        https://pytorch.org/audio/stable/compliance.kaldi.html
     '''
     return torchaudio.compliance.kaldi.fbank(
         waveform,
         sample_frequency = sample_rate,
         num_mel_bins = config.feature.num_mel_bins,
         dither = config.feature.dither,
-        energy_floor = G_EPSILON,
+        energy_floor = G_EPSILON, # Kaldi default = 0.0; torchaudio default = 1.0; doesn't matter if use_energy = False (default in both)
     )
 
 
