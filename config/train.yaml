@@ -33,7 +33,7 @@ feature:
   num_mel_bins: 80
   dither: 1.0
 
-train:
+training:
   num_epochs: 1
 
 model_sample_rate: 16000

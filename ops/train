@@ -81,8 +81,7 @@ class Dataset:
 
         for dataset in datasets:
             with open(dataset, 'r', encoding='utf8') as f:
-                items = csv.DictReader(f, delimiter='\t')
-                for item in items:
+                for item in csv.DictReader(f, delimiter='\t'):
                     sample = sample_loader(item)
                     if sample != None:
                         self.samples.append(sample)
@@ -126,8 +125,19 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
     )
 
 
+class Tokenizer:
+    def __init__(self, model):
+        self.tokenizer = spm.SentencePieceProcessor()
+        self.tokenizer.load(model)
+    
+    def __call__(self, text) -> tuple[list[str], list[int]] :
+        token_pieces = self.tokenizer.EncodeAsPieces(text)
+        token_ids = self.tokenizer.EncodeAsIds(text)
+        return token_pieces, token_ids
+
+
 class DataPipeline:
-    def __init__(self, config, tokenizer = None, text_normalizer = None):
+    def __init__(self, config, tokenizer: callable, text_normalizer: callable = None):
         self.config = config
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
@@ -157,8 +167,7 @@ class DataPipeline:
                 text = self.text_normalizer(text)
 
             # tokenization
-            token_pieces = self.tokenizer.EncodeAsPieces(text)
-            token_ids = self.tokenizer.EncodeAsIds(text)
+            token_pieces, token_ids = self.tokenizer(text)
 
             minibatch.append(
                 (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
@@ -190,8 +199,9 @@ def run():
     train_dataset = Dataset(config.train_list, sample_loader)
 
     # tokenizer
-    tokenizer = spm.SentencePieceProcessor()
-    tokenizer.load(config.tokenizer.model)
+    tokenizer = Tokenizer(config.tokenizer.model)
+
+    data_pipeline = DataPipeline(config, tokenizer = tokenizer)
 
     # datasets
     train_dataloader = torch.utils.data.DataLoader(
@@ -199,11 +209,11 @@ def run():
         shuffle = config.dataloader.shuffle,
         batch_size = config.dataloader.batch_size, 
         drop_last = config.dataloader.drop_last,
-        collate_fn = DataPipeline(config, tokenizer = tokenizer),
         num_workers = config.dataloader.num_workers,
+        collate_fn = data_pipeline,
     )
 
-    for e in range(config.train.num_epochs):
+    for e in range(config.training.num_epochs):
         for b, batch in enumerate(train_dataloader):
             logging.info(F'Epoch={e}, Batch={b}')
             print(batch)
