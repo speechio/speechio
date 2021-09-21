@@ -1,4 +1,4 @@
-system_sample_rate: 16000
+logging: config/logging.yaml
 
 train_list:
   - dataset/MINI/metadata.tsv
@@ -34,3 +34,5 @@ feature:
 
 train:
   num_epochs: 1
+
+model_sample_rate: 16000

@@ -8,16 +8,18 @@
 import os, sys
 import argparse
 import csv
-import copy
 from typing import Optional, Any
 from dataclasses import dataclass
+import logging.config
 
 import math
 import torch
 import torchaudio#; torchaudio.set_audio_backend('sox_io')
 
-import sentencepiece as spm
 from omegaconf import OmegaConf
+import yaml
+import sentencepiece as spm
+
 
 # Global Constants
 G_INT16MAX = 32768
@@ -134,7 +136,7 @@ class DataPipeline:
         minibatch = []
         for sample in minibatch_samples:
             # raw audio loading and resampling
-            waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.system_sample_rate)
+            waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.model_sample_rate)
 
             # speed perturbation
 
@@ -171,7 +173,17 @@ def run():
     args = parser.parse_args()
 
     config = OmegaConf.load(args.config)
-    print(config, file = sys.stderr)
+    print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
+
+    # setup logging
+    if os.path.isfile(config.logging):
+        with open(config.logging, 'r', encoding='utf8') as f:
+            logging.config.dictConfig(yaml.safe_load(f))
+    else:
+        logging.basicConfig(
+            stream=sys.stderr, level=logging.INFO,
+            format='%(asctime)s [%(levelname)s] %(message)s'
+        )
 
     # dataloaders
     sample_loader = SampleLoader(config.sample_loader)
@@ -193,7 +205,7 @@ def run():
 
     for e in range(config.train.num_epochs):
         for b, batch in enumerate(train_dataloader):
-            print(F'----- {e}.{b} -----')
+            logging.info(F'Epoch={e}, Batch={b}')
             print(batch)
 
 
