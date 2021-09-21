@@ -12,7 +12,7 @@ def SentencePieceTrain(config, text, language, model):
     
     dst = os.path.dirname(args.model)
     if not os.path.isdir(dst):
-        os.mkdir(dst)
+        os.makedirs(dst)
 
     config = OmegaConf.load(config)['sentencepiece'][language]
     trainer_spec = (
