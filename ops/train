@@ -43,8 +43,8 @@ class SampleLoader:
 
         return None if an utterance doesn't satisfy certain constraints, e.g. duration too short or too long
     '''
-    def __init__(self, sample_loader_config):
-        self.config = sample_loader_config
+    def __init__(self, config):
+        self.config = config
     
     def __call__(self, utterance_info: dict) -> Optional[Sample] :
         sample = Sample()
@@ -119,16 +119,16 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
     return torchaudio.compliance.kaldi.fbank(
         waveform,
         sample_frequency = sample_rate,
-        num_mel_bins = config.feature.num_mel_bins,
-        dither = config.feature.dither,
+        num_mel_bins = config.num_mel_bins,
+        dither = config.dither,
         energy_floor = G_EPSILON, # Kaldi default = 0.0; torchaudio default = 1.0; doesn't matter if use_energy = False (default in both)
     )
 
 
 class Tokenizer:
-    def __init__(self, model):
+    def __init__(self, config):
         self.tokenizer = spm.SentencePieceProcessor()
-        self.tokenizer.load(model)
+        self.tokenizer.load(config.model)
     
     def __call__(self, text) -> tuple[list[str], list[int]] :
         token_pieces = self.tokenizer.EncodeAsPieces(text)
@@ -157,7 +157,7 @@ class DataPipeline:
             # add noise
             
             # feature extraction
-            feature = ExtractFeature(waveform, sample_rate, self.config)
+            feature = ExtractFeature(waveform, sample_rate, self.config.feature)
 
             # specaug
 
@@ -189,17 +189,14 @@ def run():
         with open(config.logging, 'r', encoding='utf8') as f:
             logging.config.dictConfig(yaml.safe_load(f))
     else:
-        logging.basicConfig(
-            stream=sys.stderr, level=logging.INFO,
-            format='%(asctime)s [%(levelname)s] %(message)s'
-        )
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
     # dataloaders
     sample_loader = SampleLoader(config.sample_loader)
     train_dataset = Dataset(config.train_list, sample_loader)
 
     # tokenizer
-    tokenizer = Tokenizer(config.tokenizer.model)
+    tokenizer = Tokenizer(config.tokenizer)
 
     data_pipeline = DataPipeline(config, tokenizer = tokenizer)
 
