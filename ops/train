@@ -132,7 +132,7 @@ class DataPipeline:
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
 
-    def __call__(self, minibatch_samples):
+    def __call__(self, minibatch_samples: list[Sample]):
         minibatch = []
         for sample in minibatch_samples:
             # raw audio loading and resampling
