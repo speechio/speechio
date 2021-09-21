@@ -2,6 +2,7 @@ logging: config/logging.yaml
 
 train_list:
   - dataset/MINI/metadata.tsv
+  - dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
 
 sample_loader:
   field_map:
