@@ -1,8 +1,13 @@
 logging: config/logging.yaml
 
-train_list:
-  - dataset/MINI/metadata.tsv
-  - dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
+
+dataset:
+  train:
+    max_num_samples: 33
+    subsets:
+      - dataset/MINI/metadata.tsv
+      - dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
+
 
 sample_loader:
   field_map:
@@ -15,13 +20,12 @@ sample_loader:
 
   min_duration: 0.5
   max_duration: 20.0
-
-dataset:
-  max_num_samples: 1e10
+  
 
 tokenizer:
   model: model/tokenizer/sentencepiece.model
   vocab: model/tokenizer/sentencepiece.vocab
+
 
 dataloader:
   shuffle: True
@@ -29,11 +33,14 @@ dataloader:
   drop_last: False
   num_workers: 0
 
+
 feature:
   num_mel_bins: 80
   dither: 1.0
 
+
 training:
   num_epochs: 1
+
 
 model_sample_rate: 16000

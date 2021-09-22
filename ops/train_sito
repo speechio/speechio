@@ -76,15 +76,17 @@ class SampleLoader:
 
 
 class Dataset:
-    def __init__(self, datasets: list[str], sample_loader: callable) :
+    def __init__(self, config_dataset, sample_loader: callable) :
         self.samples = []
 
-        for dataset in datasets:
-            with open(dataset, 'r', encoding='utf8') as f:
+        for subset in config_dataset.subsets:
+            with open(subset, 'r', encoding='utf8') as f:
                 for item in csv.DictReader(f, delimiter='\t'):
                     sample = sample_loader(item)
                     if sample != None:
                         self.samples.append(sample)
+                    if len(self.samples) == config_dataset.max_num_samples:
+                        return
     
     def __getitem__(self, index: int):
         return self.samples[index]
@@ -193,7 +195,7 @@ def run():
 
     # data sets
     sample_loader = SampleLoader(config.sample_loader)
-    train_dataset = Dataset(config.train_list, sample_loader)
+    train_dataset = Dataset(config.dataset.train, sample_loader = sample_loader)
 
     # data pipline
     tokenizer = Tokenizer(config.tokenizer)
