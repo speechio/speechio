@@ -4,7 +4,7 @@ formatters:
   simple:
     format: "%(asctime)s %(name)s [%(filename)s:%(lineno)d] [%(levelname)s] %(message)s"
   console:
-    format: "%(asctime)s [%(levelname)s] %(message)s"
+    format: "\x1B[1;34m%(asctime)s [%(levelname)s] %(message)s\x1B[0m"
 
 handlers:
   console:
