@@ -52,7 +52,7 @@ class SampleLoader:
             assert hasattr(sample, f), F'field:{f} <- column:{c} mapping failed, no such field'
             v = utterance_info.get(c, None)
             if v:
-                if c in ['DURATION', 'BEGIN', ]:
+                if f in ['duration', 'begin', ]:
                     v = float(v)
                 else:
                     v = v
