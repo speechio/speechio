@@ -38,22 +38,25 @@ class Sample:
 
 
 class SampleLoader:
-    ''' callable wrapper class to load one dataset sample from a dict object containing info of an utterance,
-        input info object is typically yielded by .tsv .jsonl .yaml file reader.
+    ''' callable wrapper class：
+        Load one dataset sample from a dict with one-utterance info,
+        input dict is typically yielded by .tsv .jsonl .yaml file reader.
 
         return None if an utterance doesn't satisfy certain constraints, e.g. duration too short or too long
     '''
     def __init__(self, config):
         self.config = config
     
-    def __call__(self, utterance_info: dict) -> Optional[Sample] :
+    def __call__(self, utt: dict, dataset_root: str = '') -> Optional[Sample] :
         sample = Sample()
         for f, c in self.config.field_map.items():
             assert hasattr(sample, f), F'field:{f} <- column:{c} mapping failed, no such field'
-            v = utterance_info.get(c, None)
+            v = utt.get(c, None)
             if v:
                 if f in ['duration', 'begin', ]:
                     v = float(v)
+                elif f == 'audio':
+                    v = os.path.join(dataset_root, v)
                 else:
                     v = v
                 setattr(sample, f, v)
@@ -80,13 +83,27 @@ class Dataset:
         self.samples = []
 
         for subset in config_dataset.subsets:
-            with open(subset, 'r', encoding='utf8') as f:
-                for item in csv.DictReader(f, delimiter='\t'):
-                    sample = sample_loader(item)
+            if subset.max_num_samples <= 0:
+                continue
+
+            logging.info(F'Loading dataset: {subset.id} <- ({subset.root}, {subset.metadata})')
+            num_subset_samples = 0
+            with open(subset.metadata, 'r', encoding='utf8') as f:
+                if str.endswith(subset.metadata, '.tsv'):
+                    utterance_reader = csv.DictReader(f, delimiter='\t')
+                else:
+                    raise NotImplementedError
+
+                for utt in utterance_reader:
+                    sample = sample_loader(utt, dataset_root = subset.root)
                     if sample != None:
                         self.samples.append(sample)
-                    if len(self.samples) == config_dataset.max_num_samples:
-                        return
+                        num_subset_samples += 1
+                    if num_subset_samples >= subset.max_num_samples:
+                        break # early stop of current subset loading
+
+            logging.info(F'Loaded {num_subset_samples} samples from {subset.id}')
+                    
     
     def __getitem__(self, index: int):
         return self.samples[index]

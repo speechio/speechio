@@ -3,10 +3,17 @@ logging: config/logging.yaml
 
 dataset:
   train:
-    max_num_samples: 33
     subsets:
-      - dataset/MINI/metadata.tsv
-      - dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
+      -
+        id: MINI
+        root: dataset/MINI
+        metadata: dataset/MINI/metadata.tsv
+        max_num_samples: 1
+      -
+        id: SPEECHIO_ASR_ZH00000
+        root: dataset/SPEECHIO_ASR_ZH00000
+        metadata: dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
+        max_num_samples: 0
 
 
 sample_loader:
