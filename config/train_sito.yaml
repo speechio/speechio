@@ -13,7 +13,7 @@ dataset:
         id: SPEECHIO_ASR_ZH00000
         root: dataset/SPEECHIO_ASR_ZH00000
         metadata: dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
-        max_num_samples: 15
+        max_num_samples: 1e4
 
 
 sample_loader:
@@ -38,7 +38,7 @@ dataloader:
   shuffle: True
   batch_size: 16
   drop_last: False
-  num_workers: 0
+  num_workers: 2
 
 
 feature:
@@ -48,11 +48,16 @@ feature:
 
 training:
   num_epochs: 1
+  optimizer:
+    Adam:
+      lr: 0.001
 
 
 model_sample_rate: 16000
 
 model:
   idim: 80
-  hidden_layer_dim: 256
+  hidden_layer_dim: 4096
   odim: 4096
+
+

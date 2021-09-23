@@ -173,10 +173,9 @@ class DataPipeline:
         self.tokenizer = tokenizer
 
     def __call__(self, minibatch_samples: list[Sample]):
-        minibatch = []
         features = []
         labels = []
-
+        debug_helper = []
         for sample in minibatch_samples:
             # raw audio loading and resampling
             waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.model_sample_rate)
@@ -190,8 +189,7 @@ class DataPipeline:
             # add noise
             
             # feature extraction
-            feature = ExtractFeature(waveform, sample_rate, self.config.feature)
-            feature = feature.detach().numpy()
+            feature = ExtractFeature(waveform, sample_rate, self.config.feature).detach().numpy()
 
             # specaug
 
@@ -206,8 +204,8 @@ class DataPipeline:
             features.append(feature)
             labels.append(token_ids)
             
-            # store everything for debug purpose
-            minibatch.append(
+            # store everything here for debug purpose
+            debug_helper.append(
                 (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
             )
         
@@ -217,15 +215,15 @@ class DataPipeline:
         #   t: [0, max(t)) where t is Time domain length
         #   f: [0, F) where F is Frequency domain feature dim
         X = pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
-        XT = torch.tensor([ len(x) for x in features ])
+        X_length = torch.tensor([ len(x) for x in features ])
 
         # Y[b, l]
         #   b: [0, B)
         #   l: [0, max(l)) where l is Label length
         Y = pad_sequence([ torch.tensor(y) for y in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
-        YL = torch.tensor([ len(y) for y in labels ])
+        Y_length = torch.tensor([ len(y) for y in labels ])
 
-        return X, XT, Y, YL, minibatch
+        return X, X_length, Y, Y_length, debug_info
 
 
 class Model(torch.nn.Module):
@@ -234,6 +232,8 @@ class Model(torch.nn.Module):
         self.config = config
         self.nnet = nn.Sequential(
             nn.Linear(config.idim, config.hidden_layer_dim),
+            nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
             nn.ReLU(),
             nn.Linear(config.hidden_layer_dim, config.odim),
             nn.Softmax(dim = 2),
@@ -277,20 +277,21 @@ def run():
         collate_fn = data_pipeline,
     )
 
-    model = Model(config.model)
+    # model
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    model = Model(config.model).to(device)
+    num_params = sum(param.numel() for param in model.parameters())
+    logging.info(F'Model number of params:{num_params/float(1e6):.2f}M')
+
+    # optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr = config.training.optimizer.Adam.lr)
 
     for e in range(config.training.num_epochs):
         for b, minibatch in enumerate(train_dataloader):
             logging.info(F'Epoch={e}, Batch={b}')
-            X, XT, Y, YL, debug = minibatch
-            #logging.debug(debug)
-            #print(X)
-            print(F'X:{X.shape}, XT:{XT}')
-            #print(Y)
-            print(F'Y:{Y.shape}, YL:{YL}')
+            X, X_length, Y, Y_length, debug_helper = minibatch
+            X , X_length, Y, Y_length = X.to(device), X_length.to(device), Y.to(device), Y_length.to(device)
             pred = model(X)
-            #print(pred)
-            print(F'pred:{pred.shape}')
 
 
 def test():
