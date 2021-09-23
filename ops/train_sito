@@ -85,8 +85,8 @@ class Dataset:
         for subset in config_dataset.subsets:
             if subset.max_num_samples <= 0:
                 continue
-
             logging.info(F'Loading dataset: {subset.id} <- ({subset.root}, {subset.metadata})')
+
             num_subset_samples = 0
             with open(subset.metadata, 'r', encoding='utf8') as f:
                 if str.endswith(subset.metadata, '.tsv'):
