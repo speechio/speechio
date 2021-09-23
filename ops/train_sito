@@ -24,14 +24,13 @@ from torch.nn.utils.rnn import pad_sequence
 import torchaudio#; torchaudio.set_audio_backend('sox_io')
 
 
-
-
 # Global Constants
 G_INT16MAX = 32768
 G_EPSILON = 1e-10
 G_LOG_EPSILON = math.log(G_EPSILON)
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_LABEL_PADDING_VALUE = int(-1)
+
 
 @dataclass
 class Sample:
@@ -56,9 +55,9 @@ class SampleLoader:
     
     def __call__(self, utt: dict, dataset_root: str = '') -> Optional[Sample] :
         sample = Sample()
-        for f, c in self.config.field_map.items():
-            assert hasattr(sample, f), F'field:{f} <- column:{c} mapping failed, no such field'
-            v = utt.get(c, None)
+        for f, attr in self.config.field_map.items():
+            assert hasattr(sample, f), F'field:{f} <- attr:{attr} mapping failed, no such field'
+            v = utt.get(attr, None)
             if v:
                 if f in ['duration', 'begin', ]:
                     v = float(v)
@@ -207,31 +206,37 @@ class DataPipeline:
             features.append(feature)
             labels.append(token_ids)
             
-            # store everything in this for debug purpose
+            # store everything for debug purpose
             minibatch.append(
                 (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
             )
         
         # sequence padding & minibatch packing
+        # X[b, t, f]
+        #   b: [0, B) where B is Batch_size
+        #   t: [0, max(t)) where t is Time domain length
+        #   f: [0, F) where F is Frequency domain feature dim
         X = pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
+        XT = torch.tensor([ len(x) for x in features ])
+
+        # Y[b, l]
+        #   b: [0, B)
+        #   l: [0, max(l)) where l is Label length
         Y = pad_sequence([ torch.tensor(y) for y in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
-        XL = torch.tensor([ len(x) for x in features ])
         YL = torch.tensor([ len(y) for y in labels ])
 
-        return X, Y, XL, YL, minibatch
+        return X, XT, Y, YL, minibatch
 
 
-class NNet(torch.nn.Module):
+class Model(torch.nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
         self.nnet = nn.Sequential(
             nn.Linear(config.idim, config.hidden_layer_dim),
             nn.ReLU(),
-            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
-            nn.ReLU(),
-            #nn.Linear(config.hidden_layer_dim, config.odim),
-            nn.Softmax(),
+            nn.Linear(config.hidden_layer_dim, config.odim),
+            nn.Softmax(dim = 2),
         )
     
     def forward(self, x):
@@ -272,19 +277,20 @@ def run():
         collate_fn = data_pipeline,
     )
 
-    sito = NNet(config.nnet)
+    model = Model(config.model)
 
-    # nnet training loop
     for e in range(config.training.num_epochs):
         for b, minibatch in enumerate(train_dataloader):
             logging.info(F'Epoch={e}, Batch={b}')
-            X, Y, XL, YL, debug = minibatch
+            X, XT, Y, YL, debug = minibatch
             #logging.debug(debug)
-            print(X)
-            logging.info(F'X:{X.shape}, XL:{XL}')
-            print(Y)
-            logging.info(F'Y:{Y.shape}, YL:{YL}')
-            Y_hat = sito(X)
+            #print(X)
+            print(F'X:{X.shape}, XT:{XT}')
+            #print(Y)
+            print(F'Y:{Y.shape}, YL:{YL}')
+            pred = model(X)
+            #print(pred)
+            print(F'pred:{pred.shape}')
 
 
 def test():
