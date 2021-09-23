@@ -30,8 +30,8 @@ import torchaudio#; torchaudio.set_audio_backend('sox_io')
 G_INT16MAX = 32768
 G_EPSILON = 1e-10
 G_LOG_EPSILON = math.log(G_EPSILON)
-G_PADDING_TOKEN_ID = int(-1)
-G_PADDING_VALUE = float(0.0)
+G_FEATURE_PADDING_VALUE = float(0.0)
+G_LABEL_PADDING_VALUE = int(-1)
 
 @dataclass
 class Sample:
@@ -174,11 +174,10 @@ class DataPipeline:
         self.tokenizer = tokenizer
 
     def __call__(self, minibatch_samples: list[Sample]):
-        keys = []
+        minibatch = []
         features = []
-        feature_lengths = []
         labels = []
-        label_lengths = []
+
         for sample in minibatch_samples:
             # raw audio loading and resampling
             waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.model_sample_rate)
@@ -205,22 +204,21 @@ class DataPipeline:
             # tokenization
             token_pieces, token_ids = self.tokenizer(text)
 
-            keys.append(sample.id)
             features.append(feature)
-            feature_lengths.append(len(feature))
             labels.append(token_ids)
-            label_lengths.append(len(token_ids))
-            # minibatch.append(
-            #     (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
-            # )
+            
+            # store everything in this for debug purpose
+            minibatch.append(
+                (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
+            )
         
-        # Tensor packing & padding
-        X = pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_PADDING_VALUE)
-        Y = pad_sequence([ torch.tensor(y) for y in labels ], batch_first = True, padding_value = G_PADDING_TOKEN_ID)
-        XL = torch.tensor(feature_lengths)
-        YL = torch.tensor(label_lengths)
+        # sequence padding & minibatch packing
+        X = pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
+        Y = pad_sequence([ torch.tensor(y) for y in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
+        XL = torch.tensor([ len(x) for x in features ])
+        YL = torch.tensor([ len(y) for y in labels ])
 
-        return keys, X, Y, XL, YL
+        return X, Y, XL, YL, minibatch
 
 
 class NNet(torch.nn.Module):
@@ -232,6 +230,7 @@ class NNet(torch.nn.Module):
             nn.ReLU(),
             nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
             nn.ReLU(),
+            #nn.Linear(config.hidden_layer_dim, config.odim),
             nn.Softmax(),
         )
     
@@ -277,9 +276,15 @@ def run():
 
     # nnet training loop
     for e in range(config.training.num_epochs):
-        for b, batch in enumerate(train_dataloader):
+        for b, minibatch in enumerate(train_dataloader):
             logging.info(F'Epoch={e}, Batch={b}')
-            print(batch)
+            X, Y, XL, YL, debug = minibatch
+            #logging.debug(debug)
+            print(X)
+            logging.info(F'X:{X.shape}, XL:{XL}')
+            print(Y)
+            logging.info(F'Y:{Y.shape}, YL:{YL}')
+            Y_hat = sito(X)
 
 
 def test():
