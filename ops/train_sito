@@ -11,20 +11,27 @@ import csv
 from typing import Optional, Any
 from dataclasses import dataclass
 import logging.config
-
 import math
-import torch
-import torchaudio#; torchaudio.set_audio_backend('sox_io')
 
 from omegaconf import OmegaConf
 import yaml
 import sentencepiece as spm
+
+import numpy
+import torch
+import torch.nn as nn
+from torch.nn.utils.rnn import pad_sequence
+import torchaudio#; torchaudio.set_audio_backend('sox_io')
+
+
 
 
 # Global Constants
 G_INT16MAX = 32768
 G_EPSILON = 1e-10
 G_LOG_EPSILON = math.log(G_EPSILON)
+G_PADDING_TOKEN_ID = int(-1)
+G_PADDING_VALUE = float(0.0)
 
 @dataclass
 class Sample:
@@ -103,6 +110,11 @@ class Dataset:
                         break # early stop of current subset loading
 
             logging.info(F'Loaded {num_subset_samples} samples from {subset.id}')
+        
+        # length sort
+
+        # shuffle
+
                     
     
     def __getitem__(self, index: int):
@@ -162,7 +174,11 @@ class DataPipeline:
         self.tokenizer = tokenizer
 
     def __call__(self, minibatch_samples: list[Sample]):
-        minibatch = []
+        keys = []
+        features = []
+        feature_lengths = []
+        labels = []
+        label_lengths = []
         for sample in minibatch_samples:
             # raw audio loading and resampling
             waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.model_sample_rate)
@@ -177,6 +193,7 @@ class DataPipeline:
             
             # feature extraction
             feature = ExtractFeature(waveform, sample_rate, self.config.feature)
+            feature = feature.detach().numpy()
 
             # specaug
 
@@ -188,11 +205,39 @@ class DataPipeline:
             # tokenization
             token_pieces, token_ids = self.tokenizer(text)
 
-            minibatch.append(
-                (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
-            )
+            keys.append(sample.id)
+            features.append(feature)
+            feature_lengths.append(len(feature))
+            labels.append(token_ids)
+            label_lengths.append(len(token_ids))
+            # minibatch.append(
+            #     (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
+            # )
+        
+        # Tensor packing & padding
+        X = pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_PADDING_VALUE)
+        Y = pad_sequence([ torch.tensor(y) for y in labels ], batch_first = True, padding_value = G_PADDING_TOKEN_ID)
+        XL = torch.tensor(feature_lengths)
+        YL = torch.tensor(label_lengths)
 
-        return minibatch
+        return keys, X, Y, XL, YL
+
+
+class NNet(torch.nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.nnet = nn.Sequential(
+            nn.Linear(config.idim, config.hidden_layer_dim),
+            nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+            nn.ReLU(),
+            nn.Softmax(),
+        )
+    
+    def forward(self, x):
+        y = self.nnet(x)
+        return y
 
 
 def run():
@@ -227,6 +272,8 @@ def run():
         num_workers = config.dataloader.num_workers,
         collate_fn = data_pipeline,
     )
+
+    sito = NNet(config.nnet)
 
     # nnet training loop
     for e in range(config.training.num_epochs):
