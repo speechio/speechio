@@ -223,7 +223,7 @@ class DataPipeline:
         Y = pad_sequence([ torch.tensor(y) for y in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
         Y_length = torch.tensor([ len(y) for y in labels ])
 
-        return X, X_length, Y, Y_length, debug_info
+        return X, X_length, Y, Y_length, debug_helper
 
 
 class Model(torch.nn.Module):
@@ -284,7 +284,7 @@ def run():
     total_params, trainable_params = 0, 0
     for param in model.parameters():
         total_params += param.numel()
-        if param.require_grad:
+        if param.requires_grad:
             trainable_params += param.numel()
 
     logging.info(F'Total params:{total_params/float(1e6):.2f}M')
