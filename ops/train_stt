@@ -306,8 +306,10 @@ def run():
 
     for e in range(config.training.num_epochs):
         logging.info(F'Epoch={e}')
-        num_utts = 0
+
+        # training
         total_loss = 0.0
+        num_utts = 0
         for b, minibatch in enumerate(train_dl):
             X, L, X_lens, L_lens, _ = minibatch
             batch_size = X.shape[0]
@@ -318,19 +320,19 @@ def run():
             total_loss += loss
             num_utts += batch_size
             logging.info(F'{e}.{b} loss={(loss / batch_size):.2f}')
-        logging.info(F'TRAIN[{e}] loss={(total_loss/num_utts):.2f}')
+        logging.info(F'TRAIN[{e}] loss={(total_loss / num_utts):.2f}')
         
-        
+        # validation
+        total_loss = 0.0
+        num_utts = 0
         with torch.no_grad():
-            total_loss = 0.0
-            num_utts = 0
             for b, minibatch in enumerate(valid_dl):
                 X, L, X_lens, L_lens, _ = minibatch
                 batch_size = X.shape[0]
-                loss = Loss(model(X), L, X_lens, L_lens)
+                loss = Loss(model(X), L, X_lens, L_lens)         
                 total_loss += loss.item()
                 num_utts += batch_size
-            logging.info(F'VALID[{e}] loss={(total_loss / num_utts):.2f}')
+        logging.info(F'VALID[{e}] loss={(total_loss / num_utts):.2f}')
 
 
 def test():
