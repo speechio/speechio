@@ -172,11 +172,11 @@ class DataPipeline:
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
 
-    def __call__(self, minibatch_samples: list[Sample]):
+    def __call__(self, samples: list[Sample]):
         features = []
         labels = []
-        debug_helper = []
-        for sample in minibatch_samples:
+        minibatch_helper = []
+        for sample in samples:
             # raw audio loading and resampling
             waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.model_sample_rate)
 
@@ -205,7 +205,7 @@ class DataPipeline:
             labels.append(token_ids)
             
             # store everything here for debug purpose
-            debug_helper.append(
+            minibatch_helper.append(
                 (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
             )
         
@@ -223,7 +223,7 @@ class DataPipeline:
         Y = pad_sequence([ torch.tensor(y) for y in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
         Y_length = torch.tensor([ len(y) for y in labels ])
 
-        return X, X_length, Y, Y_length, debug_helper
+        return X, X_length, Y, Y_length, minibatch_helper
 
 
 class Model(torch.nn.Module):
@@ -233,8 +233,8 @@ class Model(torch.nn.Module):
         self.nnet = nn.Sequential(
             nn.Linear(config.idim, config.hidden_layer_dim),
             nn.ReLU(),
-            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
-            nn.ReLU(),
+#            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+#            nn.ReLU(),
             nn.Linear(config.hidden_layer_dim, config.odim),
             nn.Softmax(dim = 2),
         )
@@ -280,15 +280,8 @@ def run():
     # model
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = Model(config.model).to(device)
-
-    total_params, trainable_params = 0, 0
-    for param in model.parameters():
-        total_params += param.numel()
-        if param.requires_grad:
-            trainable_params += param.numel()
-
-    logging.info(F'Total params:{total_params/float(1e6):.2f}M')
-    logging.info(F'Trainable params:{trainable_params/float(1e6):.2f}M')
+    logging.info(F'Total params:{sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M')
+    logging.info(F'Trainable params:{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.training.optimizer.Adam.lr)
