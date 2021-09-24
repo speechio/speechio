@@ -20,7 +20,6 @@ import sentencepiece as spm
 import numpy
 import torch
 import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence
 import torchaudio#; torchaudio.set_audio_backend('sox_io')
 
 
@@ -211,14 +210,14 @@ class DataPipeline:
         
         # sequence padding & minibatch packing
         # X of shape [batch, max(time), frequency]
-        X = pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
+        X = torch.nn.utils.rnn.pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
         X_lens = torch.tensor([ len(x) for x in features ])
 
-        # Y of shape [batch, max(len(label_tokens))]
-        Y = pad_sequence([ torch.tensor(y) for y in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
-        Y_lens = torch.tensor([ len(y) for y in labels ])
+        # Y of shape [batch, max(label_length)]
+        L = torch.nn.utils.rnn.pad_sequence([ torch.tensor(l) for l in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
+        L_lens = torch.tensor([ len(l) for l in labels ])
 
-        return X, X_lens, Y, Y_lens, minibatch_bookkeeper
+        return X, L, X_lens, L_lens, minibatch_bookkeeper
 
 
 class Model(torch.nn.Module):
@@ -240,7 +239,7 @@ class Model(torch.nn.Module):
 
 
 def Loss(log_probs, targets, input_lens, target_lens, blank_index = 0, reduction="sum"):
-    log_probs = log_probs.transpose(0,1)
+    log_probs = torch.einsum("btv->tbv", log_probs)
     loss = torch.nn.functional.ctc_loss(
         log_probs,
         targets,
@@ -289,8 +288,8 @@ def run():
     # model
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = Model(config.model).to(device)
-    logging.info(F'Total params:{sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M')
-    logging.info(F'Trainable params:{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
+    logging.info(F'Total params:     {sum([ p.numel() for p in model.parameters()                    ])/float(1e6):.2f}M')
+    logging.info(F'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.training.optimizer.Adam.lr)
@@ -298,10 +297,10 @@ def run():
     for e in range(config.training.num_epochs):
         for b, minibatch in enumerate(train_dataloader):
             logging.info(F'Epoch={e}, Batch={b}')
-            X, X_lens, Y, Y_lens, minibatch_bookkeeper = minibatch
-            X , X_lens, Y, Y_lens = X.to(device), X_lens.to(device), Y.to(device), Y_lens.to(device)
-            log_probs = model(X)
-            loss = Loss(log_probs, Y, X_lens, Y_lens)
+            X, L, X_lens, L_lens, _ = minibatch
+            X, L, X_lens, L_lens = X.to(device), L.to(device), X_lens.to(device), L_lens.to(device)
+            Y = model(X)
+            loss = Loss(Y, L, X_lens, L_lens)
             print(loss)
             loss.backward()
             optimizer.step()

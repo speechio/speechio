@@ -13,7 +13,7 @@ dataset:
         id: SPEECHIO_ASR_ZH00000
         root: dataset/SPEECHIO_ASR_ZH00000
         metadata: dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
-        max_num_samples: 1e8
+        max_num_samples: 31
 
 
 sample_loader:
