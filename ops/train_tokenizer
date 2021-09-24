@@ -9,7 +9,6 @@ from omegaconf import OmegaConf
 def SentencePieceTrain(config, text, language, model):
     import sentencepiece as spm
     # https://colab.research.google.com/github/google/sentencepiece/blob/master/python/sentencepiece_python_module_example.ipynb
-    
     dst = os.path.dirname(args.model)
     if not os.path.isdir(dst):
         os.makedirs(dst)
@@ -21,6 +20,20 @@ def SentencePieceTrain(config, text, language, model):
         ' '.join([ F'--{k}={v}' for k,v in config.items()])
     )
     spm.SentencePieceTrainer.Train(trainer_spec)
+    '''
+    To check vocab ~ id list:
+      https://github.com/google/sentencepiece/issues/328
+
+    >>> import sentencepiece as spm
+    >>> sp = spm.SentencePieceProcessor()
+    >>> sp.load('test_model.model')
+    True
+    >>> vocabs = [[sp.id_to_piece(id), id] for id in range(sp.get_piece_size())]
+    >>> vocabs
+    [['<unk>', 0], ['<s>', 1], ['</s>', 2], ['\r', 3], ['▁', 4], [',', 5], ...
+    
+    '''
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

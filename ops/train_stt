@@ -175,7 +175,7 @@ class DataPipeline:
     def __call__(self, samples: list[Sample]):
         features = []
         labels = []
-        minibatch_helper = []
+        minibatch_bookkeeper = []
         for sample in samples:
             # raw audio loading and resampling
             waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.model_sample_rate)
@@ -205,25 +205,20 @@ class DataPipeline:
             labels.append(token_ids)
             
             # store everything here for debug purpose
-            minibatch_helper.append(
+            minibatch_bookkeeper.append(
                 (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
             )
         
         # sequence padding & minibatch packing
-        # X[b, t, f]
-        #   b: [0, B) where B is Batch_size
-        #   t: [0, max(t)) where t is Time domain length
-        #   f: [0, F) where F is Frequency domain feature dim
+        # X of shape [batch, max(time), frequency]
         X = pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
-        X_length = torch.tensor([ len(x) for x in features ])
+        X_lens = torch.tensor([ len(x) for x in features ])
 
-        # Y[b, l]
-        #   b: [0, B)
-        #   l: [0, max(l)) where l is Label length
+        # Y of shape [batch, max(len(label_tokens))]
         Y = pad_sequence([ torch.tensor(y) for y in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
-        Y_length = torch.tensor([ len(y) for y in labels ])
+        Y_lens = torch.tensor([ len(y) for y in labels ])
 
-        return X, X_length, Y, Y_length, minibatch_helper
+        return X, X_lens, Y, Y_lens, minibatch_bookkeeper
 
 
 class Model(torch.nn.Module):
@@ -236,12 +231,26 @@ class Model(torch.nn.Module):
 #            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
 #            nn.ReLU(),
             nn.Linear(config.hidden_layer_dim, config.odim),
-            nn.Softmax(dim = 2),
+            nn.LogSoftmax(dim = 2),
         )
     
     def forward(self, x):
         y = self.nnet(x)
         return y
+
+
+def Loss(log_probs, targets, input_lens, target_lens, blank_index = 0, reduction="sum"):
+    log_probs = log_probs.transpose(0,1)
+    loss = torch.nn.functional.ctc_loss(
+        log_probs,
+        targets,
+        input_lens,
+        target_lens,
+        blank_index,
+        zero_infinity=True,
+        reduction=reduction,
+    )
+    return loss
 
 
 def run():
@@ -289,9 +298,14 @@ def run():
     for e in range(config.training.num_epochs):
         for b, minibatch in enumerate(train_dataloader):
             logging.info(F'Epoch={e}, Batch={b}')
-            X, X_length, Y, Y_length, debug_helper = minibatch
-            X , X_length, Y, Y_length = X.to(device), X_length.to(device), Y.to(device), Y_length.to(device)
-            pred = model(X)
+            X, X_lens, Y, Y_lens, minibatch_bookkeeper = minibatch
+            X , X_lens, Y, Y_lens = X.to(device), X_lens.to(device), Y.to(device), Y_lens.to(device)
+            log_probs = model(X)
+            loss = Loss(log_probs, Y, X_lens, Y_lens)
+            print(loss)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 
 
 def test():
