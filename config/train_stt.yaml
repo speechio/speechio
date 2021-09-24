@@ -8,12 +8,20 @@ dataset:
                 id: MINI
                 root: dataset/MINI
                 metadata: dataset/MINI/metadata.tsv
-                max_num_samples: 2
+                max_num_samples: 0
             -
                 id: SPEECHIO_ASR_ZH00000
                 root: dataset/SPEECHIO_ASR_ZH00000
                 metadata: dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
-                max_num_samples: 31
+                max_num_samples: 128
+    valid:
+        subsets:
+            -
+                id: MINI
+                root: dataset/MINI
+                metadata: dataset/MINI/metadata.tsv
+                max_num_samples: 2
+
 
 
 sample_loader:
@@ -47,7 +55,7 @@ feature:
 
 
 training:
-    num_epochs: 1
+    num_epochs: 10
     optimizer:
         Adam:
             lr: 0.001

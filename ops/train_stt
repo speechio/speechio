@@ -30,6 +30,7 @@ G_LOG_EPSILON = math.log(G_EPSILON)
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_LABEL_PADDING_VALUE = int(-1)
 
+G_DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 @dataclass
 class Sample:
@@ -217,7 +218,7 @@ class DataPipeline:
         L = torch.nn.utils.rnn.pad_sequence([ torch.tensor(l) for l in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
         L_lens = torch.tensor([ len(l) for l in labels ])
 
-        return X, L, X_lens, L_lens, minibatch_bookkeeper
+        return X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE), minibatch_bookkeeper
 
 
 class Model(torch.nn.Module):
@@ -270,6 +271,7 @@ def run():
     # data sets
     sample_loader = SampleLoader(config.sample_loader)
     train_dataset = Dataset(config.dataset.train, sample_loader = sample_loader)
+    valid_dataset = Dataset(config.dataset.valid, sample_loader = sample_loader)
 
     # data pipline
     tokenizer = Tokenizer(config.tokenizer)
@@ -285,9 +287,17 @@ def run():
         collate_fn = data_pipeline,
     )
 
+    valid_dataloader = torch.utils.data.DataLoader(
+        valid_dataset, 
+        shuffle = False,
+        batch_size = config.dataloader.batch_size, 
+        drop_last = False,
+        num_workers = config.dataloader.num_workers,
+        collate_fn = data_pipeline,
+    )
+
     # model
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model = Model(config.model).to(device)
+    model = Model(config.model).to(G_DEVICE)
     logging.info(F'Total params:     {sum([ p.numel() for p in model.parameters()                    ])/float(1e6):.2f}M')
     logging.info(F'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
 
@@ -295,16 +305,28 @@ def run():
     optimizer = torch.optim.Adam(model.parameters(), lr = config.training.optimizer.Adam.lr)
 
     for e in range(config.training.num_epochs):
+        logging.info(F'Epoch={e}')
+        num_utts = 0
+        total_loss = 0.0
         for b, minibatch in enumerate(train_dataloader):
-            logging.info(F'Epoch={e}, Batch={b}')
             X, L, X_lens, L_lens, _ = minibatch
-            X, L, X_lens, L_lens = X.to(device), L.to(device), X_lens.to(device), L_lens.to(device)
-            Y = model(X)
-            loss = Loss(Y, L, X_lens, L_lens)
-            print(loss)
+            loss = Loss(model(X), L, X_lens, L_lens)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
+            total_loss += loss
+            num_utts += X.shape[0]
+        logging.info(F'Training {e}.{b}, total loss={total_loss}, num_utts={num_utts}, avg={total_loss / num_utts}')
+        
+        with torch.no_grad():
+            total_loss = 0.0
+            num_utts = 0
+            for b, minibatch in enumerate(valid_dataloader):
+                X, L, X_lens, L_lens, _ = minibatch
+                loss = Loss(model(X), L, X_lens, L_lens)
+                total_loss += loss.item()
+                num_utts += X.shape[0]
+            logging.info(F'Validation {e}, total loss={total_loss}, num_utts={num_utts}, avg={total_loss / num_utts}')
 
 
 def test():
