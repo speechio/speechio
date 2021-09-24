@@ -278,7 +278,7 @@ def run():
     data_pipeline = DataPipeline(config, tokenizer = tokenizer)
 
     # data loaders
-    train_dataloader = torch.utils.data.DataLoader(
+    train_dl = torch.utils.data.DataLoader(
         train_dataset, 
         shuffle = config.dataloader.shuffle,
         batch_size = config.dataloader.batch_size, 
@@ -287,7 +287,7 @@ def run():
         collate_fn = data_pipeline,
     )
 
-    valid_dataloader = torch.utils.data.DataLoader(
+    valid_dl = torch.utils.data.DataLoader(
         valid_dataset, 
         shuffle = False,
         batch_size = config.dataloader.batch_size, 
@@ -308,7 +308,7 @@ def run():
         logging.info(F'Epoch={e}')
         num_utts = 0
         total_loss = 0.0
-        for b, minibatch in enumerate(train_dataloader):
+        for b, minibatch in enumerate(train_dl):
             X, L, X_lens, L_lens, _ = minibatch
             loss = Loss(model(X), L, X_lens, L_lens)
             loss.backward()
@@ -316,17 +316,17 @@ def run():
             optimizer.zero_grad()
             total_loss += loss
             num_utts += X.shape[0]
-        logging.info(F'Training {e}.{b}, total loss={total_loss}, num_utts={num_utts}, avg={total_loss / num_utts}')
+        logging.info(F'Training {e}.{b}, loss={total_loss / num_utts}')
         
         with torch.no_grad():
             total_loss = 0.0
             num_utts = 0
-            for b, minibatch in enumerate(valid_dataloader):
+            for b, minibatch in enumerate(valid_dl):
                 X, L, X_lens, L_lens, _ = minibatch
                 loss = Loss(model(X), L, X_lens, L_lens)
                 total_loss += loss.item()
                 num_utts += X.shape[0]
-            logging.info(F'Validation {e}, total loss={total_loss}, num_utts={num_utts}, avg={total_loss / num_utts}')
+            logging.info(F'Validation {e}, loss={total_loss / num_utts}')
 
 
 def test():
