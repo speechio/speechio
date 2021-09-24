@@ -280,8 +280,15 @@ def run():
     # model
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = Model(config.model).to(device)
-    num_params = sum(param.numel() for param in model.parameters())
-    logging.info(F'Model number of params:{num_params/float(1e6):.2f}M')
+
+    total_params, trainable_params = 0, 0
+    for param in model.parameters():
+        total_params += param.numel()
+        if param.require_grad:
+            trainable_params += param.numel()
+
+    logging.info(F'Total params:{total_params/float(1e6):.2f}M')
+    logging.info(F'Trainable params:{trainable_params/float(1e6):.2f}M')
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.training.optimizer.Adam.lr)
