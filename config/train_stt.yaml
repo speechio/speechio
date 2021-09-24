@@ -55,7 +55,7 @@ feature:
 
 
 training:
-    num_epochs: 10
+    num_epochs: 2
     optimizer:
         Adam:
             lr: 0.001
