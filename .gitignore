@@ -10,5 +10,8 @@ ossutil_output
 
 misc/*
 test/*
-dataset/*
+
 model/*
+
+dataset/*
+!dataset/generate_metadata.py
