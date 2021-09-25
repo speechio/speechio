@@ -213,7 +213,7 @@ class DataPipeline:
         X = torch.nn.utils.rnn.pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
         X_lens = torch.tensor([ len(x) for x in features ])
 
-        # Y of shape [batch, max(label_length)]
+        # L of shape [batch, max(label_length)]
         L = torch.nn.utils.rnn.pad_sequence([ torch.tensor(l) for l in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
         L_lens = torch.tensor([ len(l) for l in labels ])
 
