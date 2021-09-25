@@ -302,34 +302,39 @@ def run():
     for e in range(config.training.num_epochs):
         # training
         logging.info(F'Starting epoch {e} training.')
-        total_loss = 0.0
-        num_utts = 0
+        dataset_loss = 0.0
+        dataset_utts = 0
         for b, minibatch in enumerate(train_dl):
             X, L, X_lens, L_lens, _ = minibatch
             X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
             batch_size = X.shape[0]
-            loss = Loss(model(X), L, X_lens, L_lens)
+            batch_loss = Loss(model(X), L, X_lens, L_lens)
+
+            loss = batch_loss / batch_size
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            total_loss += loss
-            num_utts += batch_size
-            logging.info(F'  {e}.{b} loss={(loss / batch_size):.2f}')
-        logging.info(F'TRAIN[{e}] loss={(total_loss / num_utts):.2f}')
+            # scheduler.step()
+
+            dataset_loss += batch_loss.item()
+            dataset_utts += batch_size
+            logging.info(F'  {e}.{b} loss={loss:.2f}')
+        logging.info(F'TRAIN[{e}] average_loss={(dataset_loss / dataset_utts):.2f}')
         
         # validation
         logging.info(F'Starting epoch {e} validation.')
-        total_loss = 0.0
-        num_utts = 0
+        dataset_loss = 0.0
+        dataset_utts = 0
         with torch.no_grad():
             for b, minibatch in enumerate(valid_dl):
                 X, L, X_lens, L_lens, _ = minibatch
                 X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
                 batch_size = X.shape[0]
-                loss = Loss(model(X), L, X_lens, L_lens)         
-                total_loss += loss.item()
-                num_utts += batch_size
-        logging.info(F'VALID[{e}] loss={(total_loss / num_utts):.2f}')
+                batch_loss = Loss(model(X), L, X_lens, L_lens)
+
+                dataset_loss += batch_loss.item()
+                dataset_utts += batch_size
+        logging.info(F'VALID[{e}] average_loss={(dataset_loss / dataset_utts):.2f}')
 
 
 def test():
