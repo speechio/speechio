@@ -5,22 +5,27 @@ dataset:
     train:
         subsets:
             -
-                id: MINI
-                root: dataset/MINI
-                metadata: dataset/MINI/metadata.tsv
-                max_num_samples: 0
-            -
                 id: SPEECHIO_ASR_ZH00000
                 root: dataset/SPEECHIO_ASR_ZH00000
                 metadata: dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
-                max_num_samples: 128
-    valid:
-        subsets:
+                max_num_samples: 0
             -
                 id: MINI
                 root: dataset/MINI
                 metadata: dataset/MINI/metadata.tsv
                 max_num_samples: 2
+            -
+                id: AISHELL-1-TRAIN
+                root: /data/disk001/AISHELL-1/train
+                metadata: /data/disk001/AISHELL-1/train/metadata.tsv
+                max_num_samples: 1024
+    valid:
+        subsets:
+            -
+                id: AISHELL-1-DEV
+                root: /data/disk001/AISHELL-1/dev
+                metadata: /data/disk001/AISHELL-1/dev/metadata.tsv
+                max_num_samples: 100
 
 
 
@@ -55,7 +60,7 @@ feature:
 
 
 training:
-    num_epochs: 2
+    num_epochs: 10
     optimizer:
         Adam:
             lr: 0.001
