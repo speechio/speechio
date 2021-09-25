@@ -2,62 +2,69 @@ logging: config/logging.yaml
 
 
 dataset:
-  train:
-    subsets:
-      -
-        id: MINI
-        root: dataset/MINI
-        metadata: dataset/MINI/metadata.tsv
-        max_num_samples: 2
-      -
-        id: SPEECHIO_ASR_ZH00000
-        root: dataset/SPEECHIO_ASR_ZH00000
-        metadata: dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
-        max_num_samples: 15
+    train:
+        subsets:
+            -
+                id: MINI
+                root: dataset/MINI
+                metadata: dataset/MINI/metadata.tsv
+                max_num_samples: 0
+            -
+                id: SPEECHIO_ASR_ZH00000
+                root: dataset/SPEECHIO_ASR_ZH00000
+                metadata: dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
+                max_num_samples: 128
+    valid:
+        subsets:
+            -
+                id: MINI
+                root: dataset/MINI
+                metadata: dataset/MINI/metadata.tsv
+                max_num_samples: 2
+
 
 
 sample_loader:
-  field_map:
-    id: ID
-    audio: AUDIO
-    begin: BEGIN
-    duration: DURATION
-    text: TEXT
-    speaker: SPEAKER
+    field_map:
+        id: ID
+        audio: AUDIO
+        begin: BEGIN
+        duration: DURATION
+        text: TEXT
+        speaker: SPEAKER
 
-  min_duration: 0.5
-  max_duration: 20.0
-  
+    min_duration: 0.5
+    max_duration: 20.0
+    
 
 tokenizer:
-  model: model/tokenizer/sentencepiece.model
-  vocab: model/tokenizer/sentencepiece.vocab
+    model: model/tokenizer/sentencepiece.model
+    vocab: model/tokenizer/sentencepiece.vocab
 
 
 dataloader:
-  shuffle: True
-  batch_size: 16
-  drop_last: False
-  num_workers: 2
+    shuffle: True
+    batch_size: 16
+    drop_last: False
+    num_workers: 0
 
 
 feature:
-  num_mel_bins: 80
-  dither: 1.0
+    num_mel_bins: 80
+    dither: 1.0
 
 
 training:
-  num_epochs: 1
-  optimizer:
-    Adam:
-      lr: 0.001
+    num_epochs: 2
+    optimizer:
+        Adam:
+            lr: 0.001
+    gradient_clipping:
 
 
 model_sample_rate: 16000
 
 model:
-  idim: 80
-  hidden_layer_dim: 4096
-  odim: 4096
-
-
+    idim: 80
+    hidden_layer_dim: 128
+    odim: 4096

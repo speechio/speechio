@@ -20,7 +20,6 @@ import sentencepiece as spm
 import numpy
 import torch
 import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence
 import torchaudio#; torchaudio.set_audio_backend('sox_io')
 
 
@@ -31,6 +30,7 @@ G_LOG_EPSILON = math.log(G_EPSILON)
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_LABEL_PADDING_VALUE = int(-1)
 
+G_DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 @dataclass
 class Sample:
@@ -91,9 +91,9 @@ class Dataset:
         for subset in config_dataset.subsets:
             if subset.max_num_samples <= 0:
                 continue
-            logging.info(F'Loading dataset: {subset.id} <- ({subset.root}, {subset.metadata})')
 
-            num_subset_samples = 0
+            logging.info(F'Loading dataset: {subset.id} <- ({subset.root}, {subset.metadata})')
+            n = 0
             with open(subset.metadata, 'r', encoding='utf8') as f:
                 if str.endswith(subset.metadata, '.tsv'):
                     utterance_reader = csv.DictReader(f, delimiter='\t')
@@ -104,11 +104,10 @@ class Dataset:
                     sample = sample_loader(utt, dataset_root = subset.root)
                     if sample != None:
                         self.samples.append(sample)
-                        num_subset_samples += 1
-                    if num_subset_samples >= subset.max_num_samples:
+                        n += 1
+                    if n >= subset.max_num_samples:
                         break # early stop of current subset loading
-
-            logging.info(F'Loaded {num_subset_samples} samples from {subset.id}')
+            logging.info(F'Loaded {n} samples from {subset.id}')
         
         # length sort
 
@@ -172,11 +171,11 @@ class DataPipeline:
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
 
-    def __call__(self, minibatch_samples: list[Sample]):
+    def __call__(self, samples: list[Sample]):
         features = []
         labels = []
-        debug_helper = []
-        for sample in minibatch_samples:
+        minibatch_bookkeeper = []
+        for sample in samples:
             # raw audio loading and resampling
             waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.model_sample_rate)
 
@@ -205,25 +204,20 @@ class DataPipeline:
             labels.append(token_ids)
             
             # store everything here for debug purpose
-            debug_helper.append(
+            minibatch_bookkeeper.append(
                 (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
             )
         
         # sequence padding & minibatch packing
-        # X[b, t, f]
-        #   b: [0, B) where B is Batch_size
-        #   t: [0, max(t)) where t is Time domain length
-        #   f: [0, F) where F is Frequency domain feature dim
-        X = pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
-        X_length = torch.tensor([ len(x) for x in features ])
+        # X of shape [batch, max(time), frequency]
+        X = torch.nn.utils.rnn.pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
+        X_lens = torch.tensor([ len(x) for x in features ])
 
-        # Y[b, l]
-        #   b: [0, B)
-        #   l: [0, max(l)) where l is Label length
-        Y = pad_sequence([ torch.tensor(y) for y in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
-        Y_length = torch.tensor([ len(y) for y in labels ])
+        # Y of shape [batch, max(label_length)]
+        L = torch.nn.utils.rnn.pad_sequence([ torch.tensor(l) for l in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
+        L_lens = torch.tensor([ len(l) for l in labels ])
 
-        return X, X_length, Y, Y_length, debug_helper
+        return X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE), minibatch_bookkeeper
 
 
 class Model(torch.nn.Module):
@@ -233,15 +227,29 @@ class Model(torch.nn.Module):
         self.nnet = nn.Sequential(
             nn.Linear(config.idim, config.hidden_layer_dim),
             nn.ReLU(),
-            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
-            nn.ReLU(),
+#            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+#            nn.ReLU(),
             nn.Linear(config.hidden_layer_dim, config.odim),
-            nn.Softmax(dim = 2),
+            nn.LogSoftmax(dim = 2),
         )
     
     def forward(self, x):
         y = self.nnet(x)
         return y
+
+
+def Loss(log_probs, targets, input_lens, target_lens, blank_index = 0, reduction="sum"):
+    log_probs = torch.einsum("btv->tbv", log_probs)
+    loss = torch.nn.functional.ctc_loss(
+        log_probs,
+        targets,
+        input_lens,
+        target_lens,
+        blank_index,
+        zero_infinity=True,
+        reduction=reduction,
+    )
+    return loss
 
 
 def run():
@@ -262,13 +270,14 @@ def run():
     # data sets
     sample_loader = SampleLoader(config.sample_loader)
     train_dataset = Dataset(config.dataset.train, sample_loader = sample_loader)
+    valid_dataset = Dataset(config.dataset.valid, sample_loader = sample_loader)
 
     # data pipline
     tokenizer = Tokenizer(config.tokenizer)
     data_pipeline = DataPipeline(config, tokenizer = tokenizer)
 
     # data loaders
-    train_dataloader = torch.utils.data.DataLoader(
+    train_dl = torch.utils.data.DataLoader(
         train_dataset, 
         shuffle = config.dataloader.shuffle,
         batch_size = config.dataloader.batch_size, 
@@ -277,28 +286,52 @@ def run():
         collate_fn = data_pipeline,
     )
 
+    valid_dl = torch.utils.data.DataLoader(
+        valid_dataset, 
+        shuffle = False,
+        batch_size = config.dataloader.batch_size, 
+        drop_last = False,
+        num_workers = config.dataloader.num_workers,
+        collate_fn = data_pipeline,
+    )
+
     # model
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model = Model(config.model).to(device)
-
-    total_params, trainable_params = 0, 0
-    for param in model.parameters():
-        total_params += param.numel()
-        if param.requires_grad:
-            trainable_params += param.numel()
-
-    logging.info(F'Total params:{total_params/float(1e6):.2f}M')
-    logging.info(F'Trainable params:{trainable_params/float(1e6):.2f}M')
+    model = Model(config.model).to(G_DEVICE)
+    logging.info(F'Total params:     {sum([ p.numel() for p in model.parameters()                    ])/float(1e6):.2f}M')
+    logging.info(F'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.training.optimizer.Adam.lr)
 
     for e in range(config.training.num_epochs):
-        for b, minibatch in enumerate(train_dataloader):
-            logging.info(F'Epoch={e}, Batch={b}')
-            X, X_length, Y, Y_length, debug_helper = minibatch
-            X , X_length, Y, Y_length = X.to(device), X_length.to(device), Y.to(device), Y_length.to(device)
-            pred = model(X)
+        # training
+        logging.info(F'Starting epoch {e} training.')
+        total_loss = 0.0
+        num_utts = 0
+        for b, minibatch in enumerate(train_dl):
+            X, L, X_lens, L_lens, _ = minibatch
+            batch_size = X.shape[0]
+            loss = Loss(model(X), L, X_lens, L_lens)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            total_loss += loss
+            num_utts += batch_size
+            logging.info(F'  {e}.{b} loss={(loss / batch_size):.2f}')
+        logging.info(F'TRAIN[{e}] loss={(total_loss / num_utts):.2f}')
+        
+        # validation
+        logging.info(F'Starting epoch {e} validation.')
+        total_loss = 0.0
+        num_utts = 0
+        with torch.no_grad():
+            for b, minibatch in enumerate(valid_dl):
+                X, L, X_lens, L_lens, _ = minibatch
+                batch_size = X.shape[0]
+                loss = Loss(model(X), L, X_lens, L_lens)         
+                total_loss += loss.item()
+                num_utts += batch_size
+        logging.info(F'VALID[{e}] loss={(total_loss / num_utts):.2f}')
 
 
 def test():
