@@ -61,7 +61,7 @@ if __name__ == '__main__':
         utt = {
                 'ID' : uttid,
                 'AUDIO' : audio,
-                'DURATION' : duration,
+                'DURATION' : F'{duration:.3f}',
         }
         if utt2spk:
             utt['SPEAKER'] = utt2spk.get(uttid)
