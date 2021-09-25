@@ -40,7 +40,6 @@ class Sample:
     duration: float = 0.0
     text: str = ''
     speaker: Any = None
-    audio_info: Any = None  # a place to hold entire-audio info such as codec, bit-width, sample_rate, num_channels etc.
 
 
 class SampleLoader:
@@ -66,15 +65,6 @@ class SampleLoader:
                 else:
                     v = v
                 setattr(sample, f, v)
-        
-        # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
-        # torchaudio.info(sample.audio)
-        #   -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
-        sample.audio_info = torchaudio.info(sample.audio)
-        
-        if sample.duration == 0.0:
-            entire_audio_duration = float(sample.audio_info.num_frames) / float(sample.audio_info.sample_rate)
-            sample.duration = entire_audio_duration
 
         if float(sample.duration) < self.config.min_duration:
             return None
@@ -123,15 +113,20 @@ class Dataset:
 
 
 def ReadAndResampleAudio(sample: Sample, target_sample_rate: int) :
+    # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
+    # torchaudio.info(sample.audio)
+    #   -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
+    audio_info = torchaudio.info(sample.audio)
+
     waveform, _ = torchaudio.load(
         sample.audio,
-        frame_offset = int(sample.audio_info.sample_rate * sample.begin),
-        num_frames   = int(sample.audio_info.sample_rate * sample.duration),
+        frame_offset = int(audio_info.sample_rate * sample.begin),
+        num_frames   = int(audio_info.sample_rate * sample.duration),
         channels_first = True,
     )
 
-    if sample.audio_info.sample_rate != target_sample_rate:
-        waveform = torchaudio.transforms.Resample(sample.audio_info.sample_rate, target_sample_rate)(waveform)
+    if audio_info.sample_rate != target_sample_rate:
+        waveform = torchaudio.transforms.Resample(audio_info.sample_rate, target_sample_rate)(waveform)
     
     return waveform, target_sample_rate
 
