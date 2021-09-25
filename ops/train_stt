@@ -91,9 +91,9 @@ class Dataset:
         for subset in config_dataset.subsets:
             if subset.max_num_samples <= 0:
                 continue
-            logging.info(F'Loading dataset: {subset.id} <- ({subset.root}, {subset.metadata})')
 
-            num_subset_samples = 0
+            logging.info(F'Loading dataset: {subset.id} <- ({subset.root}, {subset.metadata})')
+            n = 0
             with open(subset.metadata, 'r', encoding='utf8') as f:
                 if str.endswith(subset.metadata, '.tsv'):
                     utterance_reader = csv.DictReader(f, delimiter='\t')
@@ -104,11 +104,10 @@ class Dataset:
                     sample = sample_loader(utt, dataset_root = subset.root)
                     if sample != None:
                         self.samples.append(sample)
-                        num_subset_samples += 1
-                    if num_subset_samples >= subset.max_num_samples:
+                        n += 1
+                    if n >= subset.max_num_samples:
                         break # early stop of current subset loading
-
-            logging.info(F'Loaded {num_subset_samples} samples from {subset.id}')
+            logging.info(F'Loaded {n} samples from {subset.id}')
         
         # length sort
 
@@ -305,9 +304,8 @@ def run():
     optimizer = torch.optim.Adam(model.parameters(), lr = config.training.optimizer.Adam.lr)
 
     for e in range(config.training.num_epochs):
-        logging.info(F'Epoch={e}')
-
         # training
+        logging.info(F'Starting epoch {e} training.')
         total_loss = 0.0
         num_utts = 0
         for b, minibatch in enumerate(train_dl):
@@ -319,10 +317,11 @@ def run():
             optimizer.zero_grad()
             total_loss += loss
             num_utts += batch_size
-            logging.info(F'{e}.{b} loss={(loss / batch_size):.2f}')
+            logging.info(F'  {e}.{b} loss={(loss / batch_size):.2f}')
         logging.info(F'TRAIN[{e}] loss={(total_loss / num_utts):.2f}')
         
         # validation
+        logging.info(F'Starting epoch {e} validation.')
         total_loss = 0.0
         num_utts = 0
         with torch.no_grad():
