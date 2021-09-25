@@ -234,7 +234,7 @@ class Model(torch.nn.Module):
         return y
 
 
-def Loss(log_probs, targets, input_lens, target_lens, blank_index = 0, reduction="sum"):
+def Loss(log_probs, targets, input_lens, target_lens, blank_index = 0):
     log_probs = torch.einsum("btv->tbv", log_probs)
     loss = torch.nn.functional.ctc_loss(
         log_probs,
@@ -243,7 +243,7 @@ def Loss(log_probs, targets, input_lens, target_lens, blank_index = 0, reduction
         target_lens,
         blank_index,
         zero_infinity=True,
-        reduction=reduction,
+        reduction='sum', # this will yield batch-sum loss
     )
     return loss
 
