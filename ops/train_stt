@@ -212,7 +212,8 @@ class DataPipeline:
         L = torch.nn.utils.rnn.pad_sequence([ torch.tensor(l) for l in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
         L_lens = torch.tensor([ len(l) for l in labels ])
 
-        return X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE), minibatch_bookkeeper
+        return X, L, X_lens, L_lens, minibatch_bookkeeper
+        #return X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE), minibatch_bookkeeper
 
 
 class Model(torch.nn.Module):
@@ -305,6 +306,7 @@ def run():
         num_utts = 0
         for b, minibatch in enumerate(train_dl):
             X, L, X_lens, L_lens, _ = minibatch
+            X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
             batch_size = X.shape[0]
             loss = Loss(model(X), L, X_lens, L_lens)
             loss.backward()
@@ -322,6 +324,7 @@ def run():
         with torch.no_grad():
             for b, minibatch in enumerate(valid_dl):
                 X, L, X_lens, L_lens, _ = minibatch
+                X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
                 batch_size = X.shape[0]
                 loss = Loss(model(X), L, X_lens, L_lens)         
                 total_loss += loss.item()
