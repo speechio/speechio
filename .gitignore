@@ -13,5 +13,4 @@ test/*
 
 model/*
 
-dataset/*
-!dataset/generate_metadata.py
+dataset/SPEECHIO*
