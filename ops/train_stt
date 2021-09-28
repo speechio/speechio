@@ -20,7 +20,8 @@ import sentencepiece as spm
 import numpy
 import torch
 import torch.nn as nn
-import torchaudio#; torchaudio.set_audio_backend('sox_io')
+import torchaudio
+# torchaudio.set_audio_backend('sox_io')
 
 
 # Global Constants
@@ -43,11 +44,13 @@ class Sample:
 
 
 class SampleLoader:
-    ''' callable wrapper class：
-        Load one dataset sample from a dict with one-utterance info,
-        input dict is typically yielded by .tsv .jsonl .yaml file reader.
+    ''' A callable wrapper class to load one dataset sample from one utterance
+    input:
+        utt dict is typically yielded by .tsv .jsonl .yaml file reader.
 
-        return None if an utterance doesn't satisfy certain constraints, e.g. duration too short or too long
+    return:
+        a Sample object or None
+        None if an utterance doesn't satisfy constraints e.g. duration, text length
     '''
     def __init__(self, config):
         self.config = config
@@ -55,7 +58,7 @@ class SampleLoader:
     def __call__(self, utt: dict, dataset_root: str = '') -> Optional[Sample] :
         sample = Sample()
         for f, attr in self.config.field_map.items():
-            assert hasattr(sample, f), F'field:{f} <- attr:{attr} mapping failed, no such field'
+            assert hasattr(sample, f), F'field:{f} <- attr:{attr}, no such field'
             v = utt.get(attr, None)
             if v:
                 if f in ['duration', 'begin', ]:
@@ -113,9 +116,19 @@ class Dataset:
 
 
 def ReadAndResampleAudio(sample: Sample, target_sample_rate: int) :
-    # https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
-    # torchaudio.info(sample.audio)
-    #   -> AudioMetaData(sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S)
+    '''
+    https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
+
+    torchaudio.info(sample.audio)
+    -> 
+    AudioMetaData(
+        sample_rate=16000,
+        num_frames=31872,
+        num_channels=1,
+        bits_per_sample=16,
+        encoding=PCM_S,
+    )
+    '''
     audio_info = torchaudio.info(sample.audio)
 
     waveform, _ = torchaudio.load(
@@ -145,7 +158,10 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
         sample_frequency = sample_rate,
         num_mel_bins = config.num_mel_bins,
         dither = config.dither,
-        energy_floor = G_EPSILON, # Kaldi default = 0.0; torchaudio default = 1.0; doesn't matter if use_energy = False (default in both)
+        energy_floor = G_EPSILON,
+        # about energy_floor:
+        #   Kaldi default = 0.0; torchaudio default = 1.0;
+        #   it doesn't matter if use_energy = False (default in both)
     )
 
 
@@ -273,7 +289,7 @@ def run():
     data_pipeline = DataPipeline(config, tokenizer = tokenizer)
 
     # data loaders
-    train_dl = torch.utils.data.DataLoader(
+    train_dataloader = torch.utils.data.DataLoader(
         train_dataset, 
         shuffle = config.dataloader.shuffle,
         batch_size = config.dataloader.batch_size, 
@@ -282,7 +298,7 @@ def run():
         collate_fn = data_pipeline,
     )
 
-    valid_dl = torch.utils.data.DataLoader(
+    valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset, 
         shuffle = False,
         batch_size = config.dataloader.batch_size, 
@@ -292,9 +308,10 @@ def run():
     )
 
     # model
-    model = Model(config.model).to(G_DEVICE)
+    model = Model(config.model)
     logging.info(F'Total params:     {sum([ p.numel() for p in model.parameters()                    ])/float(1e6):.2f}M')
     logging.info(F'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
+    model = model.to(G_DEVICE)
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.training.optimizer.Adam.lr)
@@ -302,39 +319,41 @@ def run():
     for e in range(config.training.num_epochs):
         # training
         logging.info(F'Starting epoch {e} training.')
-        dataset_loss = 0.0
-        dataset_utts = 0
-        for b, minibatch in enumerate(train_dl):
+        train_loss = 0.0
+        train_utts = 0
+        for b, minibatch in enumerate(train_dataloader):
             X, L, X_lens, L_lens, _ = minibatch
             X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
+
             batch_size = X.shape[0]
             batch_loss = Loss(model(X), L, X_lens, L_lens)
-
             loss = batch_loss / batch_size
+            logging.info(F'  {e}.{b} loss={loss:.2f}')
+
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
             # scheduler.step()
 
-            dataset_loss += batch_loss.item()
-            dataset_utts += batch_size
-            logging.info(F'  {e}.{b} loss={loss:.2f}')
-        logging.info(F'TRAIN[{e}] average_loss={(dataset_loss / dataset_utts):.2f}')
+            train_loss += batch_loss.item()
+            train_utts += batch_size
+        logging.info(F'TRAIN[{e}] average_loss={(train_loss / train_utts):.2f}')
         
         # validation
         logging.info(F'Starting epoch {e} validation.')
-        dataset_loss = 0.0
-        dataset_utts = 0
+        valid_loss = 0.0
+        valid_utts = 0
         with torch.no_grad():
-            for b, minibatch in enumerate(valid_dl):
+            for b, minibatch in enumerate(valid_dataloader):
                 X, L, X_lens, L_lens, _ = minibatch
                 X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
+                
                 batch_size = X.shape[0]
                 batch_loss = Loss(model(X), L, X_lens, L_lens)
 
-                dataset_loss += batch_loss.item()
-                dataset_utts += batch_size
-        logging.info(F'VALID[{e}] average_loss={(dataset_loss / dataset_utts):.2f}')
+                valid_loss += batch_loss.item()
+                valid_utts += batch_size
+        logging.info(F'VALID[{e}] average_loss={(valid_loss / valid_utts):.2f}')
 
 
 def test():
