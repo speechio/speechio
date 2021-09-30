@@ -13,29 +13,44 @@ dataset:
                 id: MINI
                 root: dataset/MINI
                 metadata: dataset/MINI/metadata.tsv
-                max_num_samples: 0
+                max_num_samples: 1
             -
                 id: AISHELL-1-TRAIN
                 root: /data/disk001/AISHELL-1/train
                 metadata: /data/disk001/AISHELL-1/train/metadata.tsv
-                max_num_samples: 1000
+                max_num_samples: 0
             -
                 id: AISHELL-2-IOS-TRAIN
                 root: /data/disk001/AISHELL-2/iOS/train
                 metadata: /data/disk001/AISHELL-2/iOS/train/metadata.tsv
-                max_num_samples: 1000
+                max_num_samples: 0
             -
                 id: AISHELL-2-ANDROID-TRAIN
                 root: /data/disk001/AISHELL-2/Android/train
                 metadata: /data/disk001/AISHELL-2/Android/train/metadata.tsv
-                max_num_samples: 1000
+                max_num_samples: 0
+            -
+                id: LIBRISPEECH_TEST_CLEAN
+                root: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_CLEAN
+                metadata: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_CLEAN/metadata.tsv
+                max_num_samples: 0
     valid:
         subsets:
             -
                 id: AISHELL-1-DEV
                 root: /data/disk001/AISHELL-1/dev
                 metadata: /data/disk001/AISHELL-1/dev/metadata.tsv
-                max_num_samples: 1000
+                max_num_samples: 0
+            -
+                id: MINI
+                root: dataset/MINI
+                metadata: dataset/MINI/metadata.tsv
+                max_num_samples: 0
+            -
+                id: LIBRISPEECH_TEST_OTHER
+                root: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_OTHER
+                metadata: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_OTHER/metadata.tsv
+                max_num_samples: 1
     test:
         subsets:
             -
@@ -59,8 +74,8 @@ sample_loader:
     
 
 tokenizer:
-    model: model/tokenizer/sentencepiece.model
-    vocab: model/tokenizer/sentencepiece.vocab
+    model: model/tokenizer/sentencepiece_en.model
+    vocab: model/tokenizer/sentencepiece_en.vocab
 
 
 dataloader:
@@ -72,7 +87,9 @@ dataloader:
 
 feature:
     num_mel_bins: 80
-    dither: 1.0
+    dither: 0.0
+    mvn_shift: ''
+    mvn_scale: ''
 
 
 training:
@@ -87,5 +104,5 @@ model_sample_rate: 16000
 
 model:
     idim: 80
-    hidden_layer_dim: 128
-    odim: 4096
+    hidden_layer_dim: 1024
+    odim: 256

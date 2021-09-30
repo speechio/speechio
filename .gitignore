@@ -13,4 +13,7 @@ test/*
 
 model/*
 
-dataset/SPEECHIO*
+dataset/*
+!dataset/MINI
+
+*.pt

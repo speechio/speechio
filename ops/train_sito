@@ -17,12 +17,15 @@ from omegaconf import OmegaConf
 import yaml
 import sentencepiece as spm
 
+import pandas as pd
+
 import numpy
 import torch
 import torch.nn as nn
 import torchaudio
 # torchaudio.set_audio_backend('sox_io')
 
+import k2
 
 # Global Constants
 G_INT16MAX = 32768
@@ -30,6 +33,7 @@ G_EPSILON = 1e-10
 G_LOG_EPSILON = math.log(G_EPSILON)
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_LABEL_PADDING_VALUE = int(-1)
+G_16BIT_PCM_MAX = 1 << 15
 
 G_DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -153,6 +157,7 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
     torchaudio:
         https://pytorch.org/audio/stable/compliance.kaldi.html
     '''
+    waveform *= G_16BIT_PCM_MAX
     return torchaudio.compliance.kaldi.fbank(
         waveform,
         sample_frequency = sample_rate,
@@ -169,6 +174,7 @@ class Tokenizer:
     def __init__(self, config):
         self.tokenizer = spm.SentencePieceProcessor()
         self.tokenizer.load(config.model)
+        self.vocab = [ [ self.tokenizer.id_to_piece(x), x] for x in range(self.tokenizer.get_piece_size())]
     
     def __call__(self, text) -> tuple[list[str], list[int]] :
         token_pieces = self.tokenizer.EncodeAsPieces(text)
@@ -177,15 +183,19 @@ class Tokenizer:
 
 
 class DataPipeline:
-    def __init__(self, config, tokenizer: callable, text_normalizer: callable = None):
+    def __init__(self, config, tokenizer: Optional[callable] = None, text_normalizer: Optional[callable] = None, mean_norm_shift: Optional[torch.Tensor] = None, var_norm_scale: Optional[torch.Tensor] = None):
         self.config = config
+
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
+
+        self.mean_norm_shift = mean_norm_shift
+        self.var_norm_scale = var_norm_scale
 
     def __call__(self, samples: list[Sample]):
         features = []
         labels = []
-        minibatch_bookkeeper = []
+        minibatch = []
         for sample in samples:
             # raw audio loading and resampling
             waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.model_sample_rate)
@@ -199,9 +209,19 @@ class DataPipeline:
             # add noise
             
             # feature extraction
-            feature = ExtractFeature(waveform, sample_rate, self.config.feature).detach().numpy()
+            feature = ExtractFeature(waveform, sample_rate, self.config.feature).detach()
 
             # specaug
+
+            # mean normalization
+            if (self.mean_norm_shift != None):
+                feature += self.mean_norm_shift
+
+            # variance normalizaton
+            if (self.var_norm_scale != None):
+                feature *= self.var_norm_scale
+
+            features.append(feature)
 
             text = sample.text
             # text normalization
@@ -209,27 +229,27 @@ class DataPipeline:
                 text = self.text_normalizer(text)
 
             # tokenization
-            token_pieces, token_ids = self.tokenizer(text)
+            token_pieces, token_ids = [], []
+            if self.tokenizer:
+                token_pieces, token_ids = self.tokenizer(text)
 
-            features.append(feature)
             labels.append(token_ids)
             
             # store everything here for debug purpose
-            minibatch_bookkeeper.append(
+            minibatch.append(
                 (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
             )
         
         # sequence padding & minibatch packing
-        # X of shape [batch, max(time), frequency]
-        X = torch.nn.utils.rnn.pad_sequence([ torch.from_numpy(x).float() for x in features ], batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
+        # X dims: [n, max(t), f]
+        X = torch.nn.utils.rnn.pad_sequence(features, batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
         X_lens = torch.tensor([ len(x) for x in features ])
 
-        # L of shape [batch, max(label_length)]
+        # L dims: [b, max(u)]
         L = torch.nn.utils.rnn.pad_sequence([ torch.tensor(l) for l in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
         L_lens = torch.tensor([ len(l) for l in labels ])
 
-        return X, L, X_lens, L_lens, minibatch_bookkeeper
-        #return X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE), minibatch_bookkeeper
+        return minibatch, X, L, X_lens, L_lens
 
 
 class Model(torch.nn.Module):
@@ -239,8 +259,10 @@ class Model(torch.nn.Module):
         self.nnet = nn.Sequential(
             nn.Linear(config.idim, config.hidden_layer_dim),
             nn.ReLU(),
-#            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
-#            nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+            nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+            nn.ReLU(),
             nn.Linear(config.hidden_layer_dim, config.odim),
             nn.LogSoftmax(dim = 2),
         )
@@ -264,6 +286,43 @@ def Loss(log_probs, targets, input_lens, target_lens, blank_index = 0):
     return loss
 
 
+def ComputeMvnNormalizer(dataset, config):
+    pipeline = DataPipeline(config)
+
+    # data loaders
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        shuffle = config.dataloader.shuffle,
+        batch_size = config.dataloader.batch_size, 
+        drop_last = config.dataloader.drop_last,
+        num_workers = config.dataloader.num_workers,
+        collate_fn = pipeline,
+    )
+
+    logging.info('Computing global mean variance stats')
+    M = torch.zeros(config.model.idim)
+    V = torch.zeros(config.model.idim)
+    k = 0
+    for minibatch in dataloader:
+        samples, _,_,_,_ = minibatch
+        for sample in samples:
+            feat = sample[3]
+            M += feat.sum(dim=0)
+            V += feat.square().sum(dim=0)
+            k += feat.shape[0]
+    M = M / k
+    V = (V / k - M.square())
+    mean_norm_shift = -M
+    var_norm_scale = V.sqrt().clamp(min = G_EPSILON).reciprocal()
+    logging.info(F'Global MEAN/VAR Normalizer after {k} frames:\nmean_norm_shift:  {mean_norm_shift}\nvar_norm_scale:  {var_norm_scale}')
+    return mean_norm_shift, var_norm_scale
+
+
+def DumpTensorToCSV(x: torch.Tensor, filename: str):
+    df = pd.DataFrame(x.numpy())
+    df.to_csv(filename)
+
+
 def run():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type = str, required = True)
@@ -285,8 +344,12 @@ def run():
     valid_dataset = Dataset(config.dataset.valid, sample_loader = sample_loader)
 
     # data pipline
+    mean_norm_shift, var_norm_scale = ComputeMvnNormalizer(train_dataset, config)
+    torch.save(mean_norm_shift, 'mean_norm_shift.pt')
+    torch.save(var_norm_scale, 'var_norm_scale.pt')
+
     tokenizer = Tokenizer(config.tokenizer)
-    data_pipeline = DataPipeline(config, tokenizer = tokenizer)
+    data_pipeline = DataPipeline(config, tokenizer = tokenizer, mean_norm_shift = mean_norm_shift, var_norm_scale = var_norm_scale)
 
     # data loaders
     train_dataloader = torch.utils.data.DataLoader(
@@ -318,15 +381,16 @@ def run():
 
     for e in range(config.training.num_epochs):
         # training
-        logging.info(F'Starting epoch {e} training.')
+        logging.info(F'Train[{e}] started ...')
         train_loss = 0.0
         train_utts = 0
         for b, minibatch in enumerate(train_dataloader):
-            X, L, X_lens, L_lens, _ = minibatch
-            X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
+            samples, X, L, X_lens, L_lens = minibatch
+            batch_size = len(samples)
 
-            batch_size = X.shape[0]
-            batch_loss = Loss(model(X), L, X_lens, L_lens)
+            X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
+            Y = model(X)
+            batch_loss = Loss(Y, L, X_lens, L_lens)
             loss = batch_loss / batch_size
             logging.info(F'  {e}.{b} loss={loss:.2f}')
 
@@ -337,23 +401,33 @@ def run():
 
             train_loss += batch_loss.item()
             train_utts += batch_size
-        logging.info(F'TRAIN[{e}] average_loss={(train_loss / train_utts):.2f}')
-        
+        logging.info(F'TRAIN[{e}] Done with average_loss={(train_loss / train_utts):.2f}')
+
+        checkpoint_dir = os.path.join('checkpoints')
+        os.makedirs(os.path.join(checkpoint_dir), exist_ok = True)
+        checkpoint = os.path.join(checkpoint_dir, F'{e}.pt')
+        torch.save(model.state_dict(), checkpoint)
+
         # validation
-        logging.info(F'Starting epoch {e} validation.')
+        logging.info(F'VALID[{e}] started ...')
         valid_loss = 0.0
         valid_utts = 0
         with torch.no_grad():
             for b, minibatch in enumerate(valid_dataloader):
-                X, L, X_lens, L_lens, _ = minibatch
-                X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
-                
-                batch_size = X.shape[0]
-                batch_loss = Loss(model(X), L, X_lens, L_lens)
+                samples, X, L, X_lens, L_lens = minibatch
+                batch_size = len(samples)
 
+                X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
+                Y = model(X)
+                batch_loss = Loss(Y, L, X_lens, L_lens)
+                
                 valid_loss += batch_loss.item()
                 valid_utts += batch_size
-        logging.info(F'VALID[{e}] average_loss={(valid_loss / valid_utts):.2f}')
+        logging.info(F'VALID[{e}] Done average_loss={(valid_loss / valid_utts):.2f}')
+
+        with torch.no_grad():
+            test_model = Model(config.model)
+            test_model.load_state_dict(torch.load(checkpoint))
 
 
 def test():
