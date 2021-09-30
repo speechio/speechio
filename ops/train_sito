@@ -384,9 +384,10 @@ def run():
         logging.info(F'Train[{e}] started ...')
         train_loss = 0.0
         train_utts = 0
-        for b, minibatch in enumerate(train_dataloader):
-            samples, X, L, X_lens, L_lens = minibatch
+        for b, batch in enumerate(train_dataloader):
+            samples, X, L, X_lens, L_lens = batch
             batch_size = len(samples)
+            #print(samples)
 
             X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
             Y = model(X)
@@ -413,8 +414,8 @@ def run():
         valid_loss = 0.0
         valid_utts = 0
         with torch.no_grad():
-            for b, minibatch in enumerate(valid_dataloader):
-                samples, X, L, X_lens, L_lens = minibatch
+            for b, batch in enumerate(valid_dataloader):
+                samples, X, L, X_lens, L_lens = batch
                 batch_size = len(samples)
 
                 X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
