@@ -18,26 +18,26 @@ if __name__ == '__main__':
     parser.add_argument('output', help='The output directory')
     args = parser.parse_args()
 
-    output_audio_dir = os.path.join(args.output, 'audio')
-    os.makedirs(output_audio_dir, exist_ok = True)
+    audio_dir = os.path.join(args.output, 'audio')
+    os.makedirs(audio_dir, exist_ok = True)
 
     gigaspeech = GigaSpeech(args.gigaspeech_dataset_dir)
     subset = '{' + args.subset + '}'
-    with open(os.path.join(args.output, 'metadata.tsv'), 'w+') as fo:
+    with open(os.path.join(args.output, 'metadata.tsv'), 'w+', encoding='utf8') as fo:
         csv_header_fields = ['ID', 'AUDIO', 'DURATION', 'TEXT']
-        csv_writer = csv.DictWriter(fo, delimiter='\t', fieldnames=csv_header_fields)
+        csv_writer = csv.DictWriter(fo, delimiter='\t', fieldnames=csv_header_fields, lineterminator='\n')
         csv_writer.writeheader()
         for audio in gigaspeech.audios(subset):
-            long_audio = os.path.join(args.gigaspeech_dataset_dir, audio["path"])
+            audio_path = os.path.join(args.gigaspeech_dataset_dir, audio["path"])
 
-            audio_info = torchaudio.info(long_audio)
+            audio_info = torchaudio.info(audio_path)
             opus_sample_rate = audio_info.sample_rate
             assert opus_sample_rate == 48000
             nc = audio_info.num_channels
             assert nc == 1
 
             sample_rate = 16000
-            long_waveform, _ = torchaudio.load(long_audio)
+            long_waveform, _ = torchaudio.load(audio_path)
             long_waveform = torchaudio.transforms.Resample(opus_sample_rate, sample_rate)(long_waveform)
 
             #print(audio_info)
@@ -60,8 +60,9 @@ if __name__ == '__main__':
 
                 waveform = long_waveform[0][frame_offset : frame_offset + num_frames] # channel = mono 
 
+                os.makedirs(os.path.join(audio_dir, audio['aid']), exist_ok = True)
                 torchaudio.save(
-                    os.path.join(output_audio_dir, f'{seg["sid"]}.wav'), 
+                    os.path.join(audio_dir, audio['aid'], f'{seg["sid"]}.wav'), 
                     waveform.unsqueeze(0), 
                     sample_rate = sample_rate,
                     format = 'wav',
@@ -69,6 +70,7 @@ if __name__ == '__main__':
                     bits_per_sample = 16,
                 )
 
-                utt = {'ID': seg['sid'], 'AUDIO': os.path.join('audio', f'{seg["sid"]}.wav'), 'DURATION': f'{duration:.3f}', 'TEXT': text }
+                utt = {'ID': seg['sid'], 'AUDIO': os.path.join('audio', audio['aid'], f'{seg["sid"]}.wav'), 'DURATION': f'{duration:.3f}', 'TEXT': text }
                 csv_writer.writerow(utt)
+            break
 
