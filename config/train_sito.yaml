@@ -5,14 +5,14 @@ dataset:
     train:
         subsets:
             -
-                id: SPEECHIO_ASR_ZH00000
-                root: dataset/SPEECHIO_ASR_ZH00000
-                metadata: dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
-                max_num_samples: 0
-            -
                 id: MINI
                 root: dataset/MINI
                 metadata: dataset/MINI/metadata.tsv
+                max_num_samples: 0
+            -
+                id: GIGASPEECH_XS
+                root: dataset/GIGASPEECH_XS
+                metadata: dataset/GIGASPEECH_XS/metadata.tsv
                 max_num_samples: 1
             -
                 id: AISHELL-1-TRAIN
@@ -24,41 +24,62 @@ dataset:
                 root: /data/disk001/AISHELL-2/iOS/train
                 metadata: /data/disk001/AISHELL-2/iOS/train/metadata.tsv
                 max_num_samples: 0
-            -
-                id: AISHELL-2-ANDROID-TRAIN
-                root: /data/disk001/AISHELL-2/Android/train
-                metadata: /data/disk001/AISHELL-2/Android/train/metadata.tsv
-                max_num_samples: 0
-            -
-                id: LIBRISPEECH_TEST_CLEAN
-                root: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_CLEAN
-                metadata: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_CLEAN/metadata.tsv
-                max_num_samples: 0
+
     valid:
         subsets:
-            -
-                id: AISHELL-1-DEV
-                root: /data/disk001/AISHELL-1/dev
-                metadata: /data/disk001/AISHELL-1/dev/metadata.tsv
-                max_num_samples: 0
             -
                 id: MINI
                 root: dataset/MINI
                 metadata: dataset/MINI/metadata.tsv
                 max_num_samples: 0
             -
+                id: GIGASPEECH_DEV
+                root: dataset/GIGASPEECH_DEV
+                metadata: dataset/GIGASPEECH_DEV/metadata.tsv
+                max_num_samples: 1
+            -
+                id: AISHELL-1-DEV
+                root: /data/disk001/AISHELL-1/dev
+                metadata: /data/disk001/AISHELL-1/dev/metadata.tsv
+                max_num_samples: 0
+            -
+                id: AISHELL-2-IOS-DEV
+                root: /data/disk001/AISHELL-2/iOS/dev
+                metadata: /data/disk001/AISHELL-2/iOS/dev/metadata.tsv
+                max_num_samples: 0
+
+    test:
+        subsets:
+            -
+                id: GIGASPEECH_TEST
+                root: dataset/GIGASPEECH_TEST
+                metadata: dataset/GIGASPEECH_TEST/metadata.tsv
+                max_num_samples: 1
+            -
+                id: LIBRISPEECH_TEST_CLEAN
+                root: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_CLEAN
+                metadata: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_CLEAN/metadata.tsv
+                max_num_samples: 0
+            -
                 id: LIBRISPEECH_TEST_OTHER
                 root: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_OTHER
                 metadata: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_OTHER/metadata.tsv
-                max_num_samples: 1
-    test:
-        subsets:
+                max_num_samples: 0
             -
                 id: AISHELL-1-TEST
                 root: /data/disk001/AISHELL-1/test
                 metadata: /data/disk001/AISHELL-1/test/metadata.tsv
-                max_num_samples: 100
-
+                max_num_samples: 0
+            -
+                id: AISHELL-2-IOS-TEST
+                root: /data/disk001/AISHELL-2/iOS/test
+                metadata: /data/disk001/AISHELL-2/iOS/test/metadata.tsv
+                max_num_samples: 0
+            -
+                id: SPEECHIO_ASR_ZH00000
+                root: dataset/SPEECHIO_ASR_ZH00000
+                metadata: dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
+                max_num_samples: 0
 
 sample_loader:
     field_map:
@@ -93,10 +114,10 @@ feature:
 
 
 training:
-    num_epochs: 2
+    num_epochs: 1
     optimizer:
         Adam:
-            lr: 0.001
+            lr: 0.0001
     gradient_clipping:
 
 
