@@ -2,8 +2,6 @@
 
 conda activate speechio || exit 1
 
-# 
-
 #conda install -c nvidia cudatoolkit=$CUDA_VERSION
 conda install -c anaconda numpy
 conda install -c pytorch pytorch=$PYTORCH_VERSION

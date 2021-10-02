@@ -81,7 +81,7 @@ if __name__ == '__main__':
         if utt2text:
             csv_header_fields.append('TEXT')
 
-        csv_writer = csv.DictWriter(fo, delimiter='\t', fieldnames=csv_header_fields)
+        csv_writer = csv.DictWriter(fo, fieldnames=csv_header_fields, delimiter='\t', lineterminator='\n')
         csv_writer.writeheader()
         for audio in utts:
             csv_writer.writerow(audio)
