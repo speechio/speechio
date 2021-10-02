@@ -4,49 +4,49 @@ logging: config/logging.yaml
 dataset:
     train:
         subsets:
-            -
-                id: MINI
-                root: dataset/MINI
-                metadata: dataset/MINI/metadata.tsv
-                max_num_samples: 0
-            -
-                id: GIGASPEECH_XS
-                root: dataset/GIGASPEECH_XS
-                metadata: dataset/GIGASPEECH_XS/metadata.tsv
-                max_num_samples: 1
-            -
-                id: AISHELL-1-TRAIN
-                root: /data/disk001/AISHELL-1/train
-                metadata: /data/disk001/AISHELL-1/train/metadata.tsv
-                max_num_samples: 0
-            -
-                id: AISHELL-2-IOS-TRAIN
-                root: /data/disk001/AISHELL-2/iOS/train
-                metadata: /data/disk001/AISHELL-2/iOS/train/metadata.tsv
-                max_num_samples: 0
+        -
+            id: MINI
+            root: dataset/MINI
+            metadata: dataset/MINI/metadata.tsv
+            max_num_samples: 0
+        -
+            id: GIGASPEECH_XS
+            root: dataset/GIGASPEECH_XS
+            metadata: dataset/GIGASPEECH_XS/metadata.tsv
+            max_num_samples: -1
+        -
+            id: AISHELL-1-TRAIN
+            root: /data/disk001/AISHELL-1/train
+            metadata: /data/disk001/AISHELL-1/train/metadata.tsv
+            max_num_samples: 0
+        -
+            id: AISHELL-2-IOS-TRAIN
+            root: /data/disk001/AISHELL-2/iOS/train
+            metadata: /data/disk001/AISHELL-2/iOS/train/metadata.tsv
+            max_num_samples: 0
 
     valid:
         subsets:
-            -
-                id: MINI
-                root: dataset/MINI
-                metadata: dataset/MINI/metadata.tsv
-                max_num_samples: 0
-            -
-                id: GIGASPEECH_DEV
-                root: dataset/GIGASPEECH_DEV
-                metadata: dataset/GIGASPEECH_DEV/metadata.tsv
-                max_num_samples: 1
-            -
-                id: AISHELL-1-DEV
-                root: /data/disk001/AISHELL-1/dev
-                metadata: /data/disk001/AISHELL-1/dev/metadata.tsv
-                max_num_samples: 0
-            -
-                id: AISHELL-2-IOS-DEV
-                root: /data/disk001/AISHELL-2/iOS/dev
-                metadata: /data/disk001/AISHELL-2/iOS/dev/metadata.tsv
-                max_num_samples: 0
+        -
+            id: MINI
+            root: dataset/MINI
+            metadata: dataset/MINI/metadata.tsv
+            max_num_samples: 0
+        -
+            id: GIGASPEECH_DEV
+            root: dataset/GIGASPEECH_DEV
+            metadata: dataset/GIGASPEECH_DEV/metadata.tsv
+            max_num_samples: 1
+        -
+            id: AISHELL-1-DEV
+            root: /data/disk001/AISHELL-1/dev
+            metadata: /data/disk001/AISHELL-1/dev/metadata.tsv
+            max_num_samples: 0
+        -
+            id: AISHELL-2-IOS-DEV
+            root: /data/disk001/AISHELL-2/iOS/dev
+            metadata: /data/disk001/AISHELL-2/iOS/dev/metadata.tsv
+            max_num_samples: 0
 
     test:
         subsets:
@@ -101,7 +101,7 @@ tokenizer:
 
 dataloader:
     shuffle: True
-    batch_size: 16
+    batch_size: 1
     drop_last: False
     num_workers: 4
 
@@ -114,16 +114,20 @@ feature:
 
 
 training:
-    num_epochs: 1
+    num_epochs: 20
+    log_interval: 1000
     optimizer:
         Adam:
-            lr: 0.0001
-    gradient_clipping:
+            lr: 0.001
+        SGD:
+            lr: 0.001
+    scheduler:
+        gamma: 0.95
 
 
 model_sample_rate: 16000
 
 model:
     idim: 80
-    hidden_layer_dim: 1024
+    hidden_layer_dim: 2048
     odim: 256

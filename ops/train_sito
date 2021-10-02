@@ -23,17 +23,19 @@ import numpy
 import torch
 import torch.nn as nn
 import torchaudio
-# torchaudio.set_audio_backend('sox_io')
 
 import k2
 
 # Global Constants
 G_INT16MAX = 32768
-G_EPSILON = 1e-10
+G_EPSILON = torch.finfo(torch.float).eps # numeric_limits<float>::epsilon() 1.1920928955078125e-07
 G_LOG_EPSILON = math.log(G_EPSILON)
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_LABEL_PADDING_VALUE = int(-1)
-G_16BIT_PCM_MAX = 1 << 15
+G_16BIT_PCM_SAMPLE_MAX = 1 << 15
+G_BLANK_ID = 0
+G_BOS_ID = 1
+G_EOS_ID = 2
 
 G_DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -86,8 +88,10 @@ class Dataset:
         self.samples = []
 
         for subset in config_dataset.subsets:
-            if subset.max_num_samples <= 0:
+            if subset.max_num_samples == 0:
                 continue
+            elif subset.max_num_samples < 0:
+                subset.max_num_samples = sys.maxsize # https://docs.python.org/3/library/sys.html#sys.maxsize
 
             logging.info(F'Loading dataset: {subset.id} <- ({subset.root}, {subset.metadata})')
             n = 0
@@ -111,7 +115,6 @@ class Dataset:
         # shuffle
 
                     
-    
     def __getitem__(self, index: int):
         return self.samples[index]
     
@@ -157,8 +160,17 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
     torchaudio:
         https://pytorch.org/audio/stable/compliance.kaldi.html
     '''
-    waveform *= G_16BIT_PCM_MAX
-    return torchaudio.compliance.kaldi.fbank(
+    # torchaudio normally uses normalized wave
+    assert waveform.dtype == torch.float32
+    # To use Kaldi compliance function, 16bit signed-PCM is required
+    # TODO:
+    # torchaudio's feature extraction is not consistent with Kaldi https://github.com/pytorch/audio/issues/400
+    # torchaudio official plan to bind kaldi feat lib: https://github.com/pytorch/audio/issues/1269
+    # to not finished up to 2021-10-02 : https://github.com/pytorch/audio/pull/1326
+    # keep an eye on this work and do it myself if necessary
+    waveform = (waveform * G_16BIT_PCM_SAMPLE_MAX)
+
+    feature = torchaudio.compliance.kaldi.fbank(
         waveform,
         sample_frequency = sample_rate,
         num_mel_bins = config.num_mel_bins,
@@ -168,6 +180,7 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
         #   Kaldi default = 0.0; torchaudio default = 1.0;
         #   it doesn't matter if use_energy = False (default in both)
     )
+    return feature
 
 
 class Tokenizer:
@@ -199,7 +212,6 @@ class DataPipeline:
         for sample in samples:
             # raw audio loading and resampling
             waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.model_sample_rate)
-
             # speed perturbation
 
             # volumn perturbation
@@ -209,7 +221,8 @@ class DataPipeline:
             # add noise
             
             # feature extraction
-            feature = ExtractFeature(waveform, sample_rate, self.config.feature).detach()
+            feature = ExtractFeature(waveform, sample_rate, self.config.feature)
+            feature = feature.detach()
 
             # specaug
 
@@ -241,11 +254,11 @@ class DataPipeline:
             )
         
         # sequence padding & minibatch packing
-        # X dims: [n, max(t), f]
+        # X: [B, T, F], X_lens: [B, 1]
         X = torch.nn.utils.rnn.pad_sequence(features, batch_first = True, padding_value = G_FEATURE_PADDING_VALUE)
         X_lens = torch.tensor([ len(x) for x in features ])
 
-        # L dims: [b, max(u)]
+        # L: [B, U], L_lens: [B, 1]
         L = torch.nn.utils.rnn.pad_sequence([ torch.tensor(l) for l in labels ], batch_first = True, padding_value = G_LABEL_PADDING_VALUE)
         L_lens = torch.tensor([ len(l) for l in labels ])
 
@@ -263,6 +276,20 @@ class Model(torch.nn.Module):
             nn.ReLU(),
             nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
             nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+            nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+            nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+            nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+            nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+            nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+            nn.ReLU(),
+            nn.Linear(config.hidden_layer_dim, config.hidden_layer_dim),
+            nn.ReLU(),
             nn.Linear(config.hidden_layer_dim, config.odim),
             nn.LogSoftmax(dim = 2),
         )
@@ -272,16 +299,16 @@ class Model(torch.nn.Module):
         return y
 
 
-def Loss(log_probs, targets, input_lens, target_lens, blank_index = 0):
+def Loss(log_probs, labels, input_lens, label_lens, blank_index = 0):
     log_probs = torch.einsum("btv->tbv", log_probs)
     loss = torch.nn.functional.ctc_loss(
         log_probs,
-        targets,
+        labels,
         input_lens,
-        target_lens,
+        label_lens,
         blank_index,
         zero_infinity=True,
-        reduction='sum', # this will yield batch-sum loss
+        reduction='sum',
     )
     return loss
 
@@ -292,10 +319,10 @@ def ComputeMvnNormalizer(dataset, config):
     # data loaders
     dataloader = torch.utils.data.DataLoader(
         dataset,
-        shuffle = config.dataloader.shuffle,
-        batch_size = config.dataloader.batch_size, 
-        drop_last = config.dataloader.drop_last,
-        num_workers = config.dataloader.num_workers,
+        shuffle = False,
+        batch_size = 32, 
+        drop_last = False,
+        num_workers = 4,
         collate_fn = pipeline,
     )
 
@@ -303,10 +330,10 @@ def ComputeMvnNormalizer(dataset, config):
     M = torch.zeros(config.model.idim)
     V = torch.zeros(config.model.idim)
     k = 0
-    for minibatch in dataloader:
-        samples, _,_,_,_ = minibatch
+    for batch in dataloader:
+        samples, _,_,_,_ = batch
         for sample in samples:
-            feat = sample[3]
+            feat = sample[3]  # [Time, Freq]
             M += feat.sum(dim=0)
             V += feat.square().sum(dim=0)
             k += feat.shape[0]
@@ -317,6 +344,67 @@ def ComputeMvnNormalizer(dataset, config):
     logging.info(F'Global MEAN/VAR Normalizer after {k} frames:\nmean_norm_shift:  {mean_norm_shift}\nvar_norm_scale:  {var_norm_scale}')
     return mean_norm_shift, var_norm_scale
 
+
+def make_pad_mask(lengths: torch.Tensor) -> torch.Tensor:
+    """Make mask tensor containing indices of padded part.
+
+    See description of make_non_pad_mask.
+
+    Args:
+        lengths (torch.Tensor): Batch of lengths (B,).
+    Returns:
+        torch.Tensor: Mask tensor containing indices of padded part.
+
+    Examples:
+        >>> lengths = [5, 3, 2]
+        >>> make_pad_mask(lengths)
+        masks = [[0, 0, 0, 0 ,0],
+                 [0, 0, 0, 1, 1],
+                 [0, 0, 1, 1, 1]]
+    """
+    batch_size = int(lengths.size(0))
+    max_len = int(lengths.max().item())
+    seq_range = torch.arange(0,
+                             max_len,
+                             dtype=torch.int64,
+                             device=lengths.device)
+    seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len)
+    seq_length_expand = lengths.unsqueeze(-1)
+    mask = seq_range_expand >= seq_length_expand
+    return mask
+
+def make_nonpad_mask(lengths: torch.Tensor) -> torch.Tensor:
+    return ~make_pad_mask(lengths)
+
+
+def collapse_ctc_sequence(hyp: list[int]) -> list[int]:
+    new_hyp: list[int] = []
+    cur = 0
+    while cur < len(hyp):
+        if hyp[cur] != G_BLANK_ID:
+            new_hyp.append(hyp[cur])
+        prev = cur
+        while cur < len(hyp) and hyp[cur] == hyp[prev]:
+            cur += 1
+    return new_hyp
+
+
+def CtcGreedySearch(log_probs: torch.Tensor, X_lens: torch.Tensor):
+    B = log_probs.shape[0]
+    T = log_probs.shape[1]
+
+    best_scores, best_paths = log_probs.topk(1, dim=2) # [B,T,V] -> [B,T,k=1]
+
+    best_paths = best_paths.squeeze(2)
+    best_scores = best_scores.squeeze(2)
+    m = make_pad_mask(X_lens)
+
+    best_paths.masked_fill_(m, G_EOS_ID)
+    best_scores.masked_fill_(m, 0.0)
+    scores = best_scores.sum(1)
+    hyps = [ collapse_ctc_sequence(p.tolist()) for p in best_paths ]
+    #hyps = [ p.tolist() for p in best_paths ]
+    return hyps, scores
 
 def DumpTensorToCSV(x: torch.Tensor, filename: str):
     df = pd.DataFrame(x.numpy())
@@ -345,8 +433,8 @@ def run():
 
     # data pipline
     mean_norm_shift, var_norm_scale = ComputeMvnNormalizer(train_dataset, config)
-    torch.save(mean_norm_shift, 'mean_norm_shift.pt')
-    torch.save(var_norm_scale, 'var_norm_scale.pt')
+    #torch.save(mean_norm_shift, 'mean_norm_shift.pt')
+    #torch.save(var_norm_scale, 'var_norm_scale.pt')
 
     tokenizer = Tokenizer(config.tokenizer)
     data_pipeline = DataPipeline(config, tokenizer = tokenizer, mean_norm_shift = mean_norm_shift, var_norm_scale = var_norm_scale)
@@ -377,32 +465,41 @@ def run():
     model = model.to(G_DEVICE)
 
     # optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr = config.training.optimizer.Adam.lr)
+    optimizer = torch.optim.SGD(model.parameters(), lr = config.training.optimizer.SGD.lr)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.training.scheduler.gamma)
 
     for e in range(config.training.num_epochs):
         # training
         logging.info(F'Train[{e}] started ...')
         train_loss = 0.0
         train_utts = 0
+        train_frames = 0
         for b, batch in enumerate(train_dataloader):
+            optimizer.zero_grad()
+
             samples, X, L, X_lens, L_lens = batch
-            batch_size = len(samples)
-            #print(samples)
+            num_utts = X.shape[0]
+            num_frames = X_lens.sum()
 
             X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
-            Y = model(X)
-            batch_loss = Loss(Y, L, X_lens, L_lens)
-            loss = batch_loss / batch_size
-            logging.info(F'  {e}.{b} loss={loss:.2f}')
+            Y = model(X)  # Y
+            loss = Loss(Y, L, X_lens, L_lens)
 
-            loss.backward()
+            utt_loss = loss / num_utts
+            frame_loss = loss / num_frames
+
+            if b != 0 and b % config.training.log_interval == 0:
+                logging.info(F'  {e}.{b} loss={train_loss / train_utts:.2f}')
+
+            utt_loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
-            # scheduler.step()
-
-            train_loss += batch_loss.item()
-            train_utts += batch_size
-        logging.info(F'TRAIN[{e}] Done with average_loss={(train_loss / train_utts):.2f}')
+            
+            train_loss += loss.item()
+            train_utts += num_utts
+            train_frames += num_frames
+        logging.info(F'TRAIN[{e}] done. average_loss={(train_loss / train_utts):.2f}')
+        scheduler.step()
+        print(scheduler.get_last_lr())
 
         checkpoint_dir = os.path.join('checkpoints')
         os.makedirs(os.path.join(checkpoint_dir), exist_ok = True)
@@ -413,18 +510,26 @@ def run():
         logging.info(F'VALID[{e}] started ...')
         valid_loss = 0.0
         valid_utts = 0
+        valid_frames = 0
         with torch.no_grad():
             for b, batch in enumerate(valid_dataloader):
                 samples, X, L, X_lens, L_lens = batch
-                batch_size = len(samples)
+                num_utts = len(samples)
+                num_frames = X_lens.sum()
 
                 X, L, X_lens, L_lens = X.to(G_DEVICE), L.to(G_DEVICE), X_lens.to(G_DEVICE), L_lens.to(G_DEVICE)
                 Y = model(X)
-                batch_loss = Loss(Y, L, X_lens, L_lens)
+                loss = Loss(Y, L, X_lens, L_lens)
+
+                best_paths, b = CtcGreedySearch(Y, X_lens)
+                print(best_paths, b)
+                for p in best_paths:
+                    print(tokenizer.tokenizer.DecodeIds(p))
                 
-                valid_loss += batch_loss.item()
-                valid_utts += batch_size
-        logging.info(F'VALID[{e}] Done average_loss={(valid_loss / valid_utts):.2f}')
+                valid_loss += loss.item()
+                valid_utts += num_utts
+                valid_frames += num_frames
+        logging.info(F'VALID[{e}] done. average_loss={(valid_loss / valid_utts):.2f}')
 
         with torch.no_grad():
             test_model = Model(config.model)
