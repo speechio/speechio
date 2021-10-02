@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+. utils/env.sh
 
 conda activate speechio || exit 1
 
