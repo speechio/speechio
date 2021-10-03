@@ -13,7 +13,12 @@ dataset:
             id: GIGASPEECH_XS
             root: dataset/GIGASPEECH_XS
             metadata: dataset/GIGASPEECH_XS/metadata.tsv
-            max_num_samples: -1
+            max_num_samples: 0
+        -
+            id: GIGASPEECH_S
+            root: dataset/GIGASPEECH_S
+            metadata: dataset/GIGASPEECH_S/metadata.tsv
+            max_num_samples: 10
         -
             id: AISHELL-1-TRAIN
             root: /data/disk001/AISHELL-1/train
@@ -114,20 +119,21 @@ feature:
 
 
 training:
-    num_epochs: 20
-    log_interval: 1000
+    num_epochs: 15
+    log_interval: 2000
     optimizer:
         Adam:
             lr: 0.001
         SGD:
-            lr: 0.001
+            lr: 0.01
     scheduler:
-        gamma: 0.95
+        gamma: 0.5
 
 
 model_sample_rate: 16000
 
 model:
     idim: 80
-    hidden_layer_dim: 2048
-    odim: 256
+    hidden_layer_dim: 128
+    num_hidden_layers: 1
+    odim: 32
