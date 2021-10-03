@@ -18,7 +18,7 @@ dataset:
             id: GIGASPEECH_S
             root: dataset/GIGASPEECH_S
             metadata: dataset/GIGASPEECH_S/metadata.tsv
-            max_num_samples: 10
+            max_num_samples: -1
         -
             id: AISHELL-1-TRAIN
             root: /data/disk001/AISHELL-1/train
@@ -41,7 +41,12 @@ dataset:
             id: GIGASPEECH_DEV
             root: dataset/GIGASPEECH_DEV
             metadata: dataset/GIGASPEECH_DEV/metadata.tsv
-            max_num_samples: 1
+            max_num_samples: 0
+        -
+            id: GIGASPEECH_TEST
+            root: dataset/GIGASPEECH_TEST
+            metadata: dataset/GIGASPEECH_TEST/metadata.tsv
+            max_num_samples: 10
         -
             id: AISHELL-1-DEV
             root: /data/disk001/AISHELL-1/dev
@@ -59,7 +64,7 @@ dataset:
                 id: GIGASPEECH_TEST
                 root: dataset/GIGASPEECH_TEST
                 metadata: dataset/GIGASPEECH_TEST/metadata.tsv
-                max_num_samples: 1
+                max_num_samples: 0
             -
                 id: LIBRISPEECH_TEST_CLEAN
                 root: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_CLEAN
@@ -119,13 +124,13 @@ feature:
 
 
 training:
-    num_epochs: 15
+    num_epochs: 3
     log_interval: 2000
     optimizer:
         Adam:
             lr: 0.001
         SGD:
-            lr: 0.01
+            lr: 0.001
     scheduler:
         gamma: 0.5
 
@@ -134,6 +139,6 @@ model_sample_rate: 16000
 
 model:
     idim: 80
-    hidden_layer_dim: 128
-    num_hidden_layers: 1
+    hidden_layer_dim: 256
+    num_hidden_layers: 3
     odim: 32
