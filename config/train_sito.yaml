@@ -1,23 +1,23 @@
 logging: config/logging.yaml
 
 
-dataset:
+data/audio:
     train:
         subsets:
         -
             id: MINI
-            root: dataset/MINI
-            metadata: dataset/MINI/metadata.tsv
+            root: data/audio/MINI
+            metadata: data/audio/MINI/metadata.tsv
             max_num_samples: 0
         -
             id: GIGASPEECH_XS
-            root: dataset/GIGASPEECH_XS
-            metadata: dataset/GIGASPEECH_XS/metadata.tsv
+            root: data/audio/GIGASPEECH_XS
+            metadata: data/audio/GIGASPEECH_XS/metadata.tsv
             max_num_samples: 0
         -
             id: GIGASPEECH_S
-            root: dataset/GIGASPEECH_S
-            metadata: dataset/GIGASPEECH_S/metadata.tsv
+            root: data/audio/GIGASPEECH_S
+            metadata: data/audio/GIGASPEECH_S/metadata.tsv
             max_num_samples: -1
         -
             id: AISHELL-1-TRAIN
@@ -34,18 +34,18 @@ dataset:
         subsets:
         -
             id: MINI
-            root: dataset/MINI
-            metadata: dataset/MINI/metadata.tsv
+            root: data/audio/MINI
+            metadata: data/audio/MINI/metadata.tsv
             max_num_samples: 0
         -
             id: GIGASPEECH_DEV
-            root: dataset/GIGASPEECH_DEV
-            metadata: dataset/GIGASPEECH_DEV/metadata.tsv
+            root: data/audio/GIGASPEECH_DEV
+            metadata: data/audio/GIGASPEECH_DEV/metadata.tsv
             max_num_samples: 0
         -
             id: GIGASPEECH_TEST
-            root: dataset/GIGASPEECH_TEST
-            metadata: dataset/GIGASPEECH_TEST/metadata.tsv
+            root: data/audio/GIGASPEECH_TEST
+            metadata: data/audio/GIGASPEECH_TEST/metadata.tsv
             max_num_samples: 10
         -
             id: AISHELL-1-DEV
@@ -62,8 +62,8 @@ dataset:
         subsets:
             -
                 id: GIGASPEECH_TEST
-                root: dataset/GIGASPEECH_TEST
-                metadata: dataset/GIGASPEECH_TEST/metadata.tsv
+                root: data/audio/GIGASPEECH_TEST
+                metadata: data/audio/GIGASPEECH_TEST/metadata.tsv
                 max_num_samples: 0
             -
                 id: LIBRISPEECH_TEST_CLEAN
@@ -87,8 +87,8 @@ dataset:
                 max_num_samples: 0
             -
                 id: SPEECHIO_ASR_ZH00000
-                root: dataset/SPEECHIO_ASR_ZH00000
-                metadata: dataset/SPEECHIO_ASR_ZH00000/metadata.tsv
+                root: data/audio/SPEECHIO_ASR_ZH00000
+                metadata: data/audio/SPEECHIO_ASR_ZH00000/metadata.tsv
                 max_num_samples: 0
 
 sample_loader:

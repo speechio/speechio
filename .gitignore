@@ -13,7 +13,7 @@ test/*
 
 model/*
 
-dataset/*
-!dataset/MINI
+data/*
+!data/audio/MINI
 
 *.pt
