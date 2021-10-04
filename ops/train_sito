@@ -388,6 +388,10 @@ def DumpTensorToCSV(x: torch.Tensor, filename: str):
     df.to_csv(filename)
 
 
+def ensure_tensor_in_device(*tensors):
+    return tuple([t.to(G_DEVICE) for t in tensors])
+
+
 def run():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type = str, required = True)
@@ -448,11 +452,13 @@ def run():
     optimizer = torch.optim.SGD(model.parameters(), lr = config.training.optimizer.SGD.lr)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.training.scheduler.gamma)
 
-    for e in range(config.training.num_epochs):
+    num_epochs = config.training.num_epochs
+    for e in range(num_epochs):
         # training
-        logging.info(F'Train[{e}] started ...')
+        logging.info(F'Training epoch {e} with LR={scheduler.get_last_lr()} ...')
         train_loss = 0.0
         train_utts, train_frames = 0, 0
+        num_batches = len(train_dataloader)
         for b, batch in enumerate(train_dataloader):
             optimizer.zero_grad()
 
@@ -460,7 +466,7 @@ def run():
             num_utts = X.shape[0]
             num_frames = T.sum()
 
-            X, L, T, U = X.to(G_DEVICE), L.to(G_DEVICE), T.to(G_DEVICE), U.to(G_DEVICE)
+            X, L, T, U = ensure_tensor_in_device(X, L, T, U)
             Y = model(X)  # Y
             loss = Loss(Y, L, T, U)
 
@@ -468,7 +474,7 @@ def run():
             frame_loss = loss / num_frames
 
             if b != 0 and b % config.training.log_interval == 0:
-                logging.info(F'  {e}.{b} loss={train_loss / train_utts:.2f}')
+                logging.info(F'  [{e}/{num_epochs}]:[{b}/{num_batches}] loss={train_loss / train_frames:.2f}')
 
             utt_loss.backward()
             optimizer.step()
@@ -476,9 +482,8 @@ def run():
             train_loss += loss.item()
             train_utts += num_utts
             train_frames += num_frames
-        logging.info(F'TRAIN[{e}] done. average_loss={(train_loss / train_utts):.2f}')
+        logging.info(F'TRAIN[{e}] average_frame_loss={(train_loss / train_frames):.2f}')
         scheduler.step()
-        logging.info(F'LR: {scheduler.get_last_lr()}')
 
         checkpoint_dir = os.path.join('checkpoints')
         os.makedirs(os.path.join(checkpoint_dir), exist_ok = True)
@@ -486,7 +491,7 @@ def run():
         torch.save(model.state_dict(), checkpoint)
 
         # validation
-        logging.info(F'VALID[{e}] started ...')
+        logging.info(F'Validating epoch {e} ...')
         valid_loss = 0.0
         valid_utts = 0
         valid_frames = 0
@@ -496,7 +501,7 @@ def run():
                 num_utts = len(samples)
                 num_frames = T.sum()
 
-                X, L, T, U = X.to(G_DEVICE), L.to(G_DEVICE), T.to(G_DEVICE), U.to(G_DEVICE)
+                X, L, T, U = ensure_tensor_in_device(X, L, T, U)
                 Y = model(X)
                 loss = Loss(Y, L, T, U)
 
@@ -508,7 +513,7 @@ def run():
                 valid_loss += loss.item()
                 valid_utts += num_utts
                 valid_frames += num_frames
-        logging.info(F'VALID[{e}] done. average_loss={(valid_loss / valid_utts):.2f}')
+        logging.info(F'VALID[{e}] average_frame_loss={(valid_loss / valid_frames):.2f}')
 
         # with torch.no_grad():
         #     test_model = Model(config.model)
