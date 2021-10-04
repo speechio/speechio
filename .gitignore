@@ -4,10 +4,16 @@ credential/*.cfg
 log.*
 tmp*
 *.pt
+run.sh
 
 # oss
 .ossutil_checkpoint
 ossutil_output
 
 model
-data
+data/audio/*
+!data/audio/MINI
+!data/audio/zoo.yaml
+data/text/*
+!data/text/zoo.yaml
+
