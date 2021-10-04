@@ -3,17 +3,11 @@ credential/*.cfg
 
 log.*
 tmp*
+*.pt
 
 # oss
 .ossutil_checkpoint
 ossutil_output
 
-misc/*
-test/*
-
-model/*
-
-data/*
-!data/audio/MINI
-
-*.pt
+model
+data
