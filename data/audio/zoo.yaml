@@ -2,79 +2,65 @@
     id: MINI
     root: data/audio/MINI
     metadata: data/audio/MINI/metadata.tsv
-    max_num_samples: 0
 
 # GigaSpeech
 -
     id: GIGASPEECH_XS
     root: data/audio/GIGASPEECH_XS
     metadata: data/audio/GIGASPEECH_XS/metadata.tsv
-    max_num_samples: 0
 -
     id: GIGASPEECH_S
     root: data/audio/GIGASPEECH_S
     metadata: data/audio/GIGASPEECH_S/metadata.tsv
-    max_num_samples: -1
 -
     id: GIGASPEECH_TEST
     root: data/audio/GIGASPEECH_TEST
     metadata: data/audio/GIGASPEECH_TEST/metadata.tsv
-    max_num_samples: 0
 -
     id: GIGASPEECH_DEV
     root: data/audio/GIGASPEECH_DEV
     metadata: data/audio/GIGASPEECH_DEV/metadata.tsv
-    max_num_samples: 0
 
 # AISHELL-1
 -
     id: AISHELL-1-TRAIN
     root: /data/disk001/AISHELL-1/train
     metadata: /data/disk001/AISHELL-1/train/metadata.tsv
-    max_num_samples: 0
 -
     id: AISHELL-1-DEV
     root: /data/disk001/AISHELL-1/dev
     metadata: /data/disk001/AISHELL-1/dev/metadata.tsv
-    max_num_samples: 0
 -
     id: AISHELL-1-TEST
     root: /data/disk001/AISHELL-1/test
     metadata: /data/disk001/AISHELL-1/test/metadata.tsv
-    max_num_samples: 0
 
 # AISHELL-2
 -
     id: AISHELL-2-IOS-TRAIN
     root: /data/disk001/AISHELL-2/iOS/train
     metadata: /data/disk001/AISHELL-2/iOS/train/metadata.tsv
-    max_num_samples: 0
 -
     id: AISHELL-2-IOS-DEV
     root: /data/disk001/AISHELL-2/iOS/dev
     metadata: /data/disk001/AISHELL-2/iOS/dev/metadata.tsv
-    max_num_samples: 0
 -
     id: AISHELL-2-IOS-TEST
     root: /data/disk001/AISHELL-2/iOS/test
     metadata: /data/disk001/AISHELL-2/iOS/test/metadata.tsv
-    max_num_samples: 0
 
 # LibriSpeech
 -
     id: LIBRISPEECH_TEST_CLEAN
     root: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_CLEAN
     metadata: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_CLEAN/metadata.tsv
-    max_num_samples: 0
 -
     id: LIBRISPEECH_TEST_OTHER
     root: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_OTHER
     metadata: /home/dophist/work/git/leaderboard/datasets/LIBRISPEECH_TEST_OTHER/metadata.tsv
-    max_num_samples: 0
 
 # SpeechIO test set
 -
     id: SPEECHIO_ASR_ZH00000
     root: data/audio/SPEECHIO_ASR_ZH00000
     metadata: data/audio/SPEECHIO_ASR_ZH00000/metadata.tsv
-    max_num_samples: 0
