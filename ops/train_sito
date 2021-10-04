@@ -158,9 +158,10 @@ def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
     torchaudio:
         https://pytorch.org/audio/stable/compliance.kaldi.html
     '''
-    # torchaudio normally uses normalized wave
+    # By default, torchaudio uses normalized 32bits float waveform [-1.0, 1.0]
     assert waveform.dtype == torch.float32
-    # To use Kaldi compliance function, 16bit signed-PCM is required
+
+    # To use Kaldi compliance function, waveform needs to be convert to 16bits signed-interger PCM [-32768, 32767]
     # TODO:
     # torchaudio's feature extraction is not consistent with Kaldi https://github.com/pytorch/audio/issues/400
     # torchaudio official plan to bind kaldi feat lib: https://github.com/pytorch/audio/issues/1269
@@ -456,14 +457,12 @@ def run():
     for e in range(num_epochs):
         # training
         logging.info(F'Training epoch {e} with LR={scheduler.get_last_lr()} ...')
-        train_loss = 0.0
-        train_utts, train_frames = 0, 0
+        total_loss = 0.0
+        total_utts, total_frames = 0, 0
         num_batches = len(train_dataloader)
         for b, batch in enumerate(train_dataloader):
-            optimizer.zero_grad()
-
             samples, X, L, T, U = batch
-            num_utts = X.shape[0]
+            num_utts = len(samples)
             num_frames = T.sum()
 
             X, L, T, U = ensure_tensor_in_device(X, L, T, U)
@@ -474,16 +473,17 @@ def run():
             frame_loss = loss / num_frames
 
             if b != 0 and b % config.training.log_interval == 0:
-                logging.info(F'  [{e}/{num_epochs}]:[{b}/{num_batches}] loss={train_loss / train_frames:.2f}')
+                logging.info(F'  [{e}/{num_epochs}]:[{b}/{num_batches}] loss={total_loss / total_frames:.2f}')
 
             utt_loss.backward()
             optimizer.step()
+            optimizer.zero_grad()
             
-            train_loss += loss.item()
-            train_utts += num_utts
-            train_frames += num_frames
-        logging.info(F'TRAIN[{e}] average_frame_loss={(train_loss / train_frames):.2f}')
+            total_loss += loss.item()
+            total_utts += num_utts
+            total_frames += num_frames
         scheduler.step()
+        logging.info(F'TRAIN[{e}] average_frame_loss={(total_loss / total_frames):.2f}')
 
         checkpoint_dir = os.path.join('checkpoints')
         os.makedirs(os.path.join(checkpoint_dir), exist_ok = True)
@@ -492,9 +492,8 @@ def run():
 
         # validation
         logging.info(F'Validating epoch {e} ...')
-        valid_loss = 0.0
-        valid_utts = 0
-        valid_frames = 0
+        total_loss = 0.0
+        total_utts, total_frames = 0, 0
         with torch.no_grad():
             for b, batch in enumerate(valid_dataloader):
                 samples, X, L, T, U = batch
@@ -510,10 +509,10 @@ def run():
                 for p in best_paths:
                     print(tokenizer.tokenizer.DecodeIds(p))
                 
-                valid_loss += loss.item()
-                valid_utts += num_utts
-                valid_frames += num_frames
-        logging.info(F'VALID[{e}] average_frame_loss={(valid_loss / valid_frames):.2f}')
+                total_loss += loss.item()
+                total_utts += num_utts
+                total_frames += num_frames
+        logging.info(F'VALID[{e}] average_frame_loss={(total_loss / total_frames):.2f}')
 
         # with torch.no_grad():
         #     test_model = Model(config.model)
