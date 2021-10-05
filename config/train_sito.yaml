@@ -2,6 +2,8 @@ logging: config/logging.yaml
 
 data_zoo: data/audio/zoo.yaml
 
+sample_rate: 16000
+
 sample_loader:
     field_map:
         id: ID
@@ -19,7 +21,7 @@ dataset:
     train:
         subsets:
         -   id: GIGASPEECH_XS
-            max_num_samples: 100
+            max_num_samples: 10
         -   id: GIGASPEECH_S
             max_num_samples: 0
 
@@ -41,11 +43,21 @@ tokenizer:
     model: model/tokenizer/sentencepiece_en.model
     vocab: model/tokenizer/sentencepiece_en.vocab
 
+text_normalizer:
+    case: UPPER # either 'UPPER' or 'lower'
+
 dataloader:
     shuffle: True
     batch_size: 1
     drop_last: False
     num_workers: 4
+
+augmentation:
+    mark_key: True
+    speeds: [0.9, 1.0, 1.1]
+    tempos: #[0.9, 1.0, 1.1]
+    rel_volumes: #[0.9, 1.0, 1.1]
+    abs_volumes:
 
 feature:
     num_mel_bins: 80
@@ -54,7 +66,7 @@ feature:
     mvn_scale: ''
 
 training:
-    num_epochs: 3
+    num_epochs: 2
     log_interval: 10
     optimizer:
         Adam:
@@ -63,8 +75,6 @@ training:
             lr: 0.001
     scheduler:
         gamma: 0.5
-
-model_sample_rate: 16000
 
 model:
     idim: 80

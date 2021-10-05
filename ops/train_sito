@@ -11,18 +11,20 @@ import csv
 from typing import Optional, Any
 from dataclasses import dataclass
 import logging.config
+
 import math
+import random
+import numpy
+import torch
+import torch.nn as nn
+import torchaudio
+import torchaudio.sox_effects
 
 from omegaconf import OmegaConf
 import yaml
 import sentencepiece as spm
 
-import numpy
-import torch
-import torch.nn as nn
-import torchaudio
-
-import pandas as pd
+#import pandas as pd
 #import k2
 
 # Global Constants
@@ -96,7 +98,9 @@ class Dataset:
             elif subset.max_num_samples < 0:
                 subset.max_num_samples = sys.maxsize # https://docs.python.org/3/library/sys.html#sys.maxsize
 
+            # corpus related information are stored in data zoo
             subset_root, subset_meta = data_zoo[subset.id].root, data_zoo[subset.id].metadata
+
             logging.info(F'Loading dataset: {subset.id} from ({subset_root} : {subset_meta})')
             with open(subset_meta, 'r', encoding='utf8') as f:
                 if str.endswith(subset_meta, '.tsv'):
@@ -145,7 +149,6 @@ def ReadAndResampleAudio(sample: Sample, target_sample_rate: int) :
         sample.audio,
         frame_offset = int(audio_info.sample_rate * sample.begin),
         num_frames   = int(audio_info.sample_rate * sample.duration),
-        channels_first = True,
     )
 
     if audio_info.sample_rate != target_sample_rate:
@@ -153,6 +156,43 @@ def ReadAndResampleAudio(sample: Sample, target_sample_rate: int) :
     
     return waveform, target_sample_rate
 
+
+def PerturbWaveform(key: str, waveform: torch.Tensor, sample_rate: int, effect: str, factor: float, mark_key: bool):
+    '''
+    Note: Regarding to 'speed' and 'tempo' perturbation:
+
+    in classic SoX CLI:
+        soxi raw.wav -> sample_rate: 16000, duration: 00:00:01.99 = 31872 samples
+
+        sox raw.wav speed.wav speed 1.5
+        soxi speed.wav -> sample_rate: 16000, 00:00:01.33 = 21248 sample
+
+        sox raw.wav tempo.wav tempo 1.5
+        soxi tempo.wav -> sample_rate: 16000, 00:00:01.33 = 21248 sample
+
+    whereas in torchaudio.sox_effect function calls:
+        output waveform sample_rate is changed,
+        so here we need explicitly 'rate' resampling after 'speed' or 'tempo'
+
+    '''
+    if factor == 1.0:
+        return key, waveform, sample_rate
+
+    if effect in ['speed', 'tempo']:
+        effects_chain = [ [effect, str(factor)], ['rate', str(sample_rate)] ]
+    elif effect == 'vol':
+        effects_chain = [ [effect, str(factor)] ]
+    else:
+        raise RuntimeError(F'Unsupported perturbation effect: {effect}')
+
+    new_waveform, new_sample_rate = torchaudio.sox_effects.apply_effects_tensor(
+        waveform, sample_rate,
+        effects_chain,
+    )
+    new_key = F'{key}__{effect}{factor}' if mark_key else key
+
+    assert(new_sample_rate == sample_rate) # sample rate should not change in any perturbation
+    return new_key, new_waveform, new_sample_rate
 
 def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
     '''
@@ -199,8 +239,25 @@ class Tokenizer:
         return token_pieces, token_ids
 
 
+class TextNormalizer:
+    def __init__(self, config):
+        self.config = config
+    
+    def __call__(self, text):
+        if self.config.case == 'UPPER':
+            text = text.upper()
+        return text
+
+
 class DataPipeline:
-    def __init__(self, config, tokenizer: Optional[callable] = None, text_normalizer: Optional[callable] = None, mean_norm_shift: Optional[torch.Tensor] = None, var_norm_scale: Optional[torch.Tensor] = None):
+    def __init__(
+        self,
+        config,
+        mean_norm_shift: Optional[torch.Tensor] = None,
+        var_norm_scale: Optional[torch.Tensor] = None,
+        text_normalizer: Optional[callable] = None,
+        tokenizer: Optional[callable] = None,
+    ) :
         self.config = config
 
         self.text_normalizer = text_normalizer
@@ -213,10 +270,32 @@ class DataPipeline:
         minibatch = []
         for sample in samples:
             # raw audio loading and resampling
-            waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.model_sample_rate)
-            # speed perturbation
+            waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.sample_rate)
 
-            # volumn perturbation
+            # perturbations
+            mark_key = self.config.augmentation.mark_key
+            if speeds := self.config.augmentation.speeds:
+                sample.id, waveform, sample_rate = PerturbWaveform(
+                    sample.id, waveform, sample_rate, 
+                    effect = 'speed', factor = random.choice(speeds), 
+                    mark_key=mark_key
+                )
+            
+            if tempos := self.config.augmentation.tempos:
+                sample.id, waveform, sample_rate = PerturbWaveform(
+                    sample.id, waveform, sample_rate, 
+                    effect = 'tempo', factor = random.choice(tempos), 
+                    mark_key=mark_key
+                )
+            
+            if rel_volumes := self.config.augmentation.rel_volumes:
+                sample.id, waveform, sample_rate = PerturbWaveform(
+                    sample.id, waveform, sample_rate, 
+                    effect = 'vol', factor = random.choice(rel_volumes), 
+                    mark_key=mark_key
+                )
+            
+            # abs_volumes
 
             # reverb
 
@@ -256,6 +335,7 @@ class DataPipeline:
                 'token_pieces': token_pieces,
                 'token_ids': token_ids,
             })
+            logging.debug(F'Processed sample {sample.id}')
 
         features = [ x['feature'] for x in minibatch ]
         time_lengths = torch.tensor([ len(x) for x in features ]) # [B]
@@ -428,7 +508,15 @@ def run():
 
     # data pipline
     tokenizer = Tokenizer(config.tokenizer)
-    data_pipeline = DataPipeline(config, tokenizer = tokenizer, mean_norm_shift = mean_norm_shift, var_norm_scale = var_norm_scale)
+    text_normalizer = TextNormalizer(config.text_normalizer)
+
+    data_pipeline = DataPipeline(
+        config, 
+        mean_norm_shift = mean_norm_shift, 
+        var_norm_scale = var_norm_scale,
+        text_normalizer = text_normalizer,
+        tokenizer = tokenizer,
+    )
 
     # data loaders
     train_dataloader = torch.utils.data.DataLoader(
@@ -486,9 +574,9 @@ def run():
             total_utts += num_utts
             total_frames += num_frames
             if b % config.training.log_interval == 0:
-                logging.info(F'  [{e}/{num_epochs}]:[{b}/{num_batches}] loss={total_loss / total_frames:.2f}')
+                logging.info(F'  [{e+1}/{num_epochs}]:[{b+1}/{num_batches}] loss={total_loss / total_frames:.2f}')
         scheduler.step()
-        logging.info(F'TRAIN[{e}] average_frame_loss={(total_loss / total_frames):.2f}')
+        logging.info(F'TRAIN[{e}] average_frame_loss={(total_loss / total_frames):.2f} over {total_frames} frames')
 
         checkpoint_dir = os.path.join('checkpoints')
         os.makedirs(os.path.join(checkpoint_dir), exist_ok = True)
