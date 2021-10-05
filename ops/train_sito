@@ -88,9 +88,8 @@ class SampleLoader:
 
 class Dataset:
     def __init__(self, config_data_zoo, config_dataset, config_sample_loader) :
-        data_zoo = OmegaConf.load(config.data_zoo)
         self.samples = []
-
+        data_zoo = OmegaConf.load(config_data_zoo)
         for subset in config_dataset.subsets:
             if subset.max_num_samples == 0:
                 continue
@@ -211,8 +210,6 @@ class DataPipeline:
         self.var_norm_scale = var_norm_scale
 
     def __call__(self, samples: list[Sample]):
-        features = []
-        labels = []
         minibatch = []
         for sample in samples:
             # raw audio loading and resampling
@@ -239,8 +236,6 @@ class DataPipeline:
             if (self.var_norm_scale != None):
                 feature *= self.var_norm_scale
 
-            features.append(feature)
-
             text = sample.text
             # text normalization
             if self.text_normalizer:
@@ -251,14 +246,18 @@ class DataPipeline:
             if self.tokenizer:
                 token_pieces, token_ids = self.tokenizer(text)
 
-            labels.append(token_ids)
-            
             # store everything here for debug purpose
-            minibatch.append(
-                (sample.id, waveform, sample_rate, feature, text, token_pieces, token_ids)
-            )
-        
-        # sequence padding & minibatch packing
+            minibatch.append({
+                'id': sample.id,
+                'waveform': waveform,
+                'sample_rate': sample_rate,
+                'feature': feature,
+                'text': text,
+                'token_pieces': token_pieces,
+                'token_ids': token_ids,
+            })
+
+        features = [ x['feature'] for x in minibatch ]
         time_lengths = torch.tensor([ len(x) for x in features ]) # [B]
         inputs = nn.utils.rnn.pad_sequence(
             features,
@@ -266,6 +265,7 @@ class DataPipeline:
             padding_value = G_FEATURE_PADDING_VALUE,
         ) # [B, max(time_lengths), F]
 
+        labels = [ x['token_ids'] for x in minibatch ]
         label_lengths = torch.tensor([ len(y) for y in labels ]) # [B]   
         targets = nn.utils.rnn.pad_sequence(
             [ torch.tensor(l) for l in labels ],
@@ -335,10 +335,10 @@ def compute_mvn(dataset, config):
     for batch in dataloader:
         samples, _,_,_,_ = batch
         for sample in samples:
-            feat = sample[3]  # [Time, Freq]
-            M += feat.sum(dim=0)
-            V += feat.square().sum(dim=0)
-            k += feat.shape[0]
+            x = sample['feature']  # [Time, Freq]
+            M += x.sum(dim=0)
+            V += x.square().sum(dim=0)
+            k += x.shape[0]
     M = M / k
     V = (V / k - M.square())
     mean_norm_shift = -M
@@ -412,8 +412,10 @@ def run():
         with open(config.logging, 'r', encoding='utf8') as f:
             logging.config.dictConfig(yaml.safe_load(f))
     else:
-        logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
-    
+        logging.basicConfig(
+            stream=sys.stderr, level=logging.INFO,
+            format='%(asctime)s [%(levelname)s] %(message)s'
+        )
 
     # load train/dev/test dataset from data zoo
     train_dataset = Dataset(config.data_zoo, config.dataset.train, config.sample_loader)
@@ -476,9 +478,6 @@ def run():
             utt_loss = loss / num_utts
             frame_loss = loss / num_frames
 
-            if b != 0 and b % config.training.log_interval == 0:
-                logging.info(F'  [{e}/{num_epochs}]:[{b}/{num_batches}] loss={total_loss / total_frames:.2f}')
-
             utt_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -486,6 +485,8 @@ def run():
             total_loss += loss.item()
             total_utts += num_utts
             total_frames += num_frames
+            if b % config.training.log_interval == 0:
+                logging.info(F'  [{e}/{num_epochs}]:[{b}/{num_batches}] loss={total_loss / total_frames:.2f}')
         scheduler.step()
         logging.info(F'TRAIN[{e}] average_frame_loss={(total_loss / total_frames):.2f}')
 
