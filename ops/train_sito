@@ -340,7 +340,7 @@ def compute_mvn(dataset, config):
             V += x.square().sum(dim=0)
             k += x.shape[0]
     M = M / k
-    V = (V / k - M.square())
+    V = V / k - M.square()
     mean_norm_shift = -M
     var_norm_scale = V.sqrt().clamp(min = G_EPSILON).reciprocal()
     logging.info(F'Global MEAN/VAR Normalizer after {k} frames:\nmean_norm_shift:  {mean_norm_shift}\nvar_norm_scale:  {var_norm_scale}')
@@ -472,7 +472,7 @@ def run():
             num_frames = T.sum()
 
             X, L, T, U = ensure_tensor_in_device(X, L, T, U)
-            Y = model(X)  # Y
+            Y = model(X)
             loss = Loss(Y, L, T, U)
 
             utt_loss = loss / num_utts
