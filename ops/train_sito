@@ -441,7 +441,7 @@ def length_to_mask(lengths: torch.Tensor) -> torch.Tensor:
     return mask
 
 
-def ctc_collapse_sequence(hyp: list[int]) -> list[int]:
+def ctc_collapse(hyp: list[int]) -> list[int]:
     new_hyp: list[int] = []
     cur = 0
     while cur < len(hyp):
@@ -465,7 +465,7 @@ def ctc_greedy_search(log_probs: torch.Tensor, time_lengths: torch.Tensor):
     best_paths.masked_fill_(pad_mask, G_EOS_ID)
     best_scores.masked_fill_(pad_mask, 0.0)
     scores = best_scores.sum(1)
-    hyps = [ ctc_collapse_sequence(p.tolist()) for p in best_paths ]
+    hyps = [ ctc_collapse(p.tolist()) for p in best_paths ]
     #hyps = [ p.tolist() for p in best_paths ]
     return hyps, scores
 
