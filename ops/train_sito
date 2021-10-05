@@ -45,7 +45,7 @@ class Sample:
     begin: float = 0.0
     duration: float = 0.0
     text: str = ''
-    speaker: Any = None
+    speaker: str = ''
 
 
 class SampleLoader:
@@ -57,33 +57,38 @@ class SampleLoader:
         a Sample object or None
         None if an utterance doesn't satisfy constraints e.g. duration, text length
     '''
-    def __init__(self, config):
+    def __init__(self, config, data_root: str = ''):
         self.config = config
+        self.data_root = data_root
     
-    def __call__(self, utt: dict, dataset_root: str = '') -> Optional[Sample] :
+    def __call__(self, utt: dict) -> Optional[Sample] :
         sample = Sample()
-        for f, attr in self.config.field_map.items():
-            assert hasattr(sample, f), F'field:{f} <- attr:{attr}, no such field'
-            v = utt.get(attr, None)
-            if v:
-                if f in ['duration', 'begin', ]:
+        for attr, field in self.config.field_map.items():
+            if v := utt.get(field):
+                if attr in ['duration', 'begin', ]:
                     v = float(v)
-                elif f == 'audio':
-                    v = os.path.join(dataset_root, v)
+                elif attr == 'audio':
+                    v = os.path.join(self.data_root, v)
                 else:
-                    v = v
-                setattr(sample, f, v)
+                    v = str(v)
+                assert hasattr(sample, attr), F'{field} -> Sample.{attr} mapping failed, no such attribute'
+                setattr(sample, attr, v)
 
-        if float(sample.duration) < self.config.min_duration:
+        if sample.duration < self.config.min_duration:
             return None
-        if float(sample.duration) > self.config.max_duration:
+        if sample.duration > self.config.max_duration:
+            return None
+        if len(sample.text) < self.config.min_text_length:
+            return None
+        if len(sample.text) > self.config.max_text_length:
             return None
 
         return sample
 
 
 class Dataset:
-    def __init__(self, data_zoo, config_dataset, sample_loader: callable) :
+    def __init__(self, config_data_zoo, config_dataset, config_sample_loader) :
+        data_zoo = OmegaConf.load(config.data_zoo)
         self.samples = []
 
         for subset in config_dataset.subsets:
@@ -92,22 +97,23 @@ class Dataset:
             elif subset.max_num_samples < 0:
                 subset.max_num_samples = sys.maxsize # https://docs.python.org/3/library/sys.html#sys.maxsize
 
-            dataset_root, metadata_file = data_zoo[subset.id].root, data_zoo[subset.id].metadata
-            logging.info(F'Loading dataset: {subset.id} from ({dataset_root} : {metadata_file})')
-            k = 0
-            with open(metadata_file, 'r', encoding='utf8') as f:
-                if str.endswith(metadata_file, '.tsv'):
+            subset_root, subset_meta = data_zoo[subset.id].root, data_zoo[subset.id].metadata
+            logging.info(F'Loading dataset: {subset.id} from ({subset_root} : {subset_meta})')
+            with open(subset_meta, 'r', encoding='utf8') as f:
+                if str.endswith(subset_meta, '.tsv'):
                     utterance_reader = csv.DictReader(f, delimiter='\t')
                 else:
                     raise NotImplementedError
 
+                k = 0
+                sample_loader = SampleLoader(config = config_sample_loader, data_root = subset_root)
                 for utt in utterance_reader:
                     if k < subset.max_num_samples:
-                        if (sample := sample_loader(utt, dataset_root = dataset_root)) != None:
+                        if sample := sample_loader(utt):
                             self.samples.append(sample)
                             k += 1
-            logging.info(F'{k} samples loaded from {subset.id}')
-        
+                logging.info(F'{k} samples loaded from {subset.id}')
+
         # length sort
 
         # shuffle
@@ -309,7 +315,7 @@ def Loss(log_probs, labels, input_lens, label_lens, blank_index = G_BLANK_ID):
     return loss
 
 
-def compute_mvn_normalizer(dataset, config):
+def compute_mvn(dataset, config):
     pipeline = DataPipeline(config)
 
     # data loaders
@@ -355,7 +361,7 @@ def length_to_mask(lengths: torch.Tensor) -> torch.Tensor:
     return mask
 
 
-def collapse_ctc_sequence(hyp: list[int]) -> list[int]:
+def ctc_collapse_sequence(hyp: list[int]) -> list[int]:
     new_hyp: list[int] = []
     cur = 0
     while cur < len(hyp):
@@ -379,7 +385,7 @@ def ctc_greedy_search(log_probs: torch.Tensor, time_lengths: torch.Tensor):
     best_paths.masked_fill_(pad_mask, G_EOS_ID)
     best_scores.masked_fill_(pad_mask, 0.0)
     scores = best_scores.sum(1)
-    hyps = [ collapse_ctc_sequence(p.tolist()) for p in best_paths ]
+    hyps = [ ctc_collapse_sequence(p.tolist()) for p in best_paths ]
     #hyps = [ p.tolist() for p in best_paths ]
     return hyps, scores
 
@@ -408,19 +414,17 @@ def run():
     else:
         logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
     
-    # load data zoo
-    data_zoo = OmegaConf.load(config.data_zoo)
 
     # load train/dev/test dataset from data zoo
-    sample_loader = SampleLoader(config.sample_loader)
-    train_dataset = Dataset(data_zoo, config.dataset.train, sample_loader = sample_loader)
-    valid_dataset = Dataset(data_zoo, config.dataset.valid, sample_loader = sample_loader)
+    train_dataset = Dataset(config.data_zoo, config.dataset.train, config.sample_loader)
+    valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
 
-    # data pipline
-    mean_norm_shift, var_norm_scale = compute_mvn_normalizer(train_dataset, config)
+    # compute feature mean & var normalizer
+    mean_norm_shift, var_norm_scale = compute_mvn(train_dataset, config)
     #torch.save(mean_norm_shift, 'mean_norm_shift.pt')
     #torch.save(var_norm_scale, 'var_norm_scale.pt')
 
+    # data pipline
     tokenizer = Tokenizer(config.tokenizer)
     data_pipeline = DataPipeline(config, tokenizer = tokenizer, mean_norm_shift = mean_norm_shift, var_norm_scale = var_norm_scale)
 
