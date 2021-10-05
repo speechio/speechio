@@ -469,7 +469,7 @@ def run():
         for b, batch in enumerate(train_dataloader):
             samples, X, L, T, U = batch
             num_utts = len(samples)
-            num_frames = T.sum()
+            num_frames = int(T.sum())
 
             X, L, T, U = ensure_tensor_in_device(X, L, T, U)
             Y = model(X)
@@ -503,7 +503,7 @@ def run():
             for b, batch in enumerate(valid_dataloader):
                 samples, X, L, T, U = batch
                 num_utts = len(samples)
-                num_frames = T.sum()
+                num_frames = int(T.sum())
 
                 X, L, T, U = ensure_tensor_in_device(X, L, T, U)
                 Y = model(X)
