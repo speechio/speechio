@@ -309,11 +309,11 @@ class DataPipeline:
 
             # mean normalization
             if (self.mean_norm_shift != None):
-                feature += self.mean_norm_shift
+                feature += self.mean_norm_shift  # broadcasted along t-axis
 
             # variance normalizaton
             if (self.var_norm_scale != None):
-                feature *= self.var_norm_scale
+                feature *= self.var_norm_scale  # broadcasted along t-axis
 
             text = sample.text
             # text normalization
