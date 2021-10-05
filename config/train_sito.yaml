@@ -38,19 +38,6 @@ dataset:
             max_num_samples: 0
         -   id: LIBRISPEECH_TEST_OTHER
             max_num_samples: 0
-    
-tokenizer:
-    model: model/tokenizer/sentencepiece_en.model
-    vocab: model/tokenizer/sentencepiece_en.vocab
-
-text_normalizer:
-    case: UPPER # either 'UPPER' or 'lower'
-
-dataloader:
-    shuffle: True
-    batch_size: 1
-    drop_last: False
-    num_workers: 4
 
 augmentation:
     mark_key: True
@@ -64,6 +51,19 @@ feature:
     dither: 0.0
     mvn_shift: ''
     mvn_scale: ''
+
+text_normalizer:
+    case: UPPER # either 'UPPER' or 'lower'
+
+tokenizer:
+    model: model/tokenizer/sentencepiece_en.model
+    vocab: model/tokenizer/sentencepiece_en.vocab
+
+dataloader:
+    shuffle: True
+    batch_size: 1
+    drop_last: False
+    num_workers: 4
 
 training:
     num_epochs: 2
