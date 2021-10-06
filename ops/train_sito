@@ -197,7 +197,8 @@ class Perturbation:
                     ['speed', str(factor)],
                     ['rate', str(sample_rate)]
                 ])
-                key = f'{key}__speed{factor}' if self.mark_key else key
+                if self.mark_key:
+                    key = f'{key}__speed{factor}'
         
         if self.tempos:
             if (factor := random.choice(self.tempos)) != 1.0:
@@ -205,19 +206,24 @@ class Perturbation:
                     ['tempo', str(factor)],
                     ['rate', str(sample_rate)]
                 ])
-                key = f'{key}__tempo{factor}' if self.mark_key else key
+                if self.mark_key:
+                    key = f'{key}__tempo{factor}'
 
         if self.volumes:
             if (factor := random.choice(self.volumes)) != 1.0:
                 effects_chain.append(['vol', str(factor)])
-                key = f'{key}__vol{factor}' if self.mark_key else key
+                if self.mark_key:
+                    key = f'{key}__vol{factor}'
 
-        new_waveform, new_sample_rate = torchaudio.sox_effects.apply_effects_tensor(
-            waveform, sample_rate,
-            effects_chain,
-        )
-        assert new_sample_rate == sample_rate # perturbation shouldn't change sample_rate
-        return key, new_waveform, new_sample_rate
+        if effects_chain:
+            new_waveform, new_sample_rate = torchaudio.sox_effects.apply_effects_tensor(
+                waveform, sample_rate,
+                effects_chain,
+            )
+            assert new_sample_rate == sample_rate # perturbation shouldn't change sample_rate
+            waveform, sample_rate = new_waveform, new_sample_rate
+
+        return key, waveform, sample_rate
 
 
 class FeatureExtractor:
