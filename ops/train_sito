@@ -234,26 +234,10 @@ class FeatureExtractor:
 
 
 class FbankFeatureExtractor:
-    def __init__(self, num_mel_bins:int, mvn_stats_file:str, dither:float = 0.0, apply_mvn:bool = True):
-        self.feature_dim = num_mel_bins
+    def __init__(self, num_mel_bins:int, dither:float = 0.0):
+        self.num_mel_bins = num_mel_bins
         self.dither = dither
 
-        self.mean_norm_shift = None #torch.zeros(self.feature_dim)
-        self.var_norm_scale = None #torch.ones(self.feature_dim)
-
-        if apply_mvn:
-            if self.config.mvn_stats_file:
-                with open(self.config.mvn_stats_file, 'r') as f:
-                    mvn_stats = json.load(f)
-                    o1_stats = torch.Tensor(mvn_stats['o1_stats'])
-                    o2_stats = torch.Tensor(mvn_stats['o2_stats'])
-                    N = mvn_stats['N']
-                    mean = o1_stats / N
-                    var  = o2_stats / N - mean.square()
-                    self.mean_norm_shift = -mean
-                    self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
-
-    
     def __call__(self, waveform: torch.Tensor, sample_rate: int):
         '''
         kaldi:
@@ -271,26 +255,64 @@ class FbankFeatureExtractor:
         # to not finished up to 2021-10-02 : https://github.com/pytorch/audio/pull/1326
         # keep an eye on this work and do it myself if necessary
         assert waveform.dtype == torch.float32
-        kaldi_waveform = waveform * torch.iinfo(torch.int16).max
+        INT16PCM_waveform = waveform * torch.iinfo(torch.int16).max
         feature = torchaudio.compliance.kaldi.fbank(
-            kaldi_waveform,
+            INT16PCM_waveform,
             sample_frequency = sample_rate,
-            num_mel_bins = self.config.num_mel_bins,
-            dither = self.config.dither,
+            num_mel_bins = self.num_mel_bins,
+            dither = self.dither,
             energy_floor = torch.finfo(torch.float).eps,
             # about energy_floor:
             #   Kaldi default = 0.0; torchaudio default = 1.0;
             #   it doesn't matter if use_energy = False (default in both)
         )
 
+        return feature
+
+class MeanVarStats:
+    def __init__(self):
+        self.dim = 0
+        self.o1_stats = None
+        self.o2_stats = None
+        self.N = 0
+
+    def accumulate_mean_var_stats(self, feature:torch.Tensor):
+        if not self.N:
+            self.dim = feature.shape[1]
+            self.o1_stats = torch.zeros(self.dim)
+            self.o2_stats = torch.zeros(self.dim)
+        self.o1_stats += feature.sum(dim=0)
+        self.o2_stats += feature.square().sum(dim=0)
+        self.N += feature.shape[0]
+
+    def load(self, input_file:str):
+        with open(input_file, 'r') as f:
+            stats = json.load(input_file)
+            self.o1_stats = torch.Tensor(stats['o1_stats'])
+            self.o2_stats = torch.Tensor(stats['o2_stats'])
+            self.N = stats['N']
+
+    def dump(self, output_file:str):
+        stats = {
+            'o1_stats': self.o1_stats.tolist(),
+            'o2_stats': self.o2_stats.tolist(),
+            'N': self.N,
+        }
+        with open(output_file, 'w+') as f:
+            json.dump(stats, f)
+
+class MeanVarNormalizer:
+    def __init__(self, mvn_stats:MeanVarStats):
+        mean = mvn_stats.o1_stats / mvn_stats.N
+        var  = mvn_stats.o2_stats / mvn_stats.N - mean.square()
+        self.mean_norm_shift = -mean
+        self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
+    
+    def __call__(self, feature:torch.Tensor):
         # mean normalization
-        if self.mean_norm_shift:
-            feature += self.mean_norm_shift  # broadcasting over t-axis
-
+        feature += self.mean_norm_shift  # broadcasting over t-axis
         # variance normalizaton
-        if self.var_norm_scale:
-            feature *= self.var_norm_scale  # broadcasting over t-axis
-
+        feature *= self.var_norm_scale  # broadcasting over t-axis
         return feature
 
 
@@ -319,18 +341,17 @@ class TextNormalizer:
 class DataPipeline:
     def __init__(
         self,
-        config,
         resampler = Optional[callable] = None,
         perturbation = Optional[callable] = None,
         feature_extractor = Optional[callable] = None,
+        mean_var_normalizer = Optional[callable] = None,
         text_normalizer: Optional[callable] = None,
         tokenizer: Optional[callable] = None,
     ) :
-        self.config = config
-
         self.resampler = resampler
         self.perturbation = perturbation
         self.feature_extractor = feature_extractor
+        self.mean_var_normalizer = mean_var_normalizer
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
 
@@ -355,6 +376,9 @@ class DataPipeline:
             feature = None
             if self.feature_extractor:
                 feature = self.feature_extractor(waveform, sample_rate)
+            
+            if self.mean_var_normalizer:
+                feature = self.mean_var_normalizer(feature)
 
             # specaug
             
@@ -443,7 +467,7 @@ def Loss(log_probs, labels, input_lens, label_lens, blank_index = G_BLANK_ID):
 
 
 def compute_mvn_stats(dataset, config):
-    pipeline = DataPipeline(
+    feature_pipeline = DataPipeline(
         resampler = Resampler(**config.resampler),
         perturbation = Perturbation(**config.perturbation),
         feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
@@ -456,29 +480,22 @@ def compute_mvn_stats(dataset, config):
         batch_size = 32, 
         drop_last = False,
         num_workers = 4,
-        collate_fn = pipeline,
+        collate_fn = feature_pipeline,
     )
 
     logging.info('Computing global mean variance stats')
-    M = torch.zeros(config.model.idim)
-    V = torch.zeros(config.model.idim)
-    k = 0
+    stats = MeanVarStats()
     for batch in dataloader:
         samples, _,_,_,_ = batch
         for sample in samples:
-            x = sample['feature']  # [Time, Freq]
-            M += x.sum(dim=0)
-            V += x.square().sum(dim=0)
-            k += x.shape[0]
-    logging.info(f'Global MEAN/VAR stats after {k} frames:\nFirst order sum:  {M}\nSecond order sum:  {V}')
-
-    with open(config_feature_extractor.mvn_stats_file, 'w+') as f:
-        mvn_stats = {
-            'order1_stats': M,
-            'order2_stats': V,
-            'num_frames': k,
-        }
-        json.dump(stats, f)
+            stats.accumulate_mean_var_stats(sample['feature'])  # [Time, Freq]
+    logging.info(
+        f'Global MEAN/VAR stats after {stats.N} frames:\n'
+        f'  1st order sum:  {stats.o1_stats}\n'
+        f'  2nd order sum:  {stats.o2_stats}\n'
+        f'  Total number:   {stats.N}\n'
+    )
+    return stats
 
 
 def make_length_mask(lengths: torch.Tensor) -> torch.Tensor:
@@ -556,13 +573,15 @@ def run():
     valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
 
     # compute feature mean & var normalizer
-    compute_mvn_stats(train_dataset, config)
+    mvn_stats = compute_mvn_stats(train_dataset, config)
+    mvn_stats.dump('mvn_stats.json')
 
     # assemble data processing pipline
     data_pipeline = DataPipeline(
         resampler = Resampler(**config.resampler),
         perturbation = Perturbation(**config.perturbation),
         feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
+        mean_var_normalizer = MeanVarNormalizer(mvn_stats),
         text_normalizer = TextNormalizer(**config.text_normalizer),
         tokenizer = Tokenizer(**config.tokenizer),
     )
