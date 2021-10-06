@@ -597,13 +597,13 @@ def run():
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.training.scheduler.gamma)
 
     num_epochs = config.training.num_epochs
-    for e in range(num_epochs):
+    for e in range(1, 1 + num_epochs): # epoch index starts from 1
         # training
         logging.info(f'Training epoch {e} with LR={scheduler.get_last_lr()} ...')
         total_loss = 0.0
         total_utts, total_frames = 0, 0
         num_batches = len(train_dataloader)
-        for b, batch in enumerate(train_dataloader):
+        for b, batch in enumerate(train_dataloader, 1): # batch index starts from 1
             samples, X, L, T, U = batch
             num_utts = len(samples)
             num_frames = int(T.sum())
@@ -623,7 +623,7 @@ def run():
             total_utts += num_utts
             total_frames += num_frames
             if b % config.training.log_interval == 0:
-                logging.info(f'  [{e+1}/{num_epochs}]:[{b+1}/{num_batches}] loss={total_loss / total_frames:.2f}')
+                logging.info(f'  [{e}/{num_epochs}]:[{b}/{num_batches}] loss={total_loss / total_frames:.2f}')
         scheduler.step()
         logging.info(f'TRAIN[{e}] average_frame_loss={(total_loss / total_frames):.2f} over {total_frames} frames')
 
