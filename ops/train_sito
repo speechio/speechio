@@ -570,17 +570,14 @@ def run():
     # data loaders
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, 
-        shuffle = config.dataloader.shuffle,
-        batch_size = config.dataloader.batch_size, 
-        drop_last = config.dataloader.drop_last,
-        num_workers = config.dataloader.num_workers,
+        **config.dataloader.shuffle,
         collate_fn = data_pipeline,
     )
 
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset, 
         shuffle = False,
-        batch_size = config.dataloader.batch_size, 
+        batch_size = config.dataloader.batch_size,
         drop_last = False,
         num_workers = config.dataloader.num_workers,
         collate_fn = data_pipeline,
