@@ -2,8 +2,6 @@ logging: config/logging.yaml
 
 data_zoo: data/audio/zoo.yaml
 
-sample_rate: 16000
-
 sample_loader:
     field_map:
         id: ID
@@ -39,18 +37,28 @@ dataset:
         -   id: LIBRISPEECH_TEST_OTHER
             max_num_samples: 0
 
-augmentation:
-    mark_key: True
-    speeds: [0.9, 1.0, 1.1]
-    tempos: #[0.9, 1.0, 1.1]
-    rel_volumes: #[0.9, 1.0, 1.1]
-    abs_volumes:
+resampler:
+    sampler_rate: 16000
 
-feature:
-    num_mel_bins: 80
-    dither: 0.0
-    mvn_shift: ''
-    mvn_scale: ''
+perturbation:
+    mark_key: True
+    speeds: #[0.9, 1.0, 1.1]
+    tempos: #[0.9, 1.0, 1.1]
+    volumes: #[0.9, 1.0, 1.1]
+
+feature_type: fbank # support fbank only now
+feature_extractors:
+    fbank:
+        dither: 0.0
+        num_mel_bins: 80
+        mvn_stats_file: 'fbank_mvn.json'
+    hires_mfcc:
+        dither: 0.0
+        num_mel_bins: 40
+        num_ceps: 40
+        low_freq: 20
+        high_freq: -400
+        mvn_stats_file: 'hires_mfcc_mvn.json'
 
 text_normalizer:
     case: UPPER # either 'UPPER' or 'lower'

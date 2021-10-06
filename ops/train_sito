@@ -28,12 +28,8 @@ import sentencepiece as spm
 #import k2
 
 # Global Constants
-G_INT16MAX = 32768
-G_EPSILON = torch.finfo(torch.float).eps # numeric_limits<float>::epsilon() 1.1920928955078125e-07
-G_LOG_EPSILON = math.log(G_EPSILON)
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_LABEL_PADDING_VALUE = int(-1)
-G_16BIT_PCM_SAMPLE_MAX = 1 << 15
 G_BLANK_ID = 0
 G_BOS_ID = 1
 G_EOS_ID = 2
@@ -59,13 +55,19 @@ class SampleLoader:
         a Sample object or None
         None if an utterance doesn't satisfy constraints e.g. duration, text length
     '''
-    def __init__(self, config, data_root: str = ''):
-        self.config = config
+    def __init__(self, field_map:dict, min_duration:float, max_duration:float, min_text_length:int, max_text_length:int, data_root: str = ''):
+        self.field_map = field_map
+
+        self.min_duration = min_duration
+        self.max_duration = max_duration
+        self.min_text_length = min_text_length
+        self.max_text_length = min_text_length
+
         self.data_root = data_root
     
     def __call__(self, utt: dict) -> Optional[Sample] :
         sample = Sample()
-        for attr, field in self.config.field_map.items():
+        for attr, field in self.field_map.items():
             if v := utt.get(field):
                 if attr in ['duration', 'begin', ]:
                     v = float(v)
@@ -73,26 +75,26 @@ class SampleLoader:
                     v = os.path.join(self.data_root, v)
                 else:
                     v = str(v)
-                assert hasattr(sample, attr), F'{field} -> Sample.{attr} mapping failed, no such attribute'
+                assert hasattr(sample, attr), f'{field} -> Sample.{attr} mapping failed, no such attribute'
                 setattr(sample, attr, v)
 
-        if sample.duration < self.config.min_duration:
+        if sample.duration < self.min_duration:
             return None
-        if sample.duration > self.config.max_duration:
+        if sample.duration > self.max_duration:
             return None
-        if len(sample.text) < self.config.min_text_length:
+        if len(sample.text) < self.min_text_length:
             return None
-        if len(sample.text) > self.config.max_text_length:
+        if len(sample.text) > self.max_text_length:
             return None
 
         return sample
 
 
 class Dataset:
-    def __init__(self, config_data_zoo, config_dataset, config_sample_loader) :
+    def __init__(self, data_zoo_config, dataset_config, sample_loader_config) :
         self.samples = []
-        data_zoo = OmegaConf.load(config_data_zoo)
-        for subset in config_dataset.subsets:
+        data_zoo = OmegaConf.load(data_zoo_config)
+        for subset in dataset_config.subsets:
             if subset.max_num_samples == 0:
                 continue
             elif subset.max_num_samples < 0:
@@ -101,7 +103,7 @@ class Dataset:
             # corpus related information are stored in data zoo
             subset_root, subset_meta = data_zoo[subset.id].root, data_zoo[subset.id].metadata
 
-            logging.info(F'Loading dataset: {subset.id} from ({subset_root} : {subset_meta})')
+            logging.info(f'Loading dataset: {subset.id} from ({subset_root} : {subset_meta})')
             with open(subset_meta, 'r', encoding='utf8') as f:
                 if str.endswith(subset_meta, '.tsv'):
                     utterance_reader = csv.DictReader(f, delimiter='\t')
@@ -109,13 +111,13 @@ class Dataset:
                     raise NotImplementedError
 
                 k = 0
-                sample_loader = SampleLoader(config = config_sample_loader, data_root = subset_root)
+                sample_loader = SampleLoader(**sample_loader_config, data_root = subset_root)
                 for utt in utterance_reader:
                     if k < subset.max_num_samples:
                         if sample := sample_loader(utt):
                             self.samples.append(sample)
                             k += 1
-                logging.info(F'{k} samples loaded from {subset.id}')
+                logging.info(f'{k} samples loaded from {subset.id}')
 
         # length sort
 
@@ -129,108 +131,173 @@ class Dataset:
         return len(self.samples)
 
 
-def ReadAndResampleAudio(sample: Sample, target_sample_rate: int) :
+def LoadAudio(audio_path: str, begin_sec: float, duration_sec: float) :
     '''
     https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
 
     torchaudio.info(sample.audio)
     -> 
     AudioMetaData(
-        sample_rate=16000,
-        num_frames=31872,
-        num_channels=1,
-        bits_per_sample=16,
-        encoding=PCM_S,
+        sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S,
     )
     '''
-    audio_info = torchaudio.info(sample.audio)
-
-    waveform, _ = torchaudio.load(
-        sample.audio,
-        frame_offset = int(audio_info.sample_rate * sample.begin),
-        num_frames   = int(audio_info.sample_rate * sample.duration),
+    audio_info = torchaudio.info(audio_path)
+    waveform, sample_rate = torchaudio.load(
+        audio_path,
+        frame_offset = int(audio_info.sample_rate * begin_sec),
+        num_frames   = int(audio_info.sample_rate * duration_sec),
     )
+    return waveform, sample_rate
 
-    if audio_info.sample_rate != target_sample_rate:
-        waveform = torchaudio.transforms.Resample(audio_info.sample_rate, target_sample_rate)(waveform)
+
+class Resampler:
+    def __init__(self, sample_rate: int):
+        self.target_sample_rate = sample_rate
+
+    def __call__(self, waveform: torch.Tensor, sample_rate: int):
+        if sample_rate != self.target_sample_rate:
+            waveform = torchaudio.transforms.Resample(sample_rate, target_sample_rate)(waveform)
+        return waveform, self.target_sample_rate
+
+
+class Perturbation:
+    def __init__(self, 
+        mark_key: bool = False,
+        speeds: Optional[list[flost]] = None, 
+        tempos: Optional[list[flost]] = None, 
+        volumes: Optional[list[flost]] = None,
+    ) :
+        self.mark_key = mark_key
+        self.speeds = speeds
+        self.tempos = tempos
+        self.volumes = volumes
+
+    def __call__(self, key: str, waveform: torch.Tensor, sample_rate: int):
+        '''
+        Note: Regarding to 'speed' and 'tempo' perturbation:
+
+        in classic SoX CLI:
+            soxi raw.wav -> sample_rate: 16000, duration: 00:00:01.99 = 31872 samples
+
+            sox raw.wav speed.wav speed 1.5
+            soxi speed.wav -> sample_rate: 16000, 00:00:01.33 = 21248 sample
+
+            sox raw.wav tempo.wav tempo 1.5
+            soxi tempo.wav -> sample_rate: 16000, 00:00:01.33 = 21248 sample
+
+        whereas in torchaudio.sox_effect function calls:
+            output waveform sample_rate is changed,
+            so here we need explicitly 'rate' resampling after 'speed' or 'tempo'
+
+        '''
+        effects_chain = []
+        if self.speeds:
+            if (factor := random.choice(self.speeds)) != 1.0:
+                effects_chain.extend([
+                    ['speed', str(factor)],
+                    ['rate', str(sample_rate)]
+                ])
+                key = f'{key}__speed{factor}' if self.mark_key else key
+        
+        if self.tempos:
+            if (factor := random.choice(self.tempos)) != 1.0:
+                effects_chain.extend([
+                    ['tempo', str(factor)],
+                    ['rate', str(sample_rate)]
+                ])
+                key = f'{key}__tempo{factor}' if self.mark_key else key
+
+        if self.volumes:
+            if (factor := random.choice(self.volumes)) != 1.0:
+                effects_chain.append(['vol', str(factor)])
+                key = f'{key}__vol{factor}' if self.mark_key else key
+
+        new_waveform, new_sample_rate = torchaudio.sox_effects.apply_effects_tensor(
+            waveform, sample_rate,
+            effects_chain,
+        )
+        assert new_sample_rate == sample_rate # perturbation shouldn't change sample_rate
+        return key, new_waveform, new_sample_rate
+
+
+class FeatureExtractor:
+    def __init__(self, feature_extractors_config:dict, feature_type:str, ):
+        if feature_type == 'fbank':
+            self.extractor = FbankFeatureExtractor(**feature_extractors_config['fbank'])
+        elif feature_type == 'hires_mfcc':
+            raise NotImplementedError(f'feature_type:{feature_type} is not supported yet')
+        else:
+            raise RuntimeError(f'Unknown feature_type:{feature_type}')
+            
+    def __call__(self, waveform: torch.Tensor, sample_rate: int):
+        self.extractor(waveform, sample_rate)
+
+
+class FbankFeatureExtractor:
+    def __init__(self, num_mel_bins:int, mvn_stats_file:str, dither:float = 0.0, apply_mvn:bool = True):
+        self.feature_dim = num_mel_bins
+        self.dither = dither
+
+        self.mean_norm_shift = None #torch.zeros(self.feature_dim)
+        self.var_norm_scale = None #torch.ones(self.feature_dim)
+
+        if apply_mvn:
+            if self.config.mvn_stats_file:
+                with open(self.config.mvn_stats_file, 'r') as f:
+                    mvn_stats = json.load(f)
+                    o1_stats = torch.Tensor(mvn_stats['o1_stats'])
+                    o2_stats = torch.Tensor(mvn_stats['o2_stats'])
+                    N = mvn_stats['N']
+                    mean = o1_stats / N
+                    var  = o2_stats / N - mean.square()
+                    self.mean_norm_shift = -mean
+                    self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
+
     
-    return waveform, target_sample_rate
+    def __call__(self, waveform: torch.Tensor, sample_rate: int):
+        '''
+        kaldi:
+            https://github.com/kaldi-asr/kaldi/blob/master/src/feat/mel-computations.h#L60
+            https://github.com/kaldi-asr/kaldi/blob/master/src/feat/feature-fbank.h#L62
 
+        torchaudio:
+            https://pytorch.org/audio/stable/compliance.kaldi.html
+        '''
+        # By default, torchaudio uses normalized 32bits float waveform [-1.0, 1.0]
+        # To use Kaldi compliance function, waveform needs to be convert to 16bits signed-interger PCM [-32768, 32767]
+        # TODO:
+        # torchaudio's feature extraction is not consistent with Kaldi https://github.com/pytorch/audio/issues/400
+        # torchaudio official plan to bind kaldi feat lib: https://github.com/pytorch/audio/issues/1269
+        # to not finished up to 2021-10-02 : https://github.com/pytorch/audio/pull/1326
+        # keep an eye on this work and do it myself if necessary
+        assert waveform.dtype == torch.float32
+        kaldi_waveform = waveform * torch.iinfo(torch.int16).max
+        feature = torchaudio.compliance.kaldi.fbank(
+            kaldi_waveform,
+            sample_frequency = sample_rate,
+            num_mel_bins = self.config.num_mel_bins,
+            dither = self.config.dither,
+            energy_floor = torch.finfo(torch.float).eps,
+            # about energy_floor:
+            #   Kaldi default = 0.0; torchaudio default = 1.0;
+            #   it doesn't matter if use_energy = False (default in both)
+        )
 
-def PerturbWaveform(key: str, waveform: torch.Tensor, sample_rate: int, effect: str, factor: float, mark_key: bool):
-    '''
-    Note: Regarding to 'speed' and 'tempo' perturbation:
+        # mean normalization
+        if self.mean_norm_shift:
+            feature += self.mean_norm_shift  # broadcasting over t-axis
 
-    in classic SoX CLI:
-        soxi raw.wav -> sample_rate: 16000, duration: 00:00:01.99 = 31872 samples
+        # variance normalizaton
+        if self.var_norm_scale:
+            feature *= self.var_norm_scale  # broadcasting over t-axis
 
-        sox raw.wav speed.wav speed 1.5
-        soxi speed.wav -> sample_rate: 16000, 00:00:01.33 = 21248 sample
-
-        sox raw.wav tempo.wav tempo 1.5
-        soxi tempo.wav -> sample_rate: 16000, 00:00:01.33 = 21248 sample
-
-    whereas in torchaudio.sox_effect function calls:
-        output waveform sample_rate is changed,
-        so here we need explicitly 'rate' resampling after 'speed' or 'tempo'
-
-    '''
-    if factor == 1.0:
-        return key, waveform, sample_rate
-
-    if effect in ['speed', 'tempo']:
-        effects_chain = [ [effect, str(factor)], ['rate', str(sample_rate)] ]
-    elif effect == 'vol':
-        effects_chain = [ [effect, str(factor)] ]
-    else:
-        raise RuntimeError(F'Unsupported perturbation effect: {effect}')
-
-    new_waveform, new_sample_rate = torchaudio.sox_effects.apply_effects_tensor(
-        waveform, sample_rate,
-        effects_chain,
-    )
-    new_key = F'{key}__{effect}{factor}' if mark_key else key
-
-    assert(new_sample_rate == sample_rate) # sample rate should not change in any perturbation
-    return new_key, new_waveform, new_sample_rate
-
-def ExtractFeature(waveform: torch.Tensor, sample_rate: int, config):
-    '''
-    kaldi:
-        https://github.com/kaldi-asr/kaldi/blob/master/src/feat/mel-computations.h#L60
-        https://github.com/kaldi-asr/kaldi/blob/master/src/feat/feature-fbank.h#L62
-
-    torchaudio:
-        https://pytorch.org/audio/stable/compliance.kaldi.html
-    '''
-    # By default, torchaudio uses normalized 32bits float waveform [-1.0, 1.0]
-    assert waveform.dtype == torch.float32
-
-    # To use Kaldi compliance function, waveform needs to be convert to 16bits signed-interger PCM [-32768, 32767]
-    # TODO:
-    # torchaudio's feature extraction is not consistent with Kaldi https://github.com/pytorch/audio/issues/400
-    # torchaudio official plan to bind kaldi feat lib: https://github.com/pytorch/audio/issues/1269
-    # to not finished up to 2021-10-02 : https://github.com/pytorch/audio/pull/1326
-    # keep an eye on this work and do it myself if necessary
-    waveform = (waveform * G_16BIT_PCM_SAMPLE_MAX)
-
-    feature = torchaudio.compliance.kaldi.fbank(
-        waveform,
-        sample_frequency = sample_rate,
-        num_mel_bins = config.num_mel_bins,
-        dither = config.dither,
-        energy_floor = G_EPSILON,
-        # about energy_floor:
-        #   Kaldi default = 0.0; torchaudio default = 1.0;
-        #   it doesn't matter if use_energy = False (default in both)
-    )
-    return feature
+        return feature
 
 
 class Tokenizer:
-    def __init__(self, config):
+    def __init__(self, model: str):
         self.tokenizer = spm.SentencePieceProcessor()
-        self.tokenizer.load(config.model)
+        self.tokenizer.load(model)
         self.vocab = [ [ self.tokenizer.id_to_piece(x), x] for x in range(self.tokenizer.get_piece_size())]
     
     def __call__(self, text) -> tuple[list[str], list[int]] :
@@ -240,11 +307,11 @@ class Tokenizer:
 
 
 class TextNormalizer:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, case: str):
+        self.case = case
     
     def __call__(self, text):
-        if self.config.case == 'UPPER':
+        if self.case == 'UPPER':
             text = text.upper()
         return text
 
@@ -253,67 +320,47 @@ class DataPipeline:
     def __init__(
         self,
         config,
-        mean_norm_shift: Optional[torch.Tensor] = None,
-        var_norm_scale: Optional[torch.Tensor] = None,
+        resampler = Optional[callable] = None,
+        perturbation = Optional[callable] = None,
+        feature_extractor = Optional[callable] = None,
         text_normalizer: Optional[callable] = None,
         tokenizer: Optional[callable] = None,
     ) :
         self.config = config
 
+        self.resampler = resampler
+        self.perturbation = perturbation
+        self.feature_extractor = feature_extractor
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
-
-        self.mean_norm_shift = mean_norm_shift
-        self.var_norm_scale = var_norm_scale
 
     def __call__(self, samples: list[Sample]):
         minibatch = []
         for sample in samples:
-            # raw audio loading and resampling
-            waveform, sample_rate = ReadAndResampleAudio(sample, target_sample_rate = self.config.sample_rate)
+            # raw audio loading
+            key = sample.id
+            waveform, sample_rate = LoadAudio(sample.audio, sample.begin, sample.duration)
 
-            # perturbations
-            mark_key = self.config.augmentation.mark_key
-            if speeds := self.config.augmentation.speeds:
-                sample.id, waveform, sample_rate = PerturbWaveform(
-                    sample.id, waveform, sample_rate, 
-                    effect = 'speed', factor = random.choice(speeds), 
-                    mark_key=mark_key
-                )
-            
-            if tempos := self.config.augmentation.tempos:
-                sample.id, waveform, sample_rate = PerturbWaveform(
-                    sample.id, waveform, sample_rate, 
-                    effect = 'tempo', factor = random.choice(tempos), 
-                    mark_key=mark_key
-                )
-            
-            if rel_volumes := self.config.augmentation.rel_volumes:
-                sample.id, waveform, sample_rate = PerturbWaveform(
-                    sample.id, waveform, sample_rate, 
-                    effect = 'vol', factor = random.choice(rel_volumes), 
-                    mark_key=mark_key
-                )
-            
-            # abs_volumes
+            if self.resampler:
+                waveform, sample_rate = self.resampler(waveform, sample_rate)
+
+            if self.perturbation:
+                key, waveform, sample_rate = self.perturbation(key, waveform, sample_rate)
 
             # reverb
 
             # add noise
             
             # feature extraction
-            feature = ExtractFeature(waveform, sample_rate, self.config.feature)
-            feature = feature.detach()
+            feature = None
+            if self.feature_extractor:
+                feature = self.feature_extractor(waveform, sample_rate)
 
             # specaug
-
-            # mean normalization
-            if (self.mean_norm_shift != None):
-                feature += self.mean_norm_shift  # broadcasted along t-axis
-
-            # variance normalizaton
-            if (self.var_norm_scale != None):
-                feature *= self.var_norm_scale  # broadcasted along t-axis
+            
+            # detach
+            if feature:
+                feature = feature.detach()
 
             text = sample.text
             # text normalization
@@ -327,7 +374,7 @@ class DataPipeline:
 
             # store everything here for debug purpose
             minibatch.append({
-                'id': sample.id,
+                'key': key,
                 'waveform': waveform,
                 'sample_rate': sample_rate,
                 'feature': feature,
@@ -335,7 +382,7 @@ class DataPipeline:
                 'token_pieces': token_pieces,
                 'token_ids': token_ids,
             })
-            logging.debug(F'Processed sample {sample.id}')
+            logging.debug(f'Processed sample {sample.id}')
 
         features = [ x['feature'] for x in minibatch ]
         time_lengths = torch.tensor([ len(x) for x in features ]) # [B]
@@ -346,7 +393,7 @@ class DataPipeline:
         ) # [B, max(time_lengths), F]
 
         labels = [ x['token_ids'] for x in minibatch ]
-        label_lengths = torch.tensor([ len(y) for y in labels ]) # [B]   
+        label_lengths = torch.tensor([ len(y) for y in labels ]) # [B]
         targets = nn.utils.rnn.pad_sequence(
             [ torch.tensor(l) for l in labels ],
             batch_first = True,
@@ -395,8 +442,12 @@ def Loss(log_probs, labels, input_lens, label_lens, blank_index = G_BLANK_ID):
     return loss
 
 
-def compute_mvn(dataset, config):
-    pipeline = DataPipeline(config)
+def compute_mvn_stats(dataset, config):
+    pipeline = DataPipeline(
+        resampler = Resampler(**config.resampler),
+        perturbation = Perturbation(**config.perturbation),
+        feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
+    )
 
     # data loaders
     dataloader = torch.utils.data.DataLoader(
@@ -419,15 +470,18 @@ def compute_mvn(dataset, config):
             M += x.sum(dim=0)
             V += x.square().sum(dim=0)
             k += x.shape[0]
-    M = M / k
-    V = V / k - M.square()
-    mean_norm_shift = -M
-    var_norm_scale = V.sqrt().clamp(min = G_EPSILON).reciprocal()
-    logging.info(F'Global MEAN/VAR Normalizer after {k} frames:\nmean_norm_shift:  {mean_norm_shift}\nvar_norm_scale:  {var_norm_scale}')
-    return mean_norm_shift, var_norm_scale
+    logging.info(f'Global MEAN/VAR stats after {k} frames:\nFirst order sum:  {M}\nSecond order sum:  {V}')
+
+    with open(config_feature_extractor.mvn_stats_file, 'w+') as f:
+        mvn_stats = {
+            'order1_stats': M,
+            'order2_stats': V,
+            'num_frames': k,
+        }
+        json.dump(stats, f)
 
 
-def length_to_mask(lengths: torch.Tensor) -> torch.Tensor:
+def make_length_mask(lengths: torch.Tensor) -> torch.Tensor:
     """Make mask tensor indicating in-length elements.
     Args:
         lengths (torch.Tensor): Batch of lengths (B,).
@@ -460,7 +514,7 @@ def ctc_greedy_search(log_probs: torch.Tensor, time_lengths: torch.Tensor):
 
     best_paths = best_paths.squeeze(2)
     best_scores = best_scores.squeeze(2)
-    pad_mask = ~ length_to_mask(time_lengths)
+    pad_mask = ~ make_length_mask(time_lengths)
 
     best_paths.masked_fill_(pad_mask, G_EOS_ID)
     best_scores.masked_fill_(pad_mask, 0.0)
@@ -502,20 +556,15 @@ def run():
     valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
 
     # compute feature mean & var normalizer
-    mean_norm_shift, var_norm_scale = compute_mvn(train_dataset, config)
-    #torch.save(mean_norm_shift, 'mean_norm_shift.pt')
-    #torch.save(var_norm_scale, 'var_norm_scale.pt')
+    compute_mvn_stats(train_dataset, config)
 
-    # data pipline
-    tokenizer = Tokenizer(config.tokenizer)
-    text_normalizer = TextNormalizer(config.text_normalizer)
-
+    # assemble data processing pipline
     data_pipeline = DataPipeline(
-        config, 
-        mean_norm_shift = mean_norm_shift, 
-        var_norm_scale = var_norm_scale,
-        text_normalizer = text_normalizer,
-        tokenizer = tokenizer,
+        resampler = Resampler(**config.resampler),
+        perturbation = Perturbation(**config.perturbation),
+        feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
+        text_normalizer = TextNormalizer(**config.text_normalizer),
+        tokenizer = Tokenizer(**config.tokenizer),
     )
 
     # data loaders
@@ -539,8 +588,8 @@ def run():
 
     # model
     model = Model(config.model)
-    logging.info(F'Total params:     {sum([ p.numel() for p in model.parameters()                    ])/float(1e6):.2f}M')
-    logging.info(F'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
+    logging.info(f'Total params:     {sum([ p.numel() for p in model.parameters()                    ])/float(1e6):.2f}M')
+    logging.info(f'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
     model = model.to(G_DEVICE)
 
     # optimizer
@@ -550,7 +599,7 @@ def run():
     num_epochs = config.training.num_epochs
     for e in range(num_epochs):
         # training
-        logging.info(F'Training epoch {e} with LR={scheduler.get_last_lr()} ...')
+        logging.info(f'Training epoch {e} with LR={scheduler.get_last_lr()} ...')
         total_loss = 0.0
         total_utts, total_frames = 0, 0
         num_batches = len(train_dataloader)
@@ -574,17 +623,17 @@ def run():
             total_utts += num_utts
             total_frames += num_frames
             if b % config.training.log_interval == 0:
-                logging.info(F'  [{e+1}/{num_epochs}]:[{b+1}/{num_batches}] loss={total_loss / total_frames:.2f}')
+                logging.info(f'  [{e+1}/{num_epochs}]:[{b+1}/{num_batches}] loss={total_loss / total_frames:.2f}')
         scheduler.step()
-        logging.info(F'TRAIN[{e}] average_frame_loss={(total_loss / total_frames):.2f} over {total_frames} frames')
+        logging.info(f'TRAIN[{e}] average_frame_loss={(total_loss / total_frames):.2f} over {total_frames} frames')
 
         checkpoint_dir = os.path.join('checkpoints')
         os.makedirs(os.path.join(checkpoint_dir), exist_ok = True)
-        checkpoint = os.path.join(checkpoint_dir, F'{e}.pt')
+        checkpoint = os.path.join(checkpoint_dir, f'{e}.pt')
         torch.save(model.state_dict(), checkpoint)
 
         # validation
-        logging.info(F'Validating epoch {e} ...')
+        logging.info(f'Validating epoch {e} ...')
         total_loss = 0.0
         total_utts, total_frames = 0, 0
         with torch.no_grad():
@@ -605,7 +654,7 @@ def run():
                 total_loss += loss.item()
                 total_utts += num_utts
                 total_frames += num_frames
-        logging.info(F'VALID[{e}] average_frame_loss={(total_loss / total_frames):.2f}')
+        logging.info(f'VALID[{e}] average_frame_loss={(total_loss / total_frames):.2f}')
 
         # with torch.no_grad():
         #     test_model = Model(config.model)
@@ -615,7 +664,7 @@ def run():
 def unit_test():
     def test_length_to_mask():
         length=torch.Tensor([1,2,3])
-        mask=length_to_mask(length)
+        mask=make_length_mask(length)
         expected = torch.Tensor(
             [
                 [1, 0, 0],
