@@ -406,7 +406,7 @@ class DataPipeline:
                 'token_pieces': token_pieces,
                 'token_ids': token_ids,
             })
-            logging.debug(f'Processed sample {sample.id}')
+            logging.debug(f'Processed sample {sample.id} -> {key}')
 
         features = [ x['feature'] for x in minibatch ]
         time_lengths = torch.tensor([ len(x) for x in features ]) # [B]
