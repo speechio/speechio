@@ -316,10 +316,8 @@ class MeanVarNormalizer:
         self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
     
     def __call__(self, feature:torch.Tensor):
-        # mean normalization
-        feature += self.mean_norm_shift  # broadcasting over t-axis
-        # variance normalizaton
-        feature *= self.var_norm_scale  # broadcasting over t-axis
+        feature += self.mean_norm_shift
+        feature *= self.var_norm_scale
         return feature
 
 
