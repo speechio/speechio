@@ -57,13 +57,13 @@ class SampleLoader:
         a Sample object or None
         None if an utterance doesn't satisfy constraints e.g. duration, text length
     '''
-    def __init__(self, field_map:dict, min_duration:float, max_duration:float, min_text_length:int, max_text_length:int, data_root: str = ''):
+    def __init__(self, field_map:dict, min_duration:float, max_duration:float, min_text_length:int = 1, max_text_length:int = 2048, data_root: str = ''):
         self.field_map = field_map
 
         self.min_duration = min_duration
         self.max_duration = max_duration
         self.min_text_length = min_text_length
-        self.max_text_length = min_text_length
+        self.max_text_length = max_text_length
 
         self.data_root = data_root
     
@@ -96,6 +96,7 @@ class Dataset:
     def __init__(self, data_zoo_config, dataset_config, sample_loader_config) :
         self.samples = []
         data_zoo = OmegaConf.load(data_zoo_config)
+
         for subset in dataset_config.subsets:
             if subset.max_num_samples == 0:
                 continue
@@ -104,7 +105,7 @@ class Dataset:
 
             # retrive dataset info from data zoo
             subset_root, subset_meta = data_zoo[subset.id].root, data_zoo[subset.id].metadata
-            logging.info(f'Loading dataset: {subset.id} from ({subset_root} : {subset_meta})')
+            logging.info(f'Loading {subset.id} from ({subset_root} : {subset_meta}) ...')
             with open(subset_meta, 'r', encoding='utf8') as f:
                 if str.endswith(subset_meta, '.tsv'):
                     utterance_reader = csv.DictReader(f, delimiter='\t')
@@ -114,12 +115,13 @@ class Dataset:
                 k = 0
                 sample_loader = SampleLoader(**sample_loader_config, data_root = subset_root)
                 for utt in utterance_reader:
-                    if k < subset.max_num_samples:
-                        if sample := sample_loader(utt):
-                            self.samples.append(sample)
-                            k += 1
+                    if k >= subset.max_num_samples:
+                        break
+                    if sample := sample_loader(utt):
+                        self.samples.append(sample)
+                        k += 1
                 logging.info(f'{k} samples loaded from {subset.id}')
-
+        logging.info(F'Total {len(self.samples)} loaded.')
         # length sort
 
         # shuffle
@@ -572,7 +574,7 @@ def compute_mvn_stats(dataset, config):
         collate_fn = feature_pipeline,
     )
 
-    logging.info('Computing global mean variance stats')
+    logging.info('Computing global mean variance stats ...')
     stats = MeanVarStats()
     for batch in dataloader:
         samples, _,_,_,_ = batch
