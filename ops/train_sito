@@ -7,23 +7,25 @@
 
 import os, sys
 import argparse
-import csv
 from typing import Optional, Any
 from dataclasses import dataclass
 import logging.config
 
+import decimal
 import math
 import random
+
 import numpy
 import torch
 import torch.nn as nn
 import torchaudio
 import torchaudio.sox_effects
 
-from omegaconf import OmegaConf
+import csv
 import yaml
-import sentencepiece as spm
+from omegaconf import OmegaConf
 
+import sentencepiece as spm
 #import pandas as pd
 #import k2
 
@@ -121,8 +123,7 @@ class Dataset:
         # length sort
 
         # shuffle
-
-                    
+             
     def __getitem__(self, index: int):
         return self.samples[index]
     
@@ -130,7 +131,21 @@ class Dataset:
         return len(self.samples)
 
 
-def LoadAudio(audio_path: str, begin_sec: float, duration_sec: float) :
+# https://github.com/lhotse-speech/lhotse/blob/master/lhotse/utils.py#L367 : compute_num_samples()
+def SecondsToSamples(sample_rate:int, seconds:float):
+    """
+    Convert a time quantity to the number of samples given a specific sampling rate.
+    Performs consistent rounding up or down for ``duration`` that is not a multiply of
+    the sampling interval (unlike Python's built-in ``round()`` that implements banker's rounding).
+    """
+    return int(
+        decimal.Decimal(
+            round(seconds * sample_rate, ndigits=8)
+        ).quantize(0, rounding=decimal.ROUND_HALF_UP)
+    )
+
+
+def LoadAudio(audio_path: str, begin: float, duration: float) :
     '''
     https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
 
@@ -140,11 +155,11 @@ def LoadAudio(audio_path: str, begin_sec: float, duration_sec: float) :
         sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S,
     )
     '''
-    audio_info = torchaudio.info(audio_path)
+    info = torchaudio.info(audio_path)
     waveform, sample_rate = torchaudio.load(
         audio_path,
-        frame_offset = int(audio_info.sample_rate * begin_sec),
-        num_frames   = int(audio_info.sample_rate * duration_sec),
+        frame_offset = SecondsToSamples(info.sample_rate, begin),
+        num_frames   = SecondsToSamples(info.sample_rate, duration),
     )
     return waveform, sample_rate
 
