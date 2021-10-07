@@ -277,40 +277,41 @@ class FbankFeatureExtractor:
 
 class MeanVarStats:
     def __init__(self):
-        self.dim = 0
         self.o1_stats = None
         self.o2_stats = None
-        self.N = 0
+        self.n = 0
 
     def accumulate_mean_var_stats(self, feature:torch.Tensor):
-        if not self.N:
-            self.dim = feature.shape[1]
-            self.o1_stats = torch.zeros(self.dim)
-            self.o2_stats = torch.zeros(self.dim)
+        num_frames, feature_dim = feature.shape
+        if self.n == 0:
+            self.o1_stats = torch.zeros(feature_dim)
+            self.o2_stats = torch.zeros(feature_dim)
+
+        assert self.o1_stats.shape[0] != feature_dim, f'mvn accumulator dim inconsistent with features'
         self.o1_stats += feature.sum(dim=0)
         self.o2_stats += feature.square().sum(dim=0)
-        self.N += feature.shape[0]
+        self.n += num_frames
 
     def load(self, input_file:str):
         with open(input_file, 'r') as f:
             stats = json.load(input_file)
             self.o1_stats = torch.Tensor(stats['o1_stats'])
             self.o2_stats = torch.Tensor(stats['o2_stats'])
-            self.N = stats['N']
+            self.n = stats['n']
 
     def dump(self, output_file:str):
         stats = {
             'o1_stats': self.o1_stats.tolist(),
             'o2_stats': self.o2_stats.tolist(),
-            'N': self.N,
+            'n': self.n,
         }
         with open(output_file, 'w+') as f:
             json.dump(stats, f)
 
 class MeanVarNormalizer:
     def __init__(self, mvn_stats:MeanVarStats):
-        mean = mvn_stats.o1_stats / mvn_stats.N
-        var  = mvn_stats.o2_stats / mvn_stats.N - mean.square()
+        mean = mvn_stats.o1_stats / mvn_stats.n
+        var  = mvn_stats.o2_stats / mvn_stats.n - mean.square()
         self.mean_norm_shift = -mean
         self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
     
