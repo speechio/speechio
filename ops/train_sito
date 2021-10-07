@@ -100,9 +100,8 @@ class Dataset:
             elif subset.max_num_samples < 0:
                 subset.max_num_samples = sys.maxsize # https://docs.python.org/3/library/sys.html#sys.maxsize
 
-            # corpus related information are stored in data zoo
+            # retrive dataset info from data zoo
             subset_root, subset_meta = data_zoo[subset.id].root, data_zoo[subset.id].metadata
-
             logging.info(f'Loading dataset: {subset.id} from ({subset_root} : {subset_meta})')
             with open(subset_meta, 'r', encoding='utf8') as f:
                 if str.endswith(subset_meta, '.tsv'):
