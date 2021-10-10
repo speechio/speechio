@@ -26,7 +26,6 @@ import yaml, json
 from omegaconf import OmegaConf
 
 import sentencepiece as spm
-#import pandas as pd
 #import k2
 
 # Global Constants
@@ -172,7 +171,7 @@ class Resampler:
 
     def __call__(self, waveform: torch.Tensor, sample_rate: int):
         if sample_rate != self.target_sample_rate:
-            waveform = torchaudio.transforms.Resample(sample_rate, target_sample_rate)(waveform)
+            waveform = torchaudio.transforms.Resample(sample_rate, self.target_sample_rate)(waveform)
         return waveform, self.target_sample_rate
 
 
@@ -549,6 +548,7 @@ def ctc_greedy_search(log_probs: torch.Tensor, time_lengths: torch.Tensor):
 
 
 def DumpTensorToCSV(x: torch.Tensor, filename: str):
+    import pandas as pd
     df = pd.DataFrame(x.numpy())
     df.to_csv(filename)
 
