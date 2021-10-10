@@ -354,13 +354,13 @@ class MeanVarNormalizer:
 
 class Tokenizer:
     def __init__(self, model: str):
-        self.tokenizer = spm.SentencePieceProcessor()
-        self.tokenizer.load(model)
-        self.vocab = [ [ self.tokenizer.id_to_piece(x), x] for x in range(self.tokenizer.get_piece_size())]
+        self.sentence_piece = spm.SentencePieceProcessor()
+        self.sentence_piece.load(model)
+        self.vocab = [ [ self.sentence_piece.id_to_piece(x), x] for x in range(self.sentence_piece.get_piece_size())]
     
     def __call__(self, text) -> tuple[list[str], list[int]] :
-        token_pieces = self.tokenizer.encode_as_pieces(text)
-        token_ids = self.tokenizer.encode_as_ids(text)
+        token_pieces = self.sentence_piece.encode_as_pieces(text)
+        token_ids = self.sentence_piece.encode_as_ids(text)
         return token_pieces, token_ids
 
 
