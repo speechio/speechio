@@ -3,7 +3,6 @@
 #
 # Copyright (c) 2021 Jiayu DU
 # All rights reserved.
-#
 
 import os, sys
 import argparse
@@ -15,7 +14,7 @@ import decimal
 import math
 import random
 
-import numpy
+#import numpy
 import torch
 import torch.nn as nn
 import torchaudio
@@ -133,7 +132,7 @@ class Dataset:
 
 
 # https://github.com/lhotse-speech/lhotse/blob/master/lhotse/utils.py#L367 : compute_num_samples()
-def SecondsToSamples(sample_rate:int, seconds:float):
+def seconds_to_samples(sample_rate:int, seconds:float):
     """
     Convert a time quantity to the number of samples given a specific sampling rate.
     Performs consistent rounding up or down for ``duration`` that is not a multiply of
@@ -146,7 +145,7 @@ def SecondsToSamples(sample_rate:int, seconds:float):
     )
 
 
-def LoadAudio(audio_path: str, begin: float, duration: float) :
+def load_audio(audio_path: str, begin: float, duration: float) :
     '''
     https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
 
@@ -159,8 +158,8 @@ def LoadAudio(audio_path: str, begin: float, duration: float) :
     info = torchaudio.info(audio_path)
     waveform, sample_rate = torchaudio.load(
         audio_path,
-        frame_offset = SecondsToSamples(info.sample_rate, begin),
-        num_frames   = SecondsToSamples(info.sample_rate, duration),
+        frame_offset = seconds_to_samples(info.sample_rate, begin),
+        num_frames   = seconds_to_samples(info.sample_rate, duration),
     )
     return waveform, sample_rate
 
@@ -360,8 +359,8 @@ class Tokenizer:
         self.vocab = [ [ self.tokenizer.id_to_piece(x), x] for x in range(self.tokenizer.get_piece_size())]
     
     def __call__(self, text) -> tuple[list[str], list[int]] :
-        token_pieces = self.tokenizer.EncodeAsPieces(text)
-        token_ids = self.tokenizer.EncodeAsIds(text)
+        token_pieces = self.tokenizer.encode_as_pieces(text)
+        token_ids = self.tokenizer.encode_as_ids(text)
         return token_pieces, token_ids
 
 
@@ -399,7 +398,7 @@ class DataPipeline:
         for sample in samples:
             # raw audio loading
             key = sample.id
-            waveform, sample_rate = LoadAudio(sample.audio, sample.begin, sample.duration)
+            waveform, sample_rate = load_audio(sample.audio, sample.begin, sample.duration)
 
             if self.resampler:
                 waveform, sample_rate = self.resampler(waveform, sample_rate)
@@ -547,13 +546,13 @@ def ctc_greedy_search(log_probs: torch.Tensor, time_lengths: torch.Tensor):
     return hyps, scores
 
 
-def DumpTensorToCSV(x: torch.Tensor, filename: str):
+def dump_tensor_to_csv(x: torch.Tensor, filename: str):
     import pandas as pd
     df = pd.DataFrame(x.numpy())
     df.to_csv(filename)
 
 
-def ensure_tensor_in_device(*tensors):
+def move_tensor_to_device(*tensors):
     return tuple([t.to(G_DEVICE) for t in tensors])
 
 
@@ -660,7 +659,7 @@ def run():
             num_utts = len(samples)
             num_frames = int(T.sum())
 
-            X, L, T, U = ensure_tensor_in_device(X, L, T, U)
+            X, L, T, U = move_tensor_to_device(X, L, T, U)
             Y = model(X)
             loss = Loss(Y, L, T, U)
 
@@ -694,7 +693,7 @@ def run():
                 num_utts = len(samples)
                 num_frames = int(T.sum())
 
-                X, L, T, U = ensure_tensor_in_device(X, L, T, U)
+                X, L, T, U = move_tensor_to_device(X, L, T, U)
                 Y = model(X)
                 loss = Loss(Y, L, T, U)
 
