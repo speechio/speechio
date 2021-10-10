@@ -63,7 +63,6 @@ text_normalizer:
 
 tokenizer:
     model: model/tokenizer/sentencepiece_en.model
-    #vocab: model/tokenizer/sentencepiece_en.vocab # this is for human reading
 
 dataloader:
     shuffle: True
