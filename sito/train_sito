@@ -334,9 +334,9 @@ class MeanVarStats:
             json.dump(stats, f, indent=4)
 
 class MeanVarNormalizer:
-    def __init__(self, mvn_stats:MeanVarStats):
-        mean = mvn_stats.o1_stats / mvn_stats.n
-        var  = mvn_stats.o2_stats / mvn_stats.n - mean.square()
+    def __init__(self, mean_var_stats:MeanVarStats):
+        mean = mean_var_stats.o1_stats / mean_var_stats.n
+        var  = mean_var_stats.o2_stats / mean_var_stats.n - mean.square()
         self.mean_norm_shift = -mean
         self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
 
@@ -533,7 +533,7 @@ def move_tensor_to_device(*tensors):
     return tuple([t.to(G_DEVICE) for t in tensors])
 
 
-def compute_mvn_stats(dataset, config):
+def compute_mean_var_stats(dataset, config):
     feature_pipeline = DataPipeline(
         resampler = Resampler(**config.resampler),
         perturbation = Perturbation(**config.perturbation),
@@ -582,12 +582,12 @@ def run():
     valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
 
     # compute feature mean & var normalizer
-    mvn_stats = compute_mvn_stats(train_dataset, config)
-    mvn_stats.dump('mvn_stats.json')
+    mean_var_stats = compute_mean_var_stats(train_dataset, config)
+    mean_var_stats.dump('mean_var_stats.json')
 
     # assemble data processing pipline
     tokenizer = Tokenizer(**config.tokenizer)
-    mvn = MeanVarNormalizer(mvn_stats)
+    mvn = MeanVarNormalizer(mean_var_stats)
     logging.info(mvn)
     data_pipeline = DataPipeline(
         resampler = Resampler(**config.resampler),
