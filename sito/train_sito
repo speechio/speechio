@@ -27,7 +27,7 @@ from omegaconf import OmegaConf
 import sentencepiece as spm
 #import k2
 
-from py.model.lstm import Model
+from py.nnet.lstm import Model
 
 # Global Constants
 G_FEATURE_PADDING_VALUE = float(0.0)
