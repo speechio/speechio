@@ -1,6 +1,8 @@
 .DS_Store
 credential/*.cfg
 
+__pycache__
+
 *.json
 log.*
 tmp*
