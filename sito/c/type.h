@@ -33,12 +33,12 @@ New pointer-types are introduced here:
     - optional<owner<T*>> denotes pointers with    ownership & can    be nullptr
     - ref<T*>             denotes pointers without ownership & cannot be nullptr
 
-Explicit and consistent use of these types provides extra semantics that are missing in raw pointers.
-And throughout this codebase, any raw pointer(i.e. T*) should be converted to one of these. 
+Explicit and consistent use of these types provides extra semantics that are missing in C pointers.
+And throughout this codebase, any C pointer(i.e. T*) should be converted to one of these. 
 
 But notes these types:
     - serve as merely annotations between programmers, rather than compiler guarentees.
-    - are just aliasings to raw pointers, with zero runtime cost
+    - are just aliasings to C pointers, with zero runtime cost
     - work seamlessly with C API/ABI
 */
 
