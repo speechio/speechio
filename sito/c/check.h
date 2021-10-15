@@ -17,7 +17,6 @@
             "%s:%s:L%d { %s } Failed -> %s\n",             \
             __FILE__, __FUNCTION__, __LINE__, #cond, info  \
         );                                                 \
-        fflush(stderr);                                    \
         abort();                                           \
     }                                                      \
 } while(0)
