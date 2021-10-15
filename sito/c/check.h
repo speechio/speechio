@@ -4,15 +4,15 @@
 #include <stdio.h>
 
 #if defined(__clang__) || defined(__GNUC__)
-#define LIKELY(x)   __builtin_expect(!!(x), 1)
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#define SITO_LIKELY(x)   __builtin_expect(!!(x), 1)
+#define SITO_UNLIKELY(x) __builtin_expect(!!(x), 0)
 #else
-#define LIKELY(x)   (!!(x))
-#define UNLIKELY(x) (!!(x))
+#define SITO_LIKELY(x)   (!!(x))
+#define SITO_UNLIKELY(x) (!!(x))
 #endif // defined(__clang__) || defined(__GNUC__)
 
-#define CHECK(cond, info) do {                             \
-    if (UNLIKELY( !(cond) )) {                             \
+#define SITO_CHECK(cond, info) do {                        \
+    if (SITO_UNLIKELY( !(cond) )) {                        \
         fprintf(stderr,                                    \
             "%s:%s:L%d { %s } Failed -> %s\n",             \
             __FILE__, __FUNCTION__, __LINE__, #cond, info  \
@@ -22,8 +22,8 @@
     }                                                      \
 } while(0)
 
-#define P_CHECK(cond) CHECK(cond, "Precondition Broken")
-#define Q_CHECK(cond) CHECK(cond, "Postcondition Broken")
-#define I_CHECK(cond) CHECK(cond, "Invariant Broken")
+#define P_CHECK(cond) SITO_CHECK(cond, "Precondition")
+#define Q_CHECK(cond) SITO_CHECK(cond, "Postcondition")
+#define I_CHECK(cond) SITO_CHECK(cond, "Invariant")
 
 #endif
