@@ -23,17 +23,23 @@ using f64 = double;
 using str = std::string;
 
 /* 
-C pointers are great at pointing "things", but they failed expressing *ownerships* and *nullness* explicitly.
+C pointers are great at pointing "things", but they failed expressing:
+    - ownerships
+    - nullness
 
-As a convention throughout this codebase, any raw pointer should be represented with one of the following types:
-    ref<T*>             pointers without ownership & cannot be nullptr
-    owner<T*>           pointers with    ownership & cannot be nullptr
-    optional<T*>        pointers without ownership & can    be nullptr
-    optional<owner<T*>> pointers with    ownership & can    be nullptr
+New pointer-types are introduced here:
+    - owner<T*>           denotes pointers with    ownership
+    - optional<T*>        denotes pointers                     can    be nullptr
+    - optional<owner<T*>> denotes pointers with    ownership & can    be nullptr
+    - ref<T*>             denotes pointers without ownership & cannot be nullptr
 
-Notes: 
-    - These are just aliasing types of raw C pointers, which can work seamlessly with C API/ABI.
-    - Semantics here merely serve as annotations between programmers, rather than compiler guarentees.
+Explicit and consistent use of these types provides extra semantics that are missing in raw pointers.
+And throughout this codebase, any raw pointer(i.e. T*) should be converted to one of these. 
+
+But notes these types:
+    - serve as merely annotations between programmers, rather than compiler guarentees.
+    - are just aliasings to raw pointers, with zero runtime cost
+    - work seamlessly with C API/ABI
 */
 
 template < typename PtrT, typename = typename std::enable_if<std::is_pointer<PtrT>::value>::type >
