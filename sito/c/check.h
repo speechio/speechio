@@ -14,7 +14,7 @@
 #define CHECK(cond, info) do {                             \
     if (UNLIKELY( !(cond) )) {                             \
         fprintf(stderr,                                    \
-            "%s:%s:L%d |%s| %s\n",                         \
+            "%s:%s:L%d { %s } Failed -> %s\n",             \
             __FILE__, __FUNCTION__, __LINE__, #cond, info  \
         );                                                 \
         fflush(stderr);                                    \
