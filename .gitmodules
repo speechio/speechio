@@ -1,6 +1,6 @@
 [submodule "abseil-cpp"]
-	path = speechio/third_party/abseil-cpp
+	path = speechio/sio/third_party/abseil-cpp
 	url = https://github.com/abseil/abseil-cpp
 [submodule "kenlm"]
-	path = speechio/third_party/kenlm
+	path = speechio/sio/third_party/kenlm
 	url = https://github.com/kpu/kenlm
