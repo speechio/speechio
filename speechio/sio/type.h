@@ -2,11 +2,19 @@
 #define SIO_TYPE_H
 
 #include <stdint.h>
-#include <string>
 #include <type_traits>
+#include <string>
+
+#include "absl/strings/string_view.h"
+#include "absl/strings/strip.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
+#include "absl/strings/str_format.h"
 
 namespace sio {
-/* primitive types */
+
 using i8  = int8_t;
 using i16 = int16_t;
 using i32 = int32_t;
@@ -20,7 +28,9 @@ using u64 = uint64_t;
 using f32 = float;
 using f64 = double;
 
+
 using str = std::string;
+using str_view = absl::string_view;
 
 /* 
 C pointers are great at pointing "things", but they failed expressing:
@@ -29,8 +39,8 @@ C pointers are great at pointing "things", but they failed expressing:
 
 New pointer-types are introduced here:
     - owner<T*>           denotes pointers with    ownership
-    - optional<T*>        denotes pointers                     can    be nullptr
-    - optional<owner<T*>> denotes pointers with    ownership & can    be nullptr
+    - nullable<T*>        denotes pointers                     can    be nullptr
+    - nullable<owner<T*>> denotes pointers with    ownership & can    be nullptr
     - ref<T*>             denotes pointers without ownership & cannot be nullptr
 
 Explicit and consistent use of these types provides extra semantics that are missing in C pointers.
@@ -46,7 +56,7 @@ template < typename PtrT, typename = typename std::enable_if<std::is_pointer<Ptr
 using owner = PtrT;
 
 template < typename PtrT, typename = typename std::enable_if<std::is_pointer<PtrT>::value>::type >
-using optional = PtrT;
+using nullable = PtrT;
 
 template < typename PtrT, typename = typename std::enable_if<std::is_pointer<PtrT>::value>::type >
 using ref = PtrT;

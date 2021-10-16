@@ -2,13 +2,20 @@
 #define SIO_CHECK_H
 
 #include <stdio.h>
-#include "compiler.h"
+
+#if defined(__clang__) || defined(__GNUC__)
+#    define LIKELY(x)   __builtin_expect(!!(x), 1)
+#    define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#    define LIKELY(x)   (!!(x))
+#    define UNLIKELY(x) (!!(x))
+#endif
 
 #define SIO_CHECK_EXPR(expr, info) do {                       \
     if (UNLIKELY( !(expr) )) {                                \
         fprintf(stderr,                                       \
-            "%s:%s:L%d %s -> { %s } Failed.\n",               \
-            __FILE__, __FUNCTION__, __LINE__, (info), (#expr) \
+            "Check { %s } failed -> %s @ %s:%s:L%d\n",        \
+            (#expr), (info), __FILE__, __FUNCTION__, __LINE__ \
         );                                                    \
         abort();                                              \
     }                                                         \

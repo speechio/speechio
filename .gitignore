@@ -9,6 +9,8 @@ tmp*
 *.pt
 run.sh
 
+build
+
 # oss
 .ossutil_checkpoint
 ossutil_output
