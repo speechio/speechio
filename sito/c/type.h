@@ -1,11 +1,11 @@
-#ifndef SITO_TYPE_H
-#define SITO_TYPE_H
+#ifndef SIO_TYPE_H
+#define SIO_TYPE_H
 
 #include <stdint.h>
 #include <string>
 #include <type_traits>
 
-namespace sito {
+namespace sio {
 /* primitive types */
 using i8  = int8_t;
 using i16 = int16_t;
@@ -51,5 +51,5 @@ using optional = PtrT;
 template < typename PtrT, typename = typename std::enable_if<std::is_pointer<PtrT>::value>::type >
 using ref = PtrT;
 
-}; // namespace sito
+}; // namespace sio
 #endif
