@@ -14,7 +14,7 @@
 #define SIO_CHECK_EXPR(expr, info) do {                        \
     if (UNLIKELY( !(expr) )) {                                 \
         fprintf(stderr,                                        \
-            "%s -> { %s } failed @ %s:%s:L%d\n",               \
+            "%s -> { %s } failed @ %s:%s:%d\n",               \
             (info) , (#expr), __FILE__, __FUNCTION__, __LINE__ \
         );                                                     \
         abort();                                               \

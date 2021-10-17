@@ -11,4 +11,4 @@ add_subdirectory(abseil-cpp)
 add_subdirectory(sio)
 
 add_executable(stt stt.cc)
-target_link_libraries(stt absl::strings absl::type_traits)
+target_link_libraries(stt absl::strings absl::type_traits absl::flat_hash_map)
