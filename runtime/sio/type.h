@@ -40,7 +40,7 @@ using str = std::string;
 using str_view = absl::string_view;
 
 template<typename T>
-using list = std::vector<T>;
+using vec = std::vector<T>;
 
 #ifdef ENABLE_ABSL_HASH_MAP
 /*

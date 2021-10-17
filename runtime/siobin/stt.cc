@@ -1,14 +1,12 @@
 #include <iostream>
-#include <vector>
-
 #include "sio/hoare.h"
 #include "sio/type.h"
 
 int main() {
     using namespace sio;
     P_COND(true);
-    list<str> v = {"foo","bar","baz"};
-    list<list<str>> k;
+    vec<str> v = {"foo","bar","baz"};
+    vec<vec<str>> k;
     str s = absl::StrJoin(v, "-");
     str_view sv = s;
     INVARIANT(true);
