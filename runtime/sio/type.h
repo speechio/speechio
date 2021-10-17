@@ -2,9 +2,8 @@
 #define SIO_TYPE_H
 
 #include <stdint.h>
-#include <type_traits>
-#include <string>
 
+#include <string>
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 #include "absl/strings/str_cat.h"
@@ -12,6 +11,8 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_format.h"
+
+#include "absl/meta/type_traits.h"
 
 namespace sio {
 
@@ -52,13 +53,13 @@ But notes these types:
     - work seamlessly with C API/ABI
 */
 
-template < typename PtrT, typename = typename std::enable_if<std::is_pointer<PtrT>::value>::type >
+template <typename PtrT, typename = typename absl::enable_if_t<std::is_pointer<PtrT>::value>>
 using owner = PtrT;
 
-template < typename PtrT, typename = typename std::enable_if<std::is_pointer<PtrT>::value>::type >
+template <typename PtrT, typename = typename absl::enable_if_t<std::is_pointer<PtrT>::value>>
 using nullable = PtrT;
 
-template < typename PtrT, typename = typename std::enable_if<std::is_pointer<PtrT>::value>::type >
+template <typename PtrT, typename = typename absl::enable_if_t<std::is_pointer<PtrT>::value>>
 using ref = PtrT;
 
 }; // namespace sio
