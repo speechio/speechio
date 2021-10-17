@@ -11,5 +11,6 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/abseil-cpp)
 
 include_directories(${CMAKE_SOURCE_DIR})
 add_subdirectory(${CMAKE_SOURCE_DIR}/sio)
-add_executable(stt sio/stt.cc)
+add_subdirectory(${CMAKE_SOURCE_DIR}/siobin)
+add_executable(stt siobin/stt.cc)
 target_link_libraries(stt absl::strings absl::str_format absl::type_traits absl::flat_hash_map)
