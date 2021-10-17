@@ -1,6 +1,5 @@
 #include <iostream>
-#include "sio/hoare.h"
-#include "sio/type.h"
+#include "sio/base.h"
 
 int main() {
     using namespace sio;
