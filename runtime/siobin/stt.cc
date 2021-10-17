@@ -1,11 +1,25 @@
 #include <iostream>
 #include "sio/base.h"
 
+using namespace sio;
+struct Person {
+    i32 age = 0;
+    str name = "";
+};
+
+template<typename T>
+struct Slice {
+    ref<T*> items = nullptr;
+    i64 len = 0;
+    i64 cap = 0;
+};
+
 int main() {
-    using namespace sio;
+    Person x;
+    Slice<int> y;
     P_COND(true);
-    vec<str> v = {"foo","bar","baz"};
-    vec<vec<str>> k;
+    list<str> v;
+    list<list<str>> k;
     str s = absl::StrJoin(v, "-");
     str_view sv = s;
     INVARIANT(true);
