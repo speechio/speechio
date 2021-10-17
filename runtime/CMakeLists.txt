@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(sito)
+project(stt)
 
 # Abseil requires C++11
 set(CMAKE_CXX_STANDARD 11)
@@ -7,8 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 ## Import Abseil's CMake targets
 #find_package(absl REQUIRED)
-add_subdirectory(third_party/abseil-cpp)
+add_subdirectory(abseil-cpp)
+add_subdirectory(sio)
 
-add_executable(sito sito.cc)
-# Declare dependency on the absl::strings library
-target_link_libraries(sito absl::strings absl::flat_hash_map)
+add_executable(stt stt.cc)
+target_link_libraries(stt absl::strings absl::flat_hash_map)
