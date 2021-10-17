@@ -16,7 +16,7 @@ int main() {
     std::cout << "Joined string: " << sv << "\n";
     i32 i = 10;
     ref<i32*> p = &i;
-    std::cout << p << "\n";
+    std::cout << absl::StrFormat("%d\n", *p);
     map<int, str> m;
     m[123] = "abc";
     std::cout << &m << "\n";
