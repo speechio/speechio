@@ -14,6 +14,13 @@
 #include "absl/strings/str_format.h"
 #include "absl/meta/type_traits.h"
 
+//#define ENABLE_ABSL_HASH_MAP
+#ifdef ENABLE_ABSL_HASH_MAP
+#    include "absl/container/flat_hash_map.h"
+#else
+#    include <unordered_map>
+#endif
+
 namespace sio {
 
 using i8  = int8_t;
@@ -29,16 +36,13 @@ using u64 = uint64_t;
 using f32 = float;
 using f64 = double;
 
-
 using str = std::string;
 using str_view = absl::string_view;
 
 template<typename T>
 using list = std::vector<T>;
 
-//#define ENABLE_ABSL_HASH_MAP
 #ifdef ENABLE_ABSL_HASH_MAP
-#include "absl/container/flat_hash_map.h"
 /*
     template <
         class K,
@@ -52,7 +56,6 @@ using list = std::vector<T>;
     template<typename K, typename V>
     using map = absl::flat_hash_map<K, V>;
 #else 
-#include <unordered_map>
 /*
     template <
         class K,

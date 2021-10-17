@@ -18,7 +18,7 @@ int main() {
     ref<i32*> p = &i;
     std::cout << p << "\n";
     map<int, str> m;
-    m.insert({1, "abc"});
+    m[123] = "abc";
     std::cout << &m << "\n";
 
     Q_COND(true);
