@@ -1,5 +1,5 @@
-#ifndef SIO_TYPE_H
-#define SIO_TYPE_H
+#ifndef SIO_BASE_TYPE_H
+#define SIO_BASE_TYPE_H
 
 #include <stdint.h>
 

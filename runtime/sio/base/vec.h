@@ -1,5 +1,5 @@
-#ifndef SIO_VEC_H
-#define SIO_VEC_H
+#ifndef SIO_BASE_VEC_H
+#define SIO_BASE_VEC_H
 
 #include <vector>
 

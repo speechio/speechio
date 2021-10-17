@@ -1,5 +1,5 @@
-#ifndef SIO_CHECK_H
-#define SIO_CHECK_H
+#ifndef SIO_BASE_CHECK_H
+#define SIO_BASE_CHECK_H
 
 #include <stdio.h>
 

@@ -1,5 +1,5 @@
-#ifndef SIO_MAP_H
-#define SIO_MAP_H
+#ifndef SIO_BASE_MAP_H
+#define SIO_BASE_MAP_H
 
 //#define ENABLE_ABSL_HASH_MAP
 #ifdef ENABLE_ABSL_HASH_MAP
