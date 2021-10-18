@@ -1,16 +1,27 @@
-cmake_minimum_required(VERSION 3.5)
-project(stt)
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
-# Abseil requires C++11
+project(sio CXX)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-## Import Abseil's CMake targets
-#find_package(absl REQUIRED)
-add_subdirectory(${CMAKE_SOURCE_DIR}/abseil-cpp)
+set(SIO_VERSION_MAJOR 0)
+set(SIO_VERSION_MINOR 1)
+set(SIO_VERSION_PATCH 0)
 
-include_directories(${CMAKE_SOURCE_DIR})
-add_subdirectory(${CMAKE_SOURCE_DIR}/sio)
-add_subdirectory(${CMAKE_SOURCE_DIR}/siobin)
-add_executable(stt siobin/stt.cc)
+set(SIO_ROOT ${CMAKE_SOURCE_DIR})
+set(SIO_INC_DIR ${SIO_ROOT})
+set(SIO_SRC_DIR ${SIO_ROOT}/sio)
+set(SIO_BIN_DIR ${SIO_ROOT}/siobin)
+
+# add abseil lib
+add_subdirectory(${SIO_ROOT}/abseil-cpp)
+
+# sio
+include_directories(${SIO_INC_DIR})
+
+add_subdirectory(${SIO_SRC_DIR})
+add_subdirectory(${SIO_BIN_DIR})
+
+add_executable(stt ${SIO_BIN_DIR}/stt.cc)
 target_link_libraries(stt absl::strings absl::str_format absl::type_traits absl::flat_hash_map)
+
