@@ -1,12 +1,8 @@
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.5)
 
-project(sio CXX)
+project(sio LANGUAGES CXX VERSION 0.1)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-set(SIO_VERSION_MAJOR 0)
-set(SIO_VERSION_MINOR 1)
-set(SIO_VERSION_PATCH 0)
 
 set(SIO_ROOT ${CMAKE_SOURCE_DIR})
 set(SIO_INC_DIR ${SIO_ROOT})
