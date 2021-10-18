@@ -28,9 +28,17 @@ int main() {
     i32 i = 10;
     ref<i32*> p = &i;
     std::cout << absl::StrFormat("%d\n", *p);
-    map<int, str> m;
-    m[123] = "abc";
-    std::cout << &m << "\n";
+
+    gmap<int, str> m = {{1, "aaa"}, {2, "bbb"}, {3, "ccc"}};
+    m[123] = "abcd";
+
+    for (auto kv : m) {
+        std::cout << kv.first << ":" << kv.second << "\n";
+    }
+
+    for (auto it = m.begin(); it != m.end(); ++it) {
+        std::cout << it->first << ":" << it->second << "\n";
+    }
 
     Q_COND(true);
 }
