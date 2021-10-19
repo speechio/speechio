@@ -1,2 +1,1 @@
-# SpeechIO Operations
-Playground
+# SpeechIO Playground
