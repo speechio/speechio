@@ -1,5 +1,5 @@
-#ifndef SIO_BASE_STR_H
-#define SIO_BASE_STR_H
+#ifndef SIO_STR_H
+#define SIO_STR_H
 
 #include <string>
 

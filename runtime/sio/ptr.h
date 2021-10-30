@@ -1,5 +1,5 @@
-#ifndef SIO_BASE_PTR_H
-#define SIO_BASE_PTR_H
+#ifndef SIO_PTR_H
+#define SIO_PTR_H
 
 #include "absl/meta/type_traits.h"
 

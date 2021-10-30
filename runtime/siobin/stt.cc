@@ -18,8 +18,8 @@ int main() {
     Person x;
     Slice<int> y;
     P_COND(true);
-    list<str> v;
-    list<list<str>> k;
+    vec<str> v;
+    vec<vec<str>> k;
     str s = absl::StrJoin(v, "-");
     str_view sv = s;
     INVARIANT(true);
@@ -39,6 +39,8 @@ int main() {
     for (auto it = m.begin(); it != m.end(); ++it) {
         std::cout << it->first << ":" << it->second << "\n";
     }
+
+    index_t j = 0;
 
     Q_COND(true);
 }

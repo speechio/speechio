@@ -1,5 +1,5 @@
-#ifndef SIO_BASE_MAP_H
-#define SIO_BASE_MAP_H
+#ifndef SIO_MAP_H
+#define SIO_MAP_H
 
 #include <unordered_map>
 #include "absl/container/flat_hash_map.h"

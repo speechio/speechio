@@ -1,7 +1,8 @@
-#ifndef SIO_BASE_TYPE_H
-#define SIO_BASE_TYPE_H
+#ifndef SIO_TYPE_H
+#define SIO_TYPE_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 namespace sio {
 
@@ -17,6 +18,8 @@ using u64 = uint64_t;
 
 using f32 = float;
 using f64 = double;
+
+using index_t = ptrdiff_t;
 
 }; // namespace sio
 #endif

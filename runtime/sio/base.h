@@ -1,11 +1,11 @@
 #ifndef SIO_BASE_H
 #define SIO_BASE_H
 
-#include "sio/base/hoare.h"
-#include "sio/base/type.h"
-#include "sio/base/ptr.h"
-#include "sio/base/str.h"
-#include "sio/base/list.h"
-#include "sio/base/map.h"
+#include "sio/hoare.h"
+#include "sio/type.h"
+#include "sio/ptr.h"
+#include "sio/str.h"
+#include "sio/vec.h"
+#include "sio/map.h"
 
 #endif
