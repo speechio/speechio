@@ -5,7 +5,7 @@
 
 namespace sio {
 template<typename T>
-using list = std::vector<T>;
+using vec = std::vector<T>;
 };
 
 #endif
