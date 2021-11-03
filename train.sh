@@ -8,4 +8,4 @@
 # cat misc/encoded2 | ops/tokenizer_decode --model misc/tokenizer > misc/decoded2
 
 ## Train
-ops/train_sito --config config/train_sito.yaml
+ops/train_sito --config configs/train_sito.yaml
