@@ -32,7 +32,7 @@ int main() {
     gmap<int, str> m = {{1, "aaa"}, {2, "bbb"}, {3, "ccc"}};
     m[123] = "abcd";
 
-    for (auto kv : m) {
+    for (auto& kv : m) {
         std::cout << kv.first << ":" << kv.second << "\n";
     }
 
