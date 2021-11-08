@@ -34,7 +34,7 @@ class Model(nn.Module):
         return out
 
 
-class Loss(nn.Module):
+class LossEval(nn.Module):
     def __init__(self, blank_index):
         super().__init__()
         self.blank_index = blank_index

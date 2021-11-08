@@ -447,20 +447,20 @@ class DataPipeline:
             logging.debug(f'Processed sample {sample.id} -> {key}')
 
         features = [ x['feature'] for x in minibatch ]
-        time_lengths = torch.tensor([ len(x) for x in features ]) # [B]
+        time_lengths = torch.tensor([ len(x) for x in features ]) # [N]
         inputs = nn.utils.rnn.pad_sequence(
             features,
             batch_first = True,
             padding_value = G_FEATURE_PADDING_VALUE,
-        ) # [B, max(time_lengths), F]
+        ) # [N, max(time_lengths), F]
 
         labels = [ x['token_ids'] for x in minibatch ]
-        label_lengths = torch.tensor([ len(y) for y in labels ]) # [B]
+        label_lengths = torch.tensor([ len(y) for y in labels ]) # [N]
         targets = nn.utils.rnn.pad_sequence(
             [ torch.tensor(l) for l in labels ],
             batch_first = True,
             padding_value = G_LABEL_PADDING_VALUE,
-        ) # [B, max(label_lengths)]
+        ) # [N, max(label_lengths)]
 
         return minibatch, inputs, targets, time_lengths, label_lengths
 
@@ -468,7 +468,7 @@ class DataPipeline:
 def make_length_mask(lengths: torch.Tensor) -> torch.Tensor:
     """Make mask tensor indicating in-length elements.
     Args:
-        lengths (torch.Tensor): Batch of lengths (B,).
+        lengths (torch.Tensor): Batch of lengths (N,).
     Returns:
         torch.Tensor: Bool tensor mask indicating in-length elements.
     """
@@ -494,7 +494,7 @@ def ctc_collapse(hyp: list[int]) -> list[int]:
 def ctc_greedy_search(log_probs: torch.Tensor, time_lengths: torch.Tensor):
     B = log_probs.shape[0]
 
-    best_scores, best_paths = log_probs.topk(1, dim=2) # [B,T,V] -> [B,T,k=1]
+    best_scores, best_paths = log_probs.topk(1, dim=2) # [N,T,V] -> [N,T,k=1]
 
     best_paths = best_paths.squeeze(2)
     best_scores = best_scores.squeeze(2)
@@ -600,9 +600,9 @@ def run():
     )
 
     # import model & loss from nnet 
-    from nnet.lstm import Model, Loss
+    from nnet.lstm import Model, LossEval
     model = Model(config.model)
-    loss_evaluator = Loss(blank_index = G_BLANK_ID)
+    loss_eval = LossEval(blank_index = G_BLANK_ID)
 
     model = model.to(G_DEVICE)
     logging.info(f'Total params:     {sum([ p.numel() for p in model.parameters()                    ])/float(1e6):.2f}M')
@@ -626,7 +626,7 @@ def run():
 
             X, L, T, U = move_tensor_to_device(X, L, T, U)
             Y = model(X)
-            loss = loss_evaluator(Y, L, T, U)
+            loss = loss_eval(Y, L, T, U)
 
             utt_loss, frame_loss = loss/num_utts, loss/num_frames
 
@@ -639,8 +639,8 @@ def run():
             total_frames += num_frames
             if b % config.training.log_interval == 0:
                 logging.info(f'  [{e}/{num_epochs}]:[{b}/{num_batches}] loss={total_loss / total_frames:.2f}')
-        scheduler.step()
         logging.info(f'TRAIN[{e}] average_frame_loss={(total_loss / total_frames):.2f} over {total_frames} frames')
+        scheduler.step()
 
         checkpoint_dir = os.path.join('checkpoints')
         os.makedirs(os.path.join(checkpoint_dir), exist_ok = True)
@@ -659,7 +659,7 @@ def run():
 
                 X, L, T, U = move_tensor_to_device(X, L, T, U)
                 Y = model(X)
-                loss = loss_evaluator(Y, L, T, U)
+                loss = loss_eval(Y, L, T, U)
 
                 best_paths, b = ctc_greedy_search(Y, T)
                 print(best_paths, b)
