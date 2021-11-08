@@ -14,7 +14,7 @@ build
 .ossutil_checkpoint
 ossutil_output
 
-model
+model/tokenizer
 data/audio/*
 !data/audio/MINI
 !data/audio/zoo.yaml
