@@ -51,17 +51,3 @@ class Loss(nn.Module):
             reduction='sum',
         )
         return loss
-
-#def LossFunc(log_probs, labels, input_lens, label_lens, blank_index = 0):
-#    log_probs = torch.einsum("btv->tbv", log_probs)
-#    loss = torch.nn.functional.ctc_loss(
-#        log_probs,
-#        labels,
-#        input_lens,
-#        label_lens,
-#        blank_index,
-#        zero_infinity=True,
-#        reduction='sum',
-#    )
-#    return loss
-#
