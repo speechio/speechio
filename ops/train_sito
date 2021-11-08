@@ -27,7 +27,6 @@ from omegaconf import OmegaConf
 import sentencepiece as spm
 #import k2
 
-from nnet.lstm import Model
 
 # Global Constants
 G_FEATURE_PADDING_VALUE = float(0.0)
@@ -466,20 +465,6 @@ class DataPipeline:
         return minibatch, inputs, targets, time_lengths, label_lengths
 
 
-def Loss(log_probs, labels, input_lens, label_lens, blank_index = G_BLANK_ID):
-    log_probs = torch.einsum("btv->tbv", log_probs)
-    loss = torch.nn.functional.ctc_loss(
-        log_probs,
-        labels,
-        input_lens,
-        label_lens,
-        blank_index,
-        zero_infinity=True,
-        reduction='sum',
-    )
-    return loss
-
-
 def make_length_mask(lengths: torch.Tensor) -> torch.Tensor:
     """Make mask tensor indicating in-length elements.
     Args:
@@ -614,11 +599,14 @@ def run():
         collate_fn = data_pipeline,
     )
 
-    # model
+    # import model & loss from nnet 
+    from nnet.lstm import Model, Loss
     model = Model(config.model)
+    loss_evaluator = Loss(blank_index = G_BLANK_ID)
+
+    model = model.to(G_DEVICE)
     logging.info(f'Total params:     {sum([ p.numel() for p in model.parameters()                    ])/float(1e6):.2f}M')
     logging.info(f'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
-    model = model.to(G_DEVICE)
 
     # optimizer
     optimizer = torch.optim.SGD(model.parameters(), lr = config.training.optimizer.SGD.lr)
@@ -633,15 +621,14 @@ def run():
         num_batches = len(train_dataloader)
         for b, batch in enumerate(train_dataloader, 1): # batch index starts from 1
             samples, X, L, T, U = batch
-            num_utts = len(samples)
+            num_utts = X.shape[0]
             num_frames = int(T.sum())
 
             X, L, T, U = move_tensor_to_device(X, L, T, U)
             Y = model(X)
-            loss = Loss(Y, L, T, U)
+            loss = loss_evaluator(Y, L, T, U)
 
-            utt_loss = loss / num_utts
-            frame_loss = loss / num_frames
+            utt_loss, frame_loss = loss/num_utts, loss/num_frames
 
             utt_loss.backward()
             optimizer.step()
@@ -667,12 +654,12 @@ def run():
         with torch.no_grad():
             for b, batch in enumerate(valid_dataloader):
                 samples, X, L, T, U = batch
-                num_utts = len(samples)
+                num_utts = X.shape[0]
                 num_frames = int(T.sum())
 
                 X, L, T, U = move_tensor_to_device(X, L, T, U)
                 Y = model(X)
-                loss = Loss(Y, L, T, U)
+                loss = loss_evaluator(Y, L, T, U)
 
                 best_paths, b = ctc_greedy_search(Y, T)
                 print(best_paths, b)

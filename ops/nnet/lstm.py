@@ -32,3 +32,36 @@ class Model(nn.Module):
         out = self.fc(out)
         out = self.log_softmax(out)
         return out
+
+
+class Loss(nn.Module):
+    def __init__(self, blank_index):
+        super().__init__()
+        self.blank_index = blank_index
+
+    def forward(self, log_probs, labels, input_lens, label_lens):
+        log_probs = torch.einsum("btv->tbv", log_probs)
+        loss = torch.nn.functional.ctc_loss(
+            log_probs,
+            labels,
+            input_lens,
+            label_lens,
+            self.blank_index,
+            zero_infinity=True,
+            reduction='sum',
+        )
+        return loss
+
+#def LossFunc(log_probs, labels, input_lens, label_lens, blank_index = 0):
+#    log_probs = torch.einsum("btv->tbv", log_probs)
+#    loss = torch.nn.functional.ctc_loss(
+#        log_probs,
+#        labels,
+#        input_lens,
+#        label_lens,
+#        blank_index,
+#        zero_infinity=True,
+#        reduction='sum',
+#    )
+#    return loss
+#
