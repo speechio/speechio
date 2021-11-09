@@ -27,6 +27,9 @@ from omegaconf import OmegaConf
 import sentencepiece as spm
 #import k2
 
+sys.path.insert(0, "ops/nnet/deps")
+from wenet.utils.scheduler import WarmupLR
+
 
 # Global Constants
 G_FEATURE_PADDING_VALUE = float(0.0)
@@ -599,48 +602,55 @@ def run():
         collate_fn = data_pipeline,
     )
 
-    # import model & loss from nnet 
-    from nnet.lstm import Model, LossEval
-    model = Model(config.model)
-    loss_eval = LossEval(blank_index = G_BLANK_ID)
+    # import nnet
+    #from nnet.lstm import Model, LossEval
+    from nnet.transformer import Model
+    with open(config.model, 'r') as config_file:
+        model_config = yaml.load(config_file, Loader=yaml.FullLoader)
 
+    model = Model(model_config)
     model = model.to(G_DEVICE)
     logging.info(f'Total params:     {sum([ p.numel() for p in model.parameters()                    ])/float(1e6):.2f}M')
     logging.info(f'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
 
     # optimizer
-    optimizer = torch.optim.SGD(model.parameters(), lr = config.training.optimizer.SGD.lr)
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.training.scheduler.gamma)
+    #optimizer = torch.optim.SGD(model.parameters(), lr = config.training.optimizer.SGD.lr)
+    #scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.training.scheduler.gamma)
+    optimizer = torch.optim.Adam(model.parameters(), **model_config['optim_conf'])
+    scheduler = WarmupLR(optimizer, **model_config['scheduler_conf'])
+    scheduler.set_step(0)
 
-    num_epochs = config.training.num_epochs
-    for e in range(1, 1 + num_epochs): # epoch index starts from 1
+    gradient_accumulation = config.training.gradient_accumulation
+    gradient_clipping     = config.training.gradient_clipping
+    num_epochs            = config.training.num_epochs
+    for e in range(1, 1 + num_epochs): # 1-based indexing
+        logging.info(f'Training epoch {e}:')
         # training
-        logging.info(f'Training epoch {e} with LR={scheduler.get_last_lr()} ...')
         total_loss = 0.0
         total_utts, total_frames = 0, 0
         num_batches = len(train_dataloader)
-        for b, batch in enumerate(train_dataloader, 1): # batch index starts from 1
+        for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
             samples, X, L, T, U = batch
             num_utts = X.shape[0]
             num_frames = int(T.sum())
 
             X, L, T, U = move_tensor_to_device(X, L, T, U)
-            Y = model(X)
-            loss = loss_eval(Y, L, T, U)
+            loss = model(X, L, T, U)
+            (loss / num_utts / gradient_accumulation).backward()
 
-            utt_loss, frame_loss = loss/num_utts, loss/num_frames
-
-            utt_loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-            
             total_loss += loss.item()
             total_utts += num_utts
             total_frames += num_frames
+
+            if b % gradient_accumulation == 0:
+                if torch.isfinite(nn.utils.clip_grad_norm_(model.parameters(), gradient_clipping)):
+                    optimizer.step()
+                optimizer.zero_grad()
+                scheduler.step()
+            
             if b % config.training.log_interval == 0:
-                logging.info(f'  [{e}/{num_epochs}]:[{b}/{num_batches}] loss={total_loss / total_frames:.2f}')
+                logging.info(f'  [{e}/{num_epochs}]:[{b}/{num_batches}]  {total_loss/total_frames:7.2f} {total_loss/total_utts:7.2f}  LR={scheduler.get_last_lr()}')
         logging.info(f'TRAIN[{e}] average_frame_loss={(total_loss / total_frames):.2f} over {total_frames} frames')
-        scheduler.step()
 
         checkpoint_dir = os.path.join('checkpoints')
         os.makedirs(os.path.join(checkpoint_dir), exist_ok = True)
@@ -658,13 +668,15 @@ def run():
                 num_frames = int(T.sum())
 
                 X, L, T, U = move_tensor_to_device(X, L, T, U)
-                Y = model(X)
-                loss = loss_eval(Y, L, T, U)
+                loss = model(X, L, T, U)
 
-                best_paths, b = ctc_greedy_search(Y, T)
-                print(best_paths, b)
+                best_paths, b = model.decode(X, T)
                 for p in best_paths:
                     print(tokenizer.sentence_piece.DecodeIds(p))
+                #best_paths, b = ctc_greedy_search(Y, T)
+                #print(best_paths, b)
+                #for p in best_paths:
+                #    print(tokenizer.sentence_piece.DecodeIds(p))
                 
                 total_loss += loss.item()
                 total_utts += num_utts

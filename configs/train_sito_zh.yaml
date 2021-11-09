@@ -1,0 +1,87 @@
+logging: config/logging.yaml
+
+data_zoo: data/audio/zoo.yaml
+
+sample_loader:
+    field_map:
+        id: ID
+        audio: AUDIO
+        begin: BEGIN
+        duration: DURATION
+        text: TEXT
+        speaker: SPEAKER
+    min_duration: 0.5
+    max_duration: 20.0
+    min_text_length: 1
+    max_text_length: 1024
+
+dataset:
+    train:
+        subsets:
+        -   id: AISHELL-1-TRAIN
+            max_num_samples: -1
+
+    valid:
+        subsets:
+        -   id: AISHELL-1-DEV
+            max_num_samples: 10
+
+    test:
+        subsets:
+        -   id: AISHELL-1-TEST
+            max_num_samples: 0
+
+resampler:
+    sample_rate: 16000
+
+perturbation:
+    mark_key: True
+    speeds: #[0.9, 1.0, 1.1]
+    tempos: #[0.9, 1.0, 1.1]
+    volumes: #[0.9, 1.0, 1.1]
+
+feature_type: fbank # support fbank only now
+feature_extractors:
+    fbank:
+        dither: 0.0
+        num_mel_bins: 80
+    hires_mfcc:
+        dither: 0.0
+        num_mel_bins: 40
+        num_ceps: 40
+        low_freq: 20
+        high_freq: -400
+
+text_normalizer:
+    case: UPPER # either 'UPPER' or 'lower'
+
+tokenizer:
+    model: model/tokenizer/AISHELL-1.model
+
+dataloader:
+    shuffle: True
+    batch_size: 4
+    drop_last: False
+    num_workers: 8
+
+training:
+    num_epochs: 10
+    log_interval: 10
+    gradient_accumulation: 1
+    gradient_clipping: 5.0
+    optimizer:
+        Adam:
+            lr: 0.001
+        SGD:
+            lr: 0.001
+    scheduler:
+        gamma: 0.5
+
+#model:
+#    idim: 80
+#    hidden_layer_dim: 256
+#    num_hidden_layers: 3
+#    odim: 32
+
+#model: /home/dophist/work/wenet/examples/wenetspeech/s0/conf/train_conformer.yaml
+model: ops/nnet/transformer_config.yaml

@@ -3,3 +3,4 @@ omegaconf
 numpy
 torch
 torchaudio
+typeguard

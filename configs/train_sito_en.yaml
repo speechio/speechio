@@ -19,14 +19,14 @@ dataset:
     train:
         subsets:
         -   id: GIGASPEECH_XS
-            max_num_samples: 10
+            max_num_samples: -1
         -   id: GIGASPEECH_S
             max_num_samples: 0
 
     valid:
         subsets:
         -   id: GIGASPEECH_DEV
-            max_num_samples: 1
+            max_num_samples: 2
 
     test:
         subsets:
@@ -62,17 +62,19 @@ text_normalizer:
     case: UPPER # either 'UPPER' or 'lower'
 
 tokenizer:
-    model: model/tokenizer/sentencepiece_en.model
+    model: model/tokenizer/GigaSpeech_S.model
 
 dataloader:
     shuffle: True
-    batch_size: 1
+    batch_size: 4
     drop_last: False
-    num_workers: 4
+    num_workers: 8
 
 training:
-    num_epochs: 2
+    num_epochs: 10
     log_interval: 10
+    gradient_accumulation: 16
+    gradient_clipping: 5.0
     optimizer:
         Adam:
             lr: 0.001
@@ -81,8 +83,11 @@ training:
     scheduler:
         gamma: 0.5
 
-model:
-    idim: 80
-    hidden_layer_dim: 256
-    num_hidden_layers: 3
-    odim: 32
+#model:
+#    idim: 80
+#    hidden_layer_dim: 256
+#    num_hidden_layers: 3
+#    odim: 32
+
+#model: /home/dophist/work/wenet/examples/wenetspeech/s0/conf/train_conformer.yaml
+model: ops/nnet/transformer_config.yaml
