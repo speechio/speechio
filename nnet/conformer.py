@@ -10,7 +10,7 @@ import torch.nn as nn
 import yaml
 
 import sys
-sys.path.insert(0, "nnet/toolkit")
+sys.path.insert(0, "nnet/deps")
 from wenet.transformer.encoder import TransformerEncoder, ConformerEncoder
 from wenet.transformer.decoder import TransformerDecoder, BiTransformerDecoder
 from wenet.transformer.ctc import CTC
