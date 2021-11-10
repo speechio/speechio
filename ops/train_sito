@@ -34,11 +34,11 @@ from wenet.utils.scheduler import WarmupLR
 # Global Constants
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_LABEL_PADDING_VALUE = int(-1)
-G_BLANK_ID = 0
+G_BLK_ID = 0
+G_UNK_ID = G_BLK_ID
 G_BOS_ID = 1
 G_EOS_ID = 2
 
-G_DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 @dataclass
 class Sample:
@@ -485,35 +485,6 @@ def make_length_mask(lengths: torch.Tensor) -> torch.Tensor:
     return mask
 
 
-def ctc_collapse(hyp: list[int]) -> list[int]:
-    new_hyp: list[int] = []
-    cur = 0
-    while cur < len(hyp):
-        if hyp[cur] != G_BLANK_ID:
-            new_hyp.append(hyp[cur])
-        prev = cur
-        while cur < len(hyp) and hyp[cur] == hyp[prev]:
-            cur += 1
-    return new_hyp
-
-
-def ctc_greedy_search(log_probs: torch.Tensor, time_lengths: torch.Tensor):
-    B = log_probs.shape[0]
-
-    best_scores, best_paths = log_probs.topk(1, dim=2) # [N,T,V] -> [N,T,k=1]
-
-    best_paths = best_paths.squeeze(2)
-    best_scores = best_scores.squeeze(2)
-    pad_mask = ~ make_length_mask(time_lengths)
-
-    best_paths.masked_fill_(pad_mask, G_EOS_ID)
-    best_scores.masked_fill_(pad_mask, 0.0)
-    scores = best_scores.sum(1)
-    hyps = [ ctc_collapse(p.tolist()) for p in best_paths ]
-    #hyps = [ p.tolist() for p in best_paths ]
-    return hyps, scores
-
-
 def dump_tensor_to_csv(x: torch.Tensor, filename: str):
     import pandas as pd
     df = pd.DataFrame(x.numpy())
@@ -521,8 +492,8 @@ def dump_tensor_to_csv(x: torch.Tensor, filename: str):
 
 
 def move_tensor_to_device(*tensors):
-    return tuple([t.to(G_DEVICE) for t in tensors])
-
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    return tuple([t.to(device) for t in tensors])
 
 def compute_mean_var_stats(dataset, config):
     feature_pipeline = DataPipeline(
@@ -606,27 +577,27 @@ def run():
     )
 
     # model
-    if config.model == 'conformer':
-        from nnet.conformer import Model
-        fn = os.path.join('ops', 'nnet', config.model + '.yaml')
-        with open(fn, 'r') as f: 
-            model_config = yaml.load(f, Loader=yaml.FullLoader)
-        model = Model(model_config, tokenizer.vocab_size()) # TODO: reorg vocab size somewhere else
-    else:
-        raise RuntimeError
-
-    model = model.to(G_DEVICE)
-    logging.info(f'Total params:     {sum([ p.numel() for p in model.parameters()                    ])/float(1e6):.2f}M')
-    logging.info(f'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M')
+    from nnet.conformer import Model
+    model = Model(
+        config.model, config.feature_extractors.fbank.num_mel_bins, tokenizer.vocab_size(), 
+        blk_index = G_BLK_ID,
+        unk_index = G_UNK_ID,
+        bos_index = G_BOS_ID,
+        eos_index = G_EOS_ID,
+    )
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    logging.info(
+        f'Total params: {sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
+        f'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
+    )
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
     scheduler = WarmupLR(optimizer, warmup_steps = config.scheduler.warmup_steps)
     scheduler.set_step(0)
 
-    checkpoint_dir = os.path.join('checkpoints')
-    os.makedirs(os.path.join(checkpoint_dir), exist_ok = True)
-
+    os.makedirs('checkpoints', exist_ok = True)
     E = config.num_epochs
     B = len(train_dataloader)
     for e in range(1, 1 + E): # 1-based indexing
@@ -638,8 +609,10 @@ def run():
             num_utts = X.shape[0]
             num_frames = int(T.sum())
 
-            X, T = move_tensor_to_device(X, T)
-            L, U = move_tensor_to_device(L, U)
+            X = X.to(device)
+            T = T.to(device)
+            L = L.to(device)
+            U = U.to(device)
             loss = model(X, T, L, U)
             (loss / num_utts / config.gradient_accumulation).backward()
 
@@ -657,7 +630,7 @@ def run():
             if b % config.log_interval == 0:
                 logging.info(f'  [{e}/{E}]:[{b}/{B}]  {utt_loss:7.2f} {frame_loss:5.2f}  LR={scheduler.get_last_lr()[0]:7.6f}')
 
-        torch.save(model.state_dict(), os.path.join(checkpoint_dir, f'{e}.pt'))
+        torch.save(model.state_dict(), os.path.join('checkpoints', f'{e}.pt'))
         logging.info(f'TRAIN[{e}] {utt_loss:7.2f} {frame_loss:5.2f} over {total_frames} frames')
 
         # validation
@@ -670,17 +643,14 @@ def run():
                 num_utts = X.shape[0]
                 num_frames = int(T.sum())
 
-                X, T = move_tensor_to_device(X, T)
-                L, U = move_tensor_to_device(L, U)
+                X = X.to(device)
+                T = T.to(device)
+                L = L.to(device)
+                U = U.to(device)
                 loss = model(X, T, L, U)
-
                 best_paths, b = model.decode(X, T)
                 for p in best_paths:
                     print(tokenizer.sentence_piece.DecodeIds(p))
-                #best_paths, b = ctc_greedy_search(Y, T)
-                #print(best_paths, b)
-                #for p in best_paths:
-                #    print(tokenizer.sentence_piece.DecodeIds(p))
                 
                 total_loss += loss.item()
                 total_utts += num_utts

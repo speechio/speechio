@@ -15,39 +15,33 @@ from wenet.transformer.ctc import CTC
 from wenet.transformer.asr_model import ASRModel
 
 class Model(nn.Module):
-    def __init__(self, configs, vocab_size):
+    def __init__(self, config, idim, odim, blk_index: int = 0, unk_index : int = 0, bos_index: int = 1, eos_index: int = 2):
         super().__init__()
 
-        configs['input_dim'] = configs['dataset_conf']['fbank_conf']['num_mel_bins']
-        configs['output_dim'] = vocab_size
-
-        input_dim = configs['input_dim']
-        vocab_size = configs['output_dim']
-
-        encoder_type = configs.get('encoder', 'conformer')
-        decoder_type = configs.get('decoder', 'bitransformer')
-
-        if encoder_type == 'conformer':
-            encoder = ConformerEncoder(input_dim, **configs['encoder_conf'])
+        if config.get('encoder', 'conformer') == 'conformer':
+            encoder = ConformerEncoder(idim, **config['encoder_conf'])
         else:
-            encoder = TransformerEncoder(input_dim, **configs['encoder_conf'])
+            encoder = TransformerEncoder(idim, **config['encoder_conf'])
 
-        if decoder_type == 'transformer':
-            decoder = TransformerDecoder(vocab_size, encoder.output_size(), **configs['decoder_conf'])
+        if config.get('decoder', 'bitransformer') == 'transformer':
+            decoder = TransformerDecoder(odim, encoder.output_size(), **config['decoder_conf'])
         else:
-            assert 0.0 < configs['model_conf']['reverse_weight'] < 1.0
-            assert configs['decoder_conf']['r_num_blocks'] > 0
-            decoder = BiTransformerDecoder(vocab_size, encoder.output_size(), **configs['decoder_conf'])
+            assert 0.0 < config['model_conf']['reverse_weight'] < 1.0
+            assert config['decoder_conf']['r_num_blocks'] > 0
+            decoder = BiTransformerDecoder(odim, encoder.output_size(), **config['decoder_conf'])
 
-        ctc = CTC(vocab_size, encoder.output_size())
+        ctc = CTC(odim, encoder.output_size())
 
         self.model = ASRModel(
-            vocab_size=vocab_size,
+            vocab_size=odim,
             encoder=encoder,
             decoder=decoder,
             ctc=ctc,
-            **configs['model_conf'],
+            **config['model_conf'],
         )
+
+        self.model.sos = bos_index
+        self.model.eos = eos_index
     
     def forward(self, X, T, L, U):
         loss = self.model(X, T, L, U)
