@@ -27,9 +27,8 @@ from omegaconf import OmegaConf
 import sentencepiece as spm
 #import k2
 
-sys.path.insert(0, "nnet/toolkit/wenet")
+sys.path.insert(0, "nnet/toolkit")
 from wenet.utils.scheduler import WarmupLR
-
 
 # Global Constants
 G_FEATURE_PADDING_VALUE = float(0.0)
