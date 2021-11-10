@@ -27,7 +27,7 @@ from omegaconf import OmegaConf
 import sentencepiece as spm
 #import k2
 
-sys.path.insert(0, "ops/nnet/deps")
+sys.path.insert(0, "toolkit/wenet")
 from wenet.utils.scheduler import WarmupLR
 
 

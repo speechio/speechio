@@ -75,7 +75,7 @@ optimizer:
 scheduler:
     warmup_steps: 25000
 
-# model
+# model config copied from wenet/examples/aishell/s0/conf/train_unified_conformer.yaml
 model:
     encoder: conformer
     encoder_conf:

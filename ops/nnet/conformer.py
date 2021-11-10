@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 
 import sys
-sys.path.insert(0, "ops/nnet/deps")
+sys.path.insert(0, "toolkit/wenet")
 from wenet.transformer.encoder import TransformerEncoder, ConformerEncoder
 from wenet.transformer.decoder import TransformerDecoder, BiTransformerDecoder
 from wenet.transformer.ctc import CTC
