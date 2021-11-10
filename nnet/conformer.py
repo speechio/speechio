@@ -7,6 +7,8 @@
 import torch
 import torch.nn as nn
 
+import yaml
+
 import sys
 sys.path.insert(0, "nnet/toolkit")
 from wenet.transformer.encoder import TransformerEncoder, ConformerEncoder
@@ -15,8 +17,11 @@ from wenet.transformer.ctc import CTC
 from wenet.transformer.asr_model import ASRModel
 
 class Model(nn.Module):
-    def __init__(self, config, idim, odim, blk_index: int = 0, unk_index : int = 0, bos_index: int = 1, eos_index: int = 2):
+    def __init__(self, config_filename, idim, odim, blk_index: int = 0, unk_index : int = 0, bos_index: int = 1, eos_index: int = 2):
         super().__init__()
+
+        with open(config_filename, 'r') as f: 
+            config = yaml.load(f, Loader=yaml.FullLoader)
 
         if config.get('encoder', 'conformer') == 'conformer':
             encoder = ConformerEncoder(idim, **config['encoder_conf'])

@@ -578,7 +578,8 @@ def run():
     # model
     from nnet.conformer import Model
     model = Model(
-        config.model, config.feature_extractors.fbank.num_mel_bins, tokenizer.vocab_size(), 
+        os.path.join('nnet', f'{config.model}.yaml'),
+        config.feature_extractors.fbank.num_mel_bins, tokenizer.vocab_size(), 
         blk_index = G_BLK_ID,
         unk_index = G_UNK_ID,
         bos_index = G_BOS_ID,
