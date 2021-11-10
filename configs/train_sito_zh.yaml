@@ -64,6 +64,17 @@ dataloader:
     drop_last: False
     batch_size: 8
 
+# training
+num_epochs: 30
+gradient_accumulation: 2
+gradient_clipping: 5.0
+log_interval: 100
+optimizer:
+    Adam:
+        lr: 0.001
+scheduler:
+    warmup_steps: 25000
+
 # model
 model:
     encoder: conformer
@@ -103,15 +114,4 @@ model:
         ctc_weight: 0.3
         lsm_weight: 0.1     # label smoothing option
         length_normalized_loss: false
-
-# training
-num_epochs: 30
-gradient_accumulation: 2
-gradient_clipping: 5.0
-log_interval: 100
-optimizer:
-    Adam:
-        lr: 0.001
-scheduler:
-    warmup_steps: 25000
 
