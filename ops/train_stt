@@ -316,20 +316,20 @@ class MeanVarStats:
         self.o2_stats += feature.square().sum(dim=0)
         self.n += num_frames
 
-    def load(self, input_file:str):
-        with open(input_file, 'r') as f:
-            stats = json.load(input_file)
+    def load(self, filename:str):
+        with open(filename, 'r') as f:
+            stats = json.load(f)
             self.o1_stats = torch.Tensor(stats['o1_stats'])
             self.o2_stats = torch.Tensor(stats['o2_stats'])
             self.n = stats['n']
 
-    def dump(self, output_file:str):
+    def dump(self, filename:str):
         stats = {
             'o1_stats': self.o1_stats.tolist(),
             'o2_stats': self.o2_stats.tolist(),
             'n': self.n,
         }
-        with open(output_file, 'w+') as f:
+        with open(filename, 'w+') as f:
             json.dump(stats, f, indent=4)
 
 class MeanVarNormalizer:
@@ -509,7 +509,6 @@ def compute_mean_var_stats(dataset, config):
         collate_fn = feature_pipeline,
     )
 
-    logging.info('Computing global mean variance stats ...')
     stats = MeanVarStats()
     for batch in dataloader:
         samples, _,_,_,_ = batch
@@ -542,8 +541,15 @@ def run():
     valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
 
     # compute feature mean & var normalizer
-    mean_var_stats = compute_mean_var_stats(train_dataset, config)
-    mean_var_stats.dump('mean_var_stats.json')
+    mean_var_stats_file = os.path.join(args.dir, 'mean_var_stats.json')
+    if os.path.isfile(mean_var_stats_file):
+        logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
+        mean_var_stats = MeanVarStats()
+        mean_var_stats.load(mean_var_stats_file)
+    else:
+        logging.info(f'Computing mean/var stats -> {mean_var_stats_file}')
+        mean_var_stats = compute_mean_var_stats(train_dataset, config)
+        mean_var_stats.dump(mean_var_stats_file)
 
     # assemble data processing pipline
     tokenizer = Tokenizer(**config.tokenizer)
