@@ -27,14 +27,19 @@ from omegaconf import OmegaConf
 import sentencepiece as spm
 #import k2
 
-
 # Global Constants
 G_FEATURE_PADDING_VALUE = float(0.0)
-G_LABEL_PADDING_VALUE = int(-1)
-G_SIL_ID = 0
+
+G_PAD_ID = int(-1)
+G_BLK_ID = 0
 G_UNK_ID = 0
 G_BOS_ID = 1
 G_EOS_ID = 2
+
+G_BLK_TOKEN = '<blk>'
+G_UNK_TOKEN = '<unk>'
+G_BOS_TOKEN = '<s>'
+G_EOS_TOKEN = '</s>'
 
 
 @dataclass
@@ -462,7 +467,7 @@ class DataPipeline:
         targets = nn.utils.rnn.pad_sequence(
             [ torch.tensor(l) for l in labels ],
             batch_first = True,
-            padding_value = G_LABEL_PADDING_VALUE,
+            padding_value = G_PAD_ID,
         ) # [N, max(label_lengths)]
 
         return minibatch, inputs, targets, time_lengths, label_lengths
@@ -583,7 +588,7 @@ def run():
     model = Model(
         os.path.join('nnet', f'{config.model}.yaml'),
         config.feature_extractors.fbank.num_mel_bins, tokenizer.vocab_size(), 
-        blk_index = G_SIL_ID,
+        blk_index = G_BLK_ID,
         unk_index = G_UNK_ID,
         bos_index = G_BOS_ID,
         eos_index = G_EOS_ID,
