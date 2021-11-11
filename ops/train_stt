@@ -605,13 +605,13 @@ def run():
 
     os.makedirs(os.path.join(args.dir, 'checkpoints'), exist_ok = True)
     E = config.num_epochs
-    B = len(train_dataloader)
     for e in range(1, 1 + E): # 1-based indexing
         logging.info(f'Training epoch {e} ...')
         total_loss = 0.0
         total_utts, total_frames = 0, 0
+        B = len(train_dataloader)
         for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
-            samples, X, L, T, U = batch
+            _, X, L, T, U = batch
             num_utts = X.shape[0]
             num_frames = int(T.sum())
 
