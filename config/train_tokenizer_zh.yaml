@@ -13,4 +13,3 @@ sentencepiece:
     add_dummy_prefix: false
     train_extremely_large_corpus: false
     num_threads: 16
-
