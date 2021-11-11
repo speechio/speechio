@@ -32,9 +32,9 @@ if __name__ == '__main__':
     with open(os.path.join(zoo_dir, 'zoo.yaml'), 'r', encoding='utf8') as f:
         zoo = yaml.safe_load(f)
 
-    if meta := zoo.get(args.id):
+    if info := zoo.get(args.id):
         src = os.path.join(zoo_dir, args.id)
-        dst = meta['url']
+        dst = info['url']
     else:
         logging.error(f'Cannot find entry {args.id} in {zoo_dir}/zoo.yaml')
         sys.exit(-1)
