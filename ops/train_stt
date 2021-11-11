@@ -27,7 +27,10 @@ from omegaconf import OmegaConf
 import sentencepiece as spm
 #import k2
 
-sys.path.insert(0, "nnet/deps")
+sys.path.insert(0, 'nnet')
+from conformer import Model
+
+sys.path.insert(0, 'nnet/deps')
 from wenet.utils.scheduler import WarmupLR
 
 # Global Constants
@@ -577,8 +580,6 @@ def run():
     )
 
     # model
-    sys.path.insert(0, os.getcwd())
-    from nnet.conformer import Model
     model = Model(
         os.path.join('nnet', f'{config.model}.yaml'),
         config.feature_extractors.fbank.num_mel_bins, tokenizer.vocab_size(), 
