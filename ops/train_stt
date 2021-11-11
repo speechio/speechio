@@ -27,11 +27,6 @@ from omegaconf import OmegaConf
 import sentencepiece as spm
 #import k2
 
-sys.path.insert(0, 'nnet')
-from conformer import Model
-
-sys.path.insert(0, 'nnet/deps')
-from wenet.utils.scheduler import WarmupLR
 
 # Global Constants
 G_FEATURE_PADDING_VALUE = float(0.0)
@@ -580,6 +575,8 @@ def run():
     )
 
     # model
+    sys.path.insert(0, 'nnet')
+    from conformer import Model
     model = Model(
         os.path.join('nnet', f'{config.model}.yaml'),
         config.feature_extractors.fbank.num_mel_bins, tokenizer.vocab_size(), 
@@ -597,8 +594,14 @@ def run():
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
-    scheduler = WarmupLR(optimizer, warmup_steps = config.scheduler.warmup_steps)
-    scheduler.set_step(0)
+
+    # scheduler
+    K = config.scheduler.warmup_steps 
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer, 
+        lr_lambda = lambda k: K**0.5 * min((k+1)**-0.5, (k+1) * K**-1.5), 
+        verbose = False
+    )
 
     os.makedirs(os.path.join(args.dir, 'checkpoints'), exist_ok = True)
     E = config.num_epochs
