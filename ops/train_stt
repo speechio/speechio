@@ -343,8 +343,8 @@ class MeanVarNormalizer:
         return (
             f'\n'
             f'Global MEAN/VAR normalizer:\n'
-            f'    mean_shift:  {self.mean_norm_shift}\n'
-            f'    var_scale:  {self.var_norm_scale}\n'
+            f'    mean_norm_shift:  {self.mean_norm_shift}\n'
+            f'    var_norm_scale:  {self.var_norm_scale}\n'
         )
     
     def __call__(self, feature:torch.Tensor):
