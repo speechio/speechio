@@ -652,7 +652,7 @@ def run():
         total_loss = 0.0
         total_utts, total_frames = 0, 0
         with torch.no_grad():
-            for b, batch in enumerate(valid_dataloader):
+            for b, batch in enumerate(valid_dataloader, 1):
                 samples, X, L, T, U = batch
                 num_utts = X.shape[0]
                 num_frames = int(T.sum())
