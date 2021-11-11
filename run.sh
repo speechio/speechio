@@ -1,6 +1,6 @@
 ## Tokenizer
-#ops/train_tokenizer --language ZH --config config/train_tokenizer.yaml --input data/text/AISHELL-1_trn.txt --model model/tokenizer/AISHELL-1
-#ops/train_tokenizer --language EN --config config/train_tokenizer.yaml --input data/text/GigaSpeech_S.txt --model model/tokenizer/GigaSpeech_S
+#ops/train_tokenizer --config config/train_tokenizer_zh.yaml --input data/text/AISHELL-1_trn.txt --model model/tokenizer/AISHELL-1
+#ops/train_tokenizer --config config/train_tokenizer_en.yaml --input data/text/GigaSpeech_S.txt --model model/tokenizer/GigaSpeech_S
 
 # ops/tokenizer_encode --input misc/text --model misc/tokenizer --output_format id --output misc/encoded1
 # cat misc/text | ops/tokenizer_encode --model misc/tokenizer > misc/encoded2

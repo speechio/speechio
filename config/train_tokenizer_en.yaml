@@ -1,0 +1,15 @@
+sentencepiece:
+    # https://github.com/google/sentencepiece/blob/master/doc/options.md
+    model_type: unigram # ["unigram", "bpe", "char"]
+    vocab_size: 100
+    character_coverage: 1.0
+    user_defined_symbols: "" # comma seperated symbols
+    pad_id: -1
+    unk_id: 0
+    bos_id: 1
+    eos_id: 2
+    unk_piece: <unk>  # <UNK> for Kaldi 
+    max_sentencepiece_length: 16 # default 16
+    add_dummy_prefix: true
+    train_extremely_large_corpus: false
+    num_threads: 16
