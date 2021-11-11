@@ -31,8 +31,8 @@ import sentencepiece as spm
 # Global Constants
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_LABEL_PADDING_VALUE = int(-1)
-G_BLK_ID = 0
-G_UNK_ID = G_BLK_ID
+G_SIL_ID = 0
+G_UNK_ID = 0
 G_BOS_ID = 1
 G_EOS_ID = 2
 
@@ -583,7 +583,7 @@ def run():
     model = Model(
         os.path.join('nnet', f'{config.model}.yaml'),
         config.feature_extractors.fbank.num_mel_bins, tokenizer.vocab_size(), 
-        blk_index = G_BLK_ID,
+        blk_index = G_SIL_ID,
         unk_index = G_UNK_ID,
         bos_index = G_BOS_ID,
         eos_index = G_EOS_ID,
