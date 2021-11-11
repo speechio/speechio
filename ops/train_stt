@@ -599,7 +599,7 @@ def run():
     K = config.scheduler.warmup_steps 
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer, 
-        lr_lambda = lambda k: K**0.5 * min((k+1)**-0.5, (k+1) * K**-1.5), 
+        lr_lambda = lambda k: min((k+1)/K, (K/(k+1))**0.5), 
         verbose = False
     )
 
