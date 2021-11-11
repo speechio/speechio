@@ -39,12 +39,12 @@ G_EOS_ID = 2
 
 @dataclass
 class Sample:
-    id: str = ''
-    audio: str = ''
-    begin: float = 0.0
-    duration: float = 0.0
-    text: str = ''
-    speaker: str = ''
+    id:str = ''
+    audio:str = ''
+    begin:float = 0.0
+    duration:float = 0.0
+    text:str = ''
+    speaker:str = ''
 
 
 class SampleLoader:
@@ -56,7 +56,7 @@ class SampleLoader:
         a Sample object or None
         None if an utterance doesn't satisfy constraints e.g. duration, text length
     '''
-    def __init__(self, field_map:dict, min_duration:float, max_duration:float, min_text_length:int = 1, max_text_length:int = 2048, data_dir: str = ''):
+    def __init__(self, field_map:dict, min_duration:float, max_duration:float, min_text_length:int = 1, max_text_length:int = 2048, data_dir:str = ''):
         self.field_map = field_map
 
         self.min_duration = min_duration
@@ -66,7 +66,7 @@ class SampleLoader:
 
         self.data_dir = data_dir
     
-    def __call__(self, utt: dict) -> Optional[Sample] :
+    def __call__(self, utt:dict) -> Optional[Sample] :
         sample = Sample()
         for attr, field in self.field_map.items():
             if v := utt.get(field):
@@ -125,7 +125,7 @@ class Dataset:
 
         # shuffle
              
-    def __getitem__(self, index: int):
+    def __getitem__(self, index:int):
         return self.samples[index]
     
     def __len__(self):
@@ -146,7 +146,7 @@ def seconds_to_samples(sample_rate:int, seconds:float):
     )
 
 
-def load_audio(audio_path: str, begin: float, duration: float) :
+def load_audio(audio_path:str, begin:float, duration:float) :
     '''
     https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
 
@@ -166,10 +166,10 @@ def load_audio(audio_path: str, begin: float, duration: float) :
 
 
 class Resampler:
-    def __init__(self, sample_rate: int):
+    def __init__(self, sample_rate:int):
         self.target_sample_rate = sample_rate
 
-    def __call__(self, waveform: torch.Tensor, sample_rate: int):
+    def __call__(self, waveform:torch.Tensor, sample_rate:int):
         if sample_rate != self.target_sample_rate:
             waveform = torchaudio.transforms.Resample(sample_rate, self.target_sample_rate)(waveform)
         return waveform, self.target_sample_rate
@@ -177,17 +177,17 @@ class Resampler:
 
 class Perturbation:
     def __init__(self, 
-        mark_key: bool = False,
-        speeds: Optional[list[float]] = None, 
-        tempos: Optional[list[float]] = None, 
-        volumes: Optional[list[float]] = None,
+        mark_key:bool = False,
+        speeds:Optional[list[float]] = None, 
+        tempos:Optional[list[float]] = None, 
+        volumes:Optional[list[float]] = None,
     ) :
         self.mark_key = mark_key
         self.speeds = speeds
         self.tempos = tempos
         self.volumes = volumes
 
-    def __call__(self, key: str, waveform: torch.Tensor, sample_rate: int):
+    def __call__(self, key:str, waveform:torch.Tensor, sample_rate:int):
         '''
         Note: Regarding to 'speed' and 'tempo' perturbation:
 
@@ -242,7 +242,7 @@ class Perturbation:
 
 
 class FeatureExtractor:
-    def __init__(self, feature_extractors_config:dict, feature_type:str, ):
+    def __init__(self, feature_extractors_config:dict, feature_type:str):
         if feature_type == 'fbank':
             self.extractor = FbankFeatureExtractor(**feature_extractors_config['fbank'])
         elif feature_type == 'hires_mfcc':
@@ -250,7 +250,7 @@ class FeatureExtractor:
         else:
             raise RuntimeError(f'Unknown feature_type:{feature_type}')
             
-    def __call__(self, waveform: torch.Tensor, sample_rate: int):
+    def __call__(self, waveform:torch.Tensor, sample_rate:int):
         return self.extractor(waveform, sample_rate)
 
 
@@ -259,7 +259,7 @@ class FbankFeatureExtractor:
         self.num_mel_bins = num_mel_bins
         self.dither = dither
 
-    def __call__(self, waveform: torch.Tensor, sample_rate: int):
+    def __call__(self, waveform:torch.Tensor, sample_rate:int):
         '''
         kaldi:
             https://github.com/kaldi-asr/kaldi/blob/master/src/feat/mel-computations.h#L60
@@ -354,7 +354,7 @@ class MeanVarNormalizer:
 
 
 class Tokenizer:
-    def __init__(self, model: str):
+    def __init__(self, model:str):
         self.sentence_piece = spm.SentencePieceProcessor()
         self.sentence_piece.load(model)
         self.vocab = [ [ self.sentence_piece.id_to_piece(x), x] for x in range(self.sentence_piece.get_piece_size())]
@@ -369,7 +369,7 @@ class Tokenizer:
 
 
 class TextNormalizer:
-    def __init__(self, case: str):
+    def __init__(self, case:str):
         self.case = case
     
     def __call__(self, text):
@@ -383,12 +383,12 @@ class TextNormalizer:
 class DataPipeline:
     def __init__(
         self,
-        resampler : Optional[callable] = None,
+        resampler:Optional[callable] = None,
         perturbation:Optional[callable] = None,
-        feature_extractor : Optional[callable] = None,
-        mean_var_normalizer : Optional[callable] = None,
-        text_normalizer: Optional[callable] = None,
-        tokenizer: Optional[callable] = None,
+        feature_extractor:Optional[callable] = None,
+        mean_var_normalizer:Optional[callable] = None,
+        text_normalizer:Optional[callable] = None,
+        tokenizer:Optional[callable] = None,
     ) :
         self.resampler = resampler
         self.perturbation = perturbation
@@ -397,7 +397,7 @@ class DataPipeline:
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
 
-    def __call__(self, samples: list[Sample]):
+    def __call__(self, samples:list[Sample]):
         minibatch = []
         for sample in samples:
             # raw audio loading
@@ -468,7 +468,7 @@ class DataPipeline:
         return minibatch, inputs, targets, time_lengths, label_lengths
 
 
-def make_length_mask(lengths: torch.Tensor) -> torch.Tensor:
+def make_length_mask(lengths:torch.Tensor) -> torch.Tensor:
     """Make mask tensor indicating in-length elements.
     Args:
         lengths (torch.Tensor): Batch of lengths (N,).
@@ -482,7 +482,7 @@ def make_length_mask(lengths: torch.Tensor) -> torch.Tensor:
     return mask
 
 
-def dump_tensor_to_csv(x: torch.Tensor, filename: str):
+def dump_tensor_to_csv(x:torch.Tensor, filename:str):
     import pandas as pd
     df = pd.DataFrame(x.numpy())
     df.to_csv(filename)
