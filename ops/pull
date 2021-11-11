@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+import sys, os
+import argparse
+import yaml  # pip install pyyaml
+import logging
+logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('type', choices=['model', 'audio', 'text'])
+    parser.add_argument('id', type=str, help='submission model/audio/text id')
+    args = parser.parse_args()
+    logging.info(args)
+
+    if not os.path.isfile('util/oss'):
+        logging.error("Please install oss via util/install_aliyun_oss_client.sh")
+        sys.exit(-1)
+
+    if not os.path.isfile('config/credential/aliyun_oss.cfg'):
+        logging.error('Cannot find oss credential in config/credential/aliyun_oss.cfg.')
+        sys.exit(-1)
+
+    if args.type == 'model':
+        zoo_dir = 'model'
+    elif args.type == 'audio':
+        zoo_dir = 'data/audio'
+    elif args.type == 'text':
+        zoo_dir = 'data/text'
+    else:
+        raise NotImplementedError
+    
+    with open(os.path.join(zoo_dir, 'zoo.yaml'), 'r', encoding='utf8') as f:
+        zoo = yaml.safe_load(f)
+
+    if meta := zoo.get(args.id):
+        src = meta['url']
+        dst = os.path.join(zoo_dir, args.id)
+    else:
+        logging.error(f'Cannot find entry {args.id} in {zoo_dir}/zoo.yaml')
+        sys.exit(-1)
+
+    cmd = F'util/oss -c config/credential/aliyun_oss.cfg cp -ur {src} {dst}'
+    logging.info(cmd)
+    os.system(cmd)

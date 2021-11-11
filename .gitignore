@@ -1,5 +1,5 @@
 .DS_Store
-configs/credential/*.cfg
+config/credential/*.cfg
 
 __pycache__
 
@@ -21,6 +21,8 @@ data/audio/*
 !data/audio/zoo.yaml
 data/text/*
 !data/text/zoo.yaml
+
+util/oss
 
 test.wav
 

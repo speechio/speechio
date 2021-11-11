@@ -1,5 +1,6 @@
 # Debugging
 MINI:
+    url: oss://speechio-leaderboard/datasets/MINI/
     root: data/audio/MINI
     metadata: data/audio/MINI/metadata.tsv
 
