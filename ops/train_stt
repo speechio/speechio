@@ -633,7 +633,7 @@ def run():
                 logging.info(f'  [{e}/{E}]:[{b}/{B}]  {utt_loss:7.2f} {frame_loss:5.2f}  LR={scheduler.get_last_lr()[0]:7.6f}')
 
         torch.save(model.state_dict(), os.path.join(args.dir, 'checkpoints', f'{e}.pt'))
-        logging.info(f'TRAIN[{e}] {utt_loss:7.2f} {frame_loss:5.2f} over {total_frames} frames')
+        logging.info(f'TRAIN[{e}] {utt_loss:7.2f} over {total_utts} utts and {total_frames} frames.')
 
         # validation
         logging.info(f'Validating epoch {e} ...')
@@ -657,7 +657,8 @@ def run():
                 total_loss += loss.item()
                 total_utts += num_utts
                 total_frames += num_frames
-        logging.info(f'VALID[{e}] average_frame_loss={(total_loss / total_frames):.2f}')
+                utt_loss, frame_loss = total_loss/total_utts, total_loss/total_frames
+        logging.info(f'VALID[{e}] {utt_loss:7.2f} over {total_utts} utts and {total_frames} frames.')
 
         # with torch.no_grad():
         #     test_model = Model(config.model)
