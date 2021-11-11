@@ -1,49 +1,49 @@
 # Debugging
 MINI:
     url: oss://speechio-leaderboard/datasets/MINI/
-    root: data/audio/MINI
+    dir: data/audio/MINI/
     metadata: data/audio/MINI/metadata.tsv
 
 # GigaSpeech
 GIGASPEECH_XS:
-    root: data/audio/GIGASPEECH_V1.0.0_XS
+    dir: data/audio/GIGASPEECH_V1.0.0_XS/
     metadata: data/audio/GIGASPEECH_V1.0.0_XS/metadata.tsv
 GIGASPEECH_S:
-    root: data/audio/GIGASPEECH_V1.0.0_S
+    dir: data/audio/GIGASPEECH_V1.0.0_S/
     metadata: data/audio/GIGASPEECH_V1.0.0_S/metadata.tsv
 GIGASPEECH_DEV:
-    root: data/audio/GIGASPEECH_V1.0.0_DEV
+    dir: data/audio/GIGASPEECH_V1.0.0_DEV/
     metadata: data/audio/GIGASPEECH_V1.0.0_DEV/metadata.tsv
 GIGASPEECH_TEST:
-    root: data/audio/GIGASPEECH_V1.0.0_TEST
+    dir: data/audio/GIGASPEECH_V1.0.0_TEST/
     metadata: data/audio/GIGASPEECH_V1.0.0_TEST/metadata.tsv
 
 # LibriSpeech
 LIBRISPEECH_TEST_CLEAN:
-    root: data/audio/LIBRISPEECH_TEST_CLEAN
+    dir: data/audio/LIBRISPEECH_TEST_CLEAN/
     metadata: data/audio/LIBRISPEECH_TEST_CLEAN/metadata.tsv
 LIBRISPEECH_TEST_OTHER:
-    root: data/audio/LIBRISPEECH_TEST_OTHER
+    dir: data/audio/LIBRISPEECH_TEST_OTHER/
     metadata: data/audio/LIBRISPEECH_TEST_OTHER/metadata.tsv
 
 # AISHELL-1
 AISHELL-1-TRAIN:
-    root: /data/disk001/AISHELL-1/train
+    dir: /data/disk001/AISHELL-1/train/
     metadata: /data/disk001/AISHELL-1/train/metadata.tsv
 AISHELL-1-DEV:
-    root: /data/disk001/AISHELL-1/dev
+    dir: /data/disk001/AISHELL-1/dev/
     metadata: /data/disk001/AISHELL-1/dev/metadata.tsv
 AISHELL-1-TEST:
-    root: /data/disk001/AISHELL-1/test
+    dir: /data/disk001/AISHELL-1/test/
     metadata: /data/disk001/AISHELL-1/test/metadata.tsv
 
 # AISHELL-2
 AISHELL-2-IOS-TRAIN:
-    root: /data/disk001/AISHELL-2/iOS/train
+    dir: /data/disk001/AISHELL-2/iOS/train/
     metadata: /data/disk001/AISHELL-2/iOS/train/metadata.tsv
 AISHELL-2-IOS-DEV:
-    root: /data/disk001/AISHELL-2/iOS/dev
+    dir: /data/disk001/AISHELL-2/iOS/dev/
     metadata: /data/disk001/AISHELL-2/iOS/dev/metadata.tsv
 AISHELL-2-IOS-TEST:
-    root: /data/disk001/AISHELL-2/iOS/test
+    dir: /data/disk001/AISHELL-2/iOS/test/
     metadata: /data/disk001/AISHELL-2/iOS/test/metadata.tsv

@@ -56,7 +56,7 @@ class SampleLoader:
         a Sample object or None
         None if an utterance doesn't satisfy constraints e.g. duration, text length
     '''
-    def __init__(self, field_map:dict, min_duration:float, max_duration:float, min_text_length:int = 1, max_text_length:int = 2048, data_root: str = ''):
+    def __init__(self, field_map:dict, min_duration:float, max_duration:float, min_text_length:int = 1, max_text_length:int = 2048, data_dir: str = ''):
         self.field_map = field_map
 
         self.min_duration = min_duration
@@ -64,7 +64,7 @@ class SampleLoader:
         self.min_text_length = min_text_length
         self.max_text_length = max_text_length
 
-        self.data_root = data_root
+        self.data_dir = data_dir
     
     def __call__(self, utt: dict) -> Optional[Sample] :
         sample = Sample()
@@ -73,7 +73,7 @@ class SampleLoader:
                 if attr in ['duration', 'begin', ]:
                     v = float(v)
                 elif attr == 'audio':
-                    v = os.path.join(self.data_root, v)
+                    v = os.path.join(self.data_dir, v)
                 else:
                     v = str(v)
                 assert hasattr(sample, attr), f'{field} -> Sample.{attr} mapping failed, no such attribute'
@@ -103,8 +103,8 @@ class Dataset:
                 subset.max_num_samples = sys.maxsize # https://docs.python.org/3/library/sys.html#sys.maxsize
 
             # retrive dataset info from data zoo
-            subset_root, subset_meta = data_zoo[subset.id].root, data_zoo[subset.id].metadata
-            logging.info(f'Loading {subset.id} from ({subset_root} : {subset_meta}) ...')
+            subset_dir, subset_meta = data_zoo[subset.id].dir, data_zoo[subset.id].metadata
+            logging.info(f'Loading {subset.id} from ({subset_dir} : {subset_meta}) ...')
             with open(subset_meta, 'r', encoding='utf8') as f:
                 if str.endswith(subset_meta, '.tsv'):
                     utterance_reader = csv.DictReader(f, delimiter='\t')
@@ -112,7 +112,7 @@ class Dataset:
                     raise NotImplementedError
 
                 k = 0
-                sample_loader = SampleLoader(**sample_loader_config, data_root = subset_root)
+                sample_loader = SampleLoader(**sample_loader_config, data_dir = subset_dir)
                 for utt in utterance_reader:
                     if k >= subset.max_num_samples:
                         break
