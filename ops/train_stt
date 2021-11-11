@@ -523,6 +523,7 @@ def compute_mean_var_stats(dataset, config):
 def run():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type = str, required = True)
+    parser.add_argument('dir', type = str)
     args = parser.parse_args()
 
     config = OmegaConf.load(args.config)
@@ -576,6 +577,7 @@ def run():
     )
 
     # model
+    sys.path.insert(0, os.getcwd())
     from nnet.conformer import Model
     model = Model(
         os.path.join('nnet', f'{config.model}.yaml'),
@@ -597,7 +599,7 @@ def run():
     scheduler = WarmupLR(optimizer, warmup_steps = config.scheduler.warmup_steps)
     scheduler.set_step(0)
 
-    os.makedirs('checkpoints', exist_ok = True)
+    os.makedirs(os.path.join(args.dir, 'checkpoints'), exist_ok = True)
     E = config.num_epochs
     B = len(train_dataloader)
     for e in range(1, 1 + E): # 1-based indexing
@@ -630,7 +632,7 @@ def run():
             if b % config.log_interval == 0:
                 logging.info(f'  [{e}/{E}]:[{b}/{B}]  {utt_loss:7.2f} {frame_loss:5.2f}  LR={scheduler.get_last_lr()[0]:7.6f}')
 
-        torch.save(model.state_dict(), os.path.join('checkpoints', f'{e}.pt'))
+        torch.save(model.state_dict(), os.path.join(args.dir, 'checkpoints', f'{e}.pt'))
         logging.info(f'TRAIN[{e}] {utt_loss:7.2f} {frame_loss:5.2f} over {total_frames} frames')
 
         # validation
