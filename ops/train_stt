@@ -604,11 +604,12 @@ def run():
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
 
     # scheduler
-    K = config.scheduler.warmup_steps 
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer, 
-        lr_lambda = lambda k: min((k+1)/K, (K/(k+1))**0.5), 
-        verbose = False
+        lr_lambda = lambda k: min(
+            (k+1)/config.scheduler.warmup_steps,
+            (config.scheduler.warmup_steps/(k+1))**0.5
+        )
     )
 
     os.makedirs(os.path.join(args.dir, 'checkpoints'), exist_ok = True)
