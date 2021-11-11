@@ -531,16 +531,13 @@ def run():
         with open(config.logging, 'r', encoding='utf8') as f:
             logging.config.dictConfig(yaml.safe_load(f))
     else:
-        logging.basicConfig(
-            stream=sys.stderr, level=logging.INFO,
-            format='%(asctime)s [%(levelname)s] %(message)s'
-        )
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
     # load train/dev/test dataset from data zoo
     train_dataset = Dataset(config.data_zoo, config.dataset.train, config.sample_loader)
     valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
 
-    # compute feature mean & var normalizer
+    # mean var normalization
     mean_var_stats_file = os.path.join(args.dir, 'mean_var_stats.json')
     if os.path.isfile(mean_var_stats_file):
         logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
@@ -550,11 +547,11 @@ def run():
         logging.info(f'Computing mean/var stats -> {mean_var_stats_file}')
         mean_var_stats = compute_mean_var_stats(train_dataset, config)
         mean_var_stats.dump(mean_var_stats_file)
+    mvn = MeanVarNormalizer(mean_var_stats)
+    logging.info(mvn)
 
     # assemble data processing pipline
     tokenizer = Tokenizer(**config.tokenizer)
-    mvn = MeanVarNormalizer(mean_var_stats)
-    logging.info(mvn)
     data_pipeline = DataPipeline(
         resampler = Resampler(**config.resampler),
         perturbation = Perturbation(**config.perturbation),
