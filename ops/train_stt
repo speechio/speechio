@@ -599,9 +599,6 @@ def run():
     mvn = MeanVarNormalizer(mean_var_stats)
     logging.info(mvn)
 
-    # optional spec augment
-    spec_augment = SpecAugment(**config.spec_augment) if config.apply_spec_augment else None
-
     # data processing pipline
     tokenizer = Tokenizer(**config.tokenizer)
     data_pipeline = DataPipeline(
@@ -609,7 +606,7 @@ def run():
         perturbation = Perturbation(**config.perturbation),
         feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
         mean_var_normalizer = mvn,
-        spec_augment = spec_augment,
+        spec_augment = SpecAugment(**config.spec_augment) if config.apply_spec_augment else None,
         text_normalizer = TextNormalizer(**config.text_normalizer),
         tokenizer = tokenizer,
     )
