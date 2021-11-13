@@ -1,9 +1,9 @@
 # SpeechIO Playground
 
 Zen
-* all codes are debt, less code means exponentially less interests to pay over time
-* be simple, don't add complexity to prove you are smart, it's stupid
-* be explicit, stealth behaviors behind non-obvious codes are evil
-* be local, codes and information should be organized in a way that can be read & checked locally
-* abuse of abstractions brings cognitive and runtime costs, abstract only when it is absolutely necessary
-* if a variable can be made shorter without ambiguity, then make it shorter
+* Keep it small. Codes are debts, less code means less interests to pay
+* Keep it simple. Avoid complexity for "being smart"
+* Keep it explicit. Hidden behaviors behind non-obvious codes are evil
+* Keep it local. Codes and info should be organized in a way that can be read & checked locally
+* Keep it concrete. Unnecessary abstractions bring cognitive costs, abstract only when it is absolutely necessary
+* Keep it concise. If a variable can be made shorter without ambiguity, then make it shorter.
