@@ -358,6 +358,46 @@ class MeanVarNormalizer:
         return feature
 
 
+class SpecAugment:
+    def __init__(
+        self,
+        mark_key:bool = False,
+        num_t_masks:int = 2, 
+        t_mask_width_min:int = 1,
+        t_mask_width_max:int = 50,
+        num_f_masks:int = 2, 
+        f_mask_width_min:int = 1,
+        f_mask_width_max:int = 10,
+    ) :
+        self.mark_key = mark_key
+
+        self.num_t_masks = num_t_masks
+        self.t_mask_width_min = t_mask_width_min
+        self.t_mask_width_max = t_mask_width_max
+
+        self.num_f_masks = num_f_masks
+        self.f_mask_width_min = f_mask_width_min
+        self.f_mask_width_max = f_mask_width_max
+
+    def __call__(self, key:str, feature:torch.Tensor) :
+        assert(feature.dim() == 2)
+        T, F = feature.shape
+
+        for _ in range(self.num_t_masks):
+            t = random.randrange(0, T)
+            k = random.randint(self.t_mask_width_min, self.t_mask_width_max)
+            feature[t : t + k, :] = 0.0
+
+        for _ in range(self.num_f_masks):
+            f = random.randrange(0, F)
+            k = random.randint(self.f_mask_width_min, self.f_mask_width_max)
+            feature[:, f : f + k] = 0.0
+
+        if self.mark_key:
+            key = f'{key}__SpecAugment'
+        return key, feature
+
+
 class Tokenizer:
     def __init__(self, model:str):
         self.sentence_piece = spm.SentencePieceProcessor()
@@ -392,6 +432,7 @@ class DataPipeline:
         perturbation:Optional[callable] = None,
         feature_extractor:Optional[callable] = None,
         mean_var_normalizer:Optional[callable] = None,
+        spec_augment:Optional[callable] = None,
         text_normalizer:Optional[callable] = None,
         tokenizer:Optional[callable] = None,
     ) :
@@ -399,6 +440,7 @@ class DataPipeline:
         self.perturbation = perturbation
         self.feature_extractor = feature_extractor
         self.mean_var_normalizer = mean_var_normalizer
+        self.spec_augment = spec_augment
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
 
@@ -428,6 +470,8 @@ class DataPipeline:
                 feature = self.mean_var_normalizer(feature)
 
             # specaug
+            if self.spec_augment:
+                key, feature = self.spec_augment(key, feature)
             
             # detach
             feature = feature.detach()
@@ -555,13 +599,17 @@ def run():
     mvn = MeanVarNormalizer(mean_var_stats)
     logging.info(mvn)
 
-    # assemble data processing pipline
+    # optional spec augment
+    spec_augment = SpecAugment(**config.spec_augment) if config.apply_spec_augment else None
+
+    # data processing pipline
     tokenizer = Tokenizer(**config.tokenizer)
     data_pipeline = DataPipeline(
         resampler = Resampler(**config.resampler),
         perturbation = Perturbation(**config.perturbation),
         feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
         mean_var_normalizer = mvn,
+        spec_augment = spec_augment,
         text_normalizer = TextNormalizer(**config.text_normalizer),
         tokenizer = tokenizer,
     )

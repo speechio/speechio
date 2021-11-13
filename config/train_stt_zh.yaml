@@ -52,6 +52,16 @@ feature_extractors:
         low_freq: 20
         high_freq: -400
 
+
+apply_spec_augment: True
+spec_augment:
+    mark_key: True
+    num_t_masks: 2
+    t_mask_width_max: 50
+    num_f_masks: 2
+    f_mask_width_max: 10
+
+
 text_normalizer:
     case: UPPER # either 'UPPER' or 'lower'
 
