@@ -26,5 +26,5 @@ util/oss
 
 test.wav
 
-nnet/deps/speechbrain
-nnet/deps/wenet
+nnet/toolkit/speechbrain
+nnet/toolkit/wenet
