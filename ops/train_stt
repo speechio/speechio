@@ -350,8 +350,7 @@ class MeanVarNormalizer:
 
     def __repr__(self):
         return (
-            f'\n'
-            f'Global MEAN/VAR normalizer:\n'
+            f'\nGlobal MEAN/VAR normalizer:\n'
             f'    mean_norm_shift:  {self.mean_norm_shift}\n'
             f'    var_norm_scale:  {self.var_norm_scale}\n'
         )
