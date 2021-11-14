@@ -661,12 +661,12 @@ def run():
     )
 
     os.makedirs(os.path.join(args.dir, 'checkpoints'), exist_ok = True)
-    E = config.num_epochs
+    num_epochs = config.num_epochs
     for e in range(1, 1 + E): # 1-based indexing
         logging.info(f'Training epoch {e} ...')
         total_loss = 0.0
         total_utts, total_frames = 0, 0
-        B = len(train_dataloader)
+        num_batches = len(train_dataloader)
         for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
             samples, X, T, Y, U = batch
             num_utts = X.shape[0]
@@ -691,7 +691,7 @@ def run():
             utt_loss, frame_loss = total_loss/total_utts, total_loss/total_frames
 
             if b % config.log_interval == 0:
-                logging.info(f'  [{e}/{E}]:[{b}/{B}]  {utt_loss:7.2f} {frame_loss:5.2f}  LR={scheduler.get_last_lr()[0]:7.6f}')
+                logging.info(f'  [{e}/{num_epochs}]:[{b}/{num_batches}] {utt_loss:7.2f} LR={scheduler.get_last_lr()[0]:7.6f}')
 
         torch.save(model.state_dict(), os.path.join(args.dir, 'checkpoints', f'{e}.pt'))
         logging.info(f'TRAIN[{e}] {utt_loss:7.2f} over {total_utts} utts and {total_frames} frames.')
