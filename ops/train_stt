@@ -145,7 +145,7 @@ def seconds_to_samples(sample_rate:int, seconds:float):
     )
 
 
-def load_audio(audio_path:str, begin:float, duration:float) :
+def LoadAudio(audio_path:str, begin:float, duration:float) :
     '''
     https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
 
@@ -456,6 +456,7 @@ class TextNormalizer:
 class DataPipeline:
     def __init__(
         self,
+        audio_loader:callable,
         resampler:Optional[callable] = None,
         perturbation:Optional[callable] = None,
         feature_extractor:Optional[callable] = None,
@@ -464,6 +465,7 @@ class DataPipeline:
         text_normalizer:Optional[callable] = None,
         tokenizer:Optional[callable] = None,
     ) :
+        self.audio_loader = audio_loader
         self.resampler = resampler
         self.perturbation = perturbation
         self.feature_extractor = feature_extractor
@@ -477,7 +479,8 @@ class DataPipeline:
         for sample in samples:
             # raw audio loading
             key = sample.id
-            waveform, sample_rate = load_audio(sample.audio, sample.begin, sample.duration)
+
+            waveform, sample_rate = self.audio_loader(sample.audio, sample.begin, sample.duration)
 
             if self.resampler:
                 waveform, sample_rate = self.resampler(waveform, sample_rate)
@@ -574,6 +577,7 @@ def move_tensor_to_device(*tensors):
 
 def compute_mean_var_stats(dataset, config):
     feature_pipeline = DataPipeline(
+        audio_loader = LoadAudio,
         resampler = Resampler(**config.resampler),
         perturbation = Perturbation(**config.perturbation),
         feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
@@ -636,6 +640,7 @@ def run():
 
     # data processing pipline
     data_pipeline = DataPipeline(
+        audio_loader = LoadAudio,
         resampler = Resampler(**config.resampler),
         perturbation = Perturbation(**config.perturbation),
         feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
