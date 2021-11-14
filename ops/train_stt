@@ -473,7 +473,7 @@ class DataPipeline:
         self.tokenizer = tokenizer
 
     def __call__(self, samples:list[Sample]):
-        minibatch = []
+        samples_processed = []
         for sample in samples:
             # raw audio loading
             key = sample.id
@@ -515,7 +515,7 @@ class DataPipeline:
                 token_pieces, token_ids = self.tokenizer(text)
 
             # store everything here for debug purpose
-            minibatch.append({
+            samples_processed.append({
                 'key': key,
                 'waveform': waveform,
                 'sample_rate': sample_rate,
@@ -526,7 +526,7 @@ class DataPipeline:
             })
             logging.debug(f'Processed sample {sample.id} -> {key}')
 
-        features = [ x['feature'] for x in minibatch ]
+        features = [ x['feature'] for x in samples_processed ]
         time_lengths = torch.tensor([ len(x) for x in features ]) # [N]
         inputs = nn.utils.rnn.pad_sequence(
             features,
@@ -534,7 +534,7 @@ class DataPipeline:
             padding_value = G_FEATURE_PADDING_VALUE,
         ) # [N, max(time_lengths), F]
 
-        labels = [ x['token_ids'] for x in minibatch ]
+        labels = [ x['token_ids'] for x in samples_processed ]
         label_lengths = torch.tensor([ len(y) for y in labels ]) # [N]
         targets = nn.utils.rnn.pad_sequence(
             [ torch.tensor(l) for l in labels ],
@@ -542,7 +542,10 @@ class DataPipeline:
             padding_value = G_PAD_ID,
         ) # [N, max(label_lengths)]
 
-        return minibatch, inputs, time_lengths, targets, label_lengths
+        num_utts = len(samples_processed)
+        num_frames = int(time_lengths.sum())
+
+        return samples_processed, num_utts, num_frames, inputs, time_lengths, targets, label_lengths
 
 
 def make_length_mask(lengths:torch.Tensor) -> torch.Tensor:
@@ -588,7 +591,7 @@ def compute_mean_var_stats(dataset, config):
 
     stats = MeanVarStats()
     for batch in dataloader:
-        samples, _,_,_,_ = batch
+        samples, *_ = batch
         for sample in samples:
             stats.accumulate_mean_var_stats(sample['feature'])  # [Time, Freq]
     return stats
@@ -699,9 +702,7 @@ def run():
         total_utts, total_frames = 0, 0
         num_batches = len(train_dataloader)
         for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
-            samples, X, T, Y, U = batch
-            num_utts = X.shape[0]
-            num_frames = int(T.sum())
+            samples, num_utts, num_frames, X, T, Y, U = batch
 
             X = X.to(device)
             T = T.to(device)
@@ -733,9 +734,7 @@ def run():
         total_utts, total_frames = 0, 0
         with torch.no_grad():
             for b, batch in enumerate(valid_dataloader, 1):
-                samples, X, T, Y, U = batch
-                num_utts = X.shape[0]
-                num_frames = int(T.sum())
+                samples, num_utts, num_frames, X, T, Y, U = batch
 
                 X = X.to(device)
                 T = T.to(device)
