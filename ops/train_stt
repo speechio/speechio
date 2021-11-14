@@ -516,7 +516,7 @@ class DataPipeline:
             padding_value = G_PAD_ID,
         ) # [N, max(label_lengths)]
 
-        return minibatch, inputs, targets, time_lengths, label_lengths
+        return minibatch, inputs, time_lengths, targets, label_lengths
 
 
 def make_length_mask(lengths:torch.Tensor) -> torch.Tensor:
@@ -668,15 +668,15 @@ def run():
         total_utts, total_frames = 0, 0
         B = len(train_dataloader)
         for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
-            _, X, L, T, U = batch
+            _, X, T, Y, U = batch
             num_utts = X.shape[0]
             num_frames = int(T.sum())
 
             X = X.to(device)
             T = T.to(device)
-            L = L.to(device)
+            Y = Y.to(device)
             U = U.to(device)
-            loss = model(X, T, L, U)
+            loss = model(X, T, Y, U)
             (loss / num_utts / config.gradient_accumulation).backward()
 
             if b % config.gradient_accumulation == 0:
@@ -702,15 +702,15 @@ def run():
         total_utts, total_frames = 0, 0
         with torch.no_grad():
             for b, batch in enumerate(valid_dataloader, 1):
-                samples, X, L, T, U = batch
+                samples, X, T, Y, U = batch
                 num_utts = X.shape[0]
                 num_frames = int(T.sum())
 
                 X = X.to(device)
                 T = T.to(device)
-                L = L.to(device)
+                Y = Y.to(device)
                 U = U.to(device)
-                loss = model(X, T, L, U)
+                loss = model(X, T, Y, U)
                 best_paths, b = model.decode(X, T)
                 for p in best_paths:
                     print(tokenizer.sentence_piece.DecodeIds(p))
