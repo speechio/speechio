@@ -59,7 +59,7 @@ feature_extractors:
         high_freq: -400
 
 text_normalizer:
-    case: UPPER # either 'UPPER' or 'lower'
+    case: upper # either 'upper' or 'lower'
 
 tokenizer:
     model: model/tokenizer/GigaSpeech_S.model

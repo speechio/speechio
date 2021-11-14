@@ -17,7 +17,7 @@ from wenet.transformer.ctc import CTC
 from wenet.transformer.asr_model import ASRModel
 
 class Model(nn.Module):
-    def __init__(self, config_filename, idim, odim, blk_index: int = 0, unk_index : int = 0, bos_index: int = 1, eos_index: int = 2):
+    def __init__(self, config_filename, idim, odim, blk_index:int, bos_index:int, eos_index:int, sil_index:int, unk_index:int):
         super().__init__()
 
         with open(config_filename, 'r') as f: 

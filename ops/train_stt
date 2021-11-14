@@ -28,17 +28,7 @@ import sentencepiece as spm
 
 # Global Constants
 G_FEATURE_PADDING_VALUE = float(0.0)
-
-G_PAD_ID = int(-1)
-G_BLK_ID = 0
-G_UNK_ID = 0
-G_BOS_ID = 1
-G_EOS_ID = 2
-
-G_BLK_TOKEN = '<blk>'
-G_UNK_TOKEN = '<unk>'
-G_BOS_TOKEN = '<s>'
-G_EOS_TOKEN = '</s>'
+G_PAD_ID = -1
 
 
 @dataclass
@@ -400,19 +390,55 @@ class SpecAugment:
         return key, feature
 
 
+class Vocabulary:
+    def __init__(
+        self, 
+        filepath:str, 
+        blk:str = '<blk>',
+        bos:str = '<s>',
+        eos:str = '</s>',
+        sil:str = '<sil>',
+        unk:str = '<unk>',
+    ) :
+        self.words = []
+        self.word_to_id = {}
+        with open(filepath, 'r') as f:
+            for l in f:
+                if len(cols := l.strip().split()) == 2:
+                    word = cols[0]
+                    self.word_to_id[word] = len(self.words)
+                    self.words.append(word)
+
+        self.unk, self.unk_index = unk, self.word_to_id[unk]
+        self.bos, self.bos_index = bos, self.word_to_id[bos]
+        self.eos, self.eos_index = eos, self.word_to_id[eos]
+        self.sil, self.sil_index = sil, self.word_to_id.get(sil, self.unk_index)
+        self.blk, self.blk_index = blk, self.word_to_id.get(blk, self.unk_index)
+
+    def size(self):
+        return len(self.words)
+
+
 class Tokenizer:
     def __init__(self, model:str):
         self.sentence_piece = spm.SentencePieceProcessor()
         self.sentence_piece.load(model)
-        self.vocab = [ [ self.sentence_piece.id_to_piece(x), x] for x in range(self.sentence_piece.get_piece_size())]
-    
-    def __call__(self, text) -> tuple[list[str], list[int]] :
-        token_pieces = self.sentence_piece.encode_as_pieces(text)
-        token_ids = self.sentence_piece.encode_as_ids(text)
-        return token_pieces, token_ids
 
-    def vocab_size(self):
-        return len(self.vocab)
+    def encode(self, text:str, mode) -> list[int]:
+        tokens = []
+        if mode == 'id':
+            tokens = self.sentence_piece.encode_as_ids(text)
+        elif mode == 'piece':
+            tokens = self.sentence_piece.encode_as_pieces(text)
+        else:
+            raise RuntimeError
+        return tokens
+    
+    def decode(self, tokens:list[int]) -> str:
+        return self.sentence_piece.DecodeIds(tokens)
+
+    def __call__(self, text) -> tuple[list[str], list[int]] :
+        return self.encode(text, 'piece'), self.encode(text, 'id')
 
 
 class TextNormalizer:
@@ -420,7 +446,7 @@ class TextNormalizer:
         self.case = case
     
     def __call__(self, text):
-        if self.case == 'UPPER':
+        if self.case == 'upper':
             text = text.upper()
         elif self.case == 'lower':
             text = text.lower()
@@ -602,8 +628,10 @@ def run():
     mvn = MeanVarNormalizer(mean_var_stats)
     logging.info(mvn)
 
+    # vocab
+    vocab = Vocabulary(config.vocabulary)
+
     # data processing pipline
-    tokenizer = Tokenizer(**config.tokenizer)
     data_pipeline = DataPipeline(
         resampler = Resampler(**config.resampler),
         perturbation = Perturbation(**config.perturbation),
@@ -611,7 +639,7 @@ def run():
         mean_var_normalizer = mvn,
         spec_augment = SpecAugment(**config.spec_augment) if config.apply_spec_augment else None,
         text_normalizer = TextNormalizer(**config.text_normalizer),
-        tokenizer = tokenizer,
+        tokenizer = Tokenizer(**config.tokenizer),
     )
 
     # data loaders
@@ -630,16 +658,19 @@ def run():
         collate_fn = data_pipeline,
     )
 
+    vocab = Vocabulary(config.vocabulary)
+
     # model
     sys.path.insert(0, 'nnet')
     from conformer import Model
     model = Model(
         os.path.join('nnet', f'{config.model}.yaml'),
-        config.feature_extractors.fbank.num_mel_bins, tokenizer.vocab_size(), 
-        blk_index = G_BLK_ID,
-        unk_index = G_UNK_ID,
-        bos_index = G_BOS_ID,
-        eos_index = G_EOS_ID,
+        config.feature_extractors.fbank.num_mel_bins, vocab.size(), 
+        blk_index = vocab.blk_index,
+        bos_index = vocab.bos_index,
+        eos_index = vocab.eos_index,
+        unk_index = vocab.unk_index,
+        sil_index = vocab.sil_index,
     )
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)

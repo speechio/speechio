@@ -19,13 +19,11 @@ dataset:
     train:
         subsets:
         -   id: AISHELL-1-TRAIN
-            max_num_samples: -1
-
+            max_num_samples: 128
     valid:
         subsets:
         -   id: AISHELL-1-DEV
             max_num_samples: 20
-
     test:
         subsets:
         -   id: AISHELL-1-TEST
@@ -52,7 +50,6 @@ feature_extractors:
         low_freq: 20
         high_freq: -400
 
-
 apply_spec_augment: True
 spec_augment:
     mark_key: True
@@ -61,11 +58,11 @@ spec_augment:
     num_f_masks: 2
     f_mask_width_max: 10
 
-
 text_normalizer:
-    case: UPPER # either 'UPPER' or 'lower'
+    case: upper # either 'upper' or 'lower'
 
-tokenizer:
+vocabulary: model/tokenizer/AISHELL-1.vocab
+tokenizer: 
     model: model/tokenizer/AISHELL-1.model
 
 dataloader:
