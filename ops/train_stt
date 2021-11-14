@@ -6,12 +6,11 @@
 
 import os, sys
 import argparse
-from typing import Optional, Any
+from typing import Optional
 from dataclasses import dataclass
 import logging.config
 
 import decimal
-import math
 import random
 
 #import numpy
@@ -20,9 +19,9 @@ import torch.nn as nn
 import torchaudio
 import torchaudio.sox_effects
 
-import csv
-import yaml, json
-from omegaconf import OmegaConf
+import csv   # metadata
+import json  # mvn stats
+from omegaconf import OmegaConf  # various configs
 
 import sentencepiece as spm
 #import k2
@@ -53,9 +52,14 @@ class Sample:
 
 
 class SampleLoader:
-    ''' A callable wrapper class to load one dataset sample from one utterance
+    ''' A callable wrapper class to load one utterance dict (a tsv/jsonl/yaml item)
     input:
-        utt dict is typically yielded by .tsv .jsonl .yaml file reader.
+        utt_dict = {
+            'ID': 'utt_key_1',
+            'AUDIO': 'audio/one_utterance.wav',
+            'DURATION': '1.28',
+            'TEXT': 'Hello World'
+        }
 
     return:
         a Sample object or None
@@ -576,6 +580,7 @@ def run():
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
     # setup logging
+    import yaml 
     if os.path.isfile(config.logging):
         with open(config.logging, 'r', encoding='utf8') as f:
             logging.config.dictConfig(yaml.safe_load(f))
