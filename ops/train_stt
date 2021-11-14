@@ -668,7 +668,7 @@ def run():
         total_utts, total_frames = 0, 0
         B = len(train_dataloader)
         for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
-            _, X, T, Y, U = batch
+            samples, X, T, Y, U = batch
             num_utts = X.shape[0]
             num_frames = int(T.sum())
 
@@ -677,8 +677,8 @@ def run():
             Y = Y.to(device)
             U = U.to(device)
             loss = model(X, T, Y, U)
-            (loss / num_utts / config.gradient_accumulation).backward()
 
+            (loss / num_utts / config.gradient_accumulation).backward()
             if b % config.gradient_accumulation == 0:
                 if torch.isfinite(nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clipping)):
                     optimizer.step()
@@ -711,9 +711,10 @@ def run():
                 Y = Y.to(device)
                 U = U.to(device)
                 loss = model(X, T, Y, U)
-                best_paths, b = model.decode(X, T)
-                for p in best_paths:
-                    print(tokenizer.sentence_piece.DecodeIds(p))
+
+                #best_paths, b = model.decode(X, T)
+                #for p in best_paths:
+                #    print(tokenizer.sentence_piece.DecodeIds(p))
                 
                 total_loss += loss.item()
                 total_utts += num_utts
