@@ -307,8 +307,7 @@ class MeanVarStats:
 
     def __repr__(self):
         return (
-            f'\n'
-            f'Global MEAN/VAR stats:\n'
+            '\nGlobal MEAN/VAR stats:\n'
             f'    1st_order:  {self.o1_stats}\n'
             f'    2nd_order:  {self.o2_stats}\n'
             f'    frames:   {self.n}\n'
@@ -350,7 +349,7 @@ class MeanVarNormalizer:
 
     def __repr__(self):
         return (
-            f'\nGlobal MEAN/VAR normalizer:\n'
+            '\nGlobal MEAN/VAR normalizer:\n'
             f'    mean_norm_shift:  {self.mean_norm_shift}\n'
             f'    var_norm_scale:  {self.var_norm_scale}\n'
         )
