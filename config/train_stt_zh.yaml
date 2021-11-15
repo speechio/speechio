@@ -1,6 +1,7 @@
 logging: config/logging.yaml
-
 data_zoo: data/audio/zoo.yaml
+
+mode: test
 
 sample_loader:
     field_map:
@@ -19,7 +20,7 @@ dataset:
     train:
         subsets:
         -   id: AISHELL-1-TRAIN
-            max_num_samples: 128
+            max_num_samples: -1
     valid:
         subsets:
         -   id: AISHELL-1-DEV
@@ -27,7 +28,7 @@ dataset:
     test:
         subsets:
         -   id: AISHELL-1-TEST
-            max_num_samples: 0
+            max_num_samples: -1
 
 resampler:
     sample_rate: 16000
@@ -50,7 +51,7 @@ feature_extractors:
         low_freq: 20
         high_freq: -400
 
-apply_spec_augment: True
+apply_spec_augment: False
 spec_augment:
     mark_key: True
     num_t_masks: 2

@@ -52,5 +52,16 @@ class Model(nn.Module):
         loss = self.model(X, T, L, U)
         return loss[0] * X.shape[0] # batch loss
 
-    def decode(self, X, T):
-        return self.model.ctc_greedy_search(X, T)
+    def decode(self, X, T, mode = 'attention_rescoring'):
+        if mode == 'attention':
+            hyps, _ = self.model.recognize(X, T)
+            hyps = [hyp.tolist() for hyp in hyps]
+        elif mode == 'ctc_greedy_search':
+            hyps, _ = self.model.ctc_greedy_search(X, T)
+        elif mode == 'ctc_prefix_beam_search':
+            hyp, _ = self.model.ctc_prefix_beam_search(X, T, beam_size = 10)
+            hyps = [list(hyp)]
+        elif mode == 'attention_rescoring':
+            hyp, _ = self.model.attention_rescoring(X, T, beam_size = 10)
+            hyps = [list(hyp)]
+        return hyps

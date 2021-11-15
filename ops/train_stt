@@ -638,113 +638,82 @@ def run():
     else:
         logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
-    # load train/dev/test dataset from data zoo
-    train_dataset = Dataset(config.data_zoo, config.dataset.train, config.sample_loader)
-    valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
+    if config.mode == 'train':
+        # load train/dev/test dataset from data zoo
+        train_dataset = Dataset(config.data_zoo, config.dataset.train, config.sample_loader)
+        valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
 
-    # mean var normalization
-    mean_var_stats_file = os.path.join(args.dir, 'mean_var_stats.json')
-    if os.path.isfile(mean_var_stats_file):
-        logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
-        mean_var_stats = MeanVarStats()
-        mean_var_stats.load(mean_var_stats_file)
-    else:
-        logging.info(f'Computing mean/var stats -> {mean_var_stats_file}')
-        mean_var_stats = compute_mean_var_stats(train_dataset, config)
-        mean_var_stats.dump(mean_var_stats_file)
-    mvn = MeanVarNormalizer(mean_var_stats)
-    logging.info(mvn)
+        # mean var normalization
+        mean_var_stats_file = os.path.join(args.dir, 'mean_var_stats.json')
+        if os.path.isfile(mean_var_stats_file):
+            logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
+            mean_var_stats = MeanVarStats()
+            mean_var_stats.load(mean_var_stats_file)
+        else:
+            logging.info(f'Computing mean/var stats -> {mean_var_stats_file}')
+            mean_var_stats = compute_mean_var_stats(train_dataset, config)
+            mean_var_stats.dump(mean_var_stats_file)
+        mvn = MeanVarNormalizer(mean_var_stats)
+        logging.info(mvn)
 
-    # vocab
-    vocab = Vocabulary(config.vocabulary)
+        # vocab
+        vocab = Vocabulary(config.vocabulary)
 
-    # data processing pipline
-    train_datapipe = DataPipe(
-        audio_loader = LoadAudio,
-        resampler = Resampler(**config.resampler),
-        perturbation = Perturbation(**config.perturbation),
-        feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
-        mean_var_normalizer = mvn,
-        spec_augment = SpecAugment(**config.spec_augment) if config.apply_spec_augment else None,
-        text_normalizer = TextNormalizer(**config.text_normalizer),
-        tokenizer = Tokenizer(**config.tokenizer),
-    )
-
-    # data loaders
-    train_dataloader = torch.utils.data.DataLoader(
-        train_dataset, 
-        **config.dataloader,
-        collate_fn = train_datapipe,
-    )
-
-    valid_dataloader = torch.utils.data.DataLoader(
-        valid_dataset, 
-        shuffle = False,
-        batch_size = config.dataloader.batch_size,
-        drop_last = config.dataloader.drop_last,
-        num_workers = config.dataloader.num_workers,
-        collate_fn = train_datapipe,
-    )
-
-    vocab = Vocabulary(config.vocabulary)
-
-    # model
-    model = LoadModel(config.model, config.feature_extractors.fbank.num_mel_bins, vocab)
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
-
-    # optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
-
-    # scheduler
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, 
-        lr_lambda = lambda k: min(
-            (k+1)/config.scheduler.warmup_steps,
-            (config.scheduler.warmup_steps/(k+1))**0.5
+        # data processing pipline
+        train_datapipe = DataPipe(
+            audio_loader = LoadAudio,
+            resampler = Resampler(**config.resampler),
+            perturbation = Perturbation(**config.perturbation),
+            feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
+            mean_var_normalizer = mvn,
+            spec_augment = SpecAugment(**config.spec_augment) if config.apply_spec_augment else None,
+            text_normalizer = TextNormalizer(**config.text_normalizer),
+            tokenizer = Tokenizer(**config.tokenizer),
         )
-    )
 
-    os.makedirs(os.path.join(args.dir, 'checkpoints'), exist_ok = True)
-    for e in range(1, config.num_epochs + 1): # 1-based indexing
-        logging.info(f'Training epoch {e} ...')
-        model.train()
-        train_loss = 0.0
-        train_utts, train_frames = 0, 0
-        num_batches = len(train_dataloader)
-        for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
-            samples, num_utts, num_frames, X, T, Y, U = batch
+        # data loaders
+        train_dataloader = torch.utils.data.DataLoader(
+            train_dataset, 
+            **config.dataloader,
+            collate_fn = train_datapipe,
+        )
 
-            X = X.to(device)
-            T = T.to(device)
-            Y = Y.to(device)
-            U = U.to(device)
-            loss = model(X, T, Y, U)
+        valid_dataloader = torch.utils.data.DataLoader(
+            valid_dataset, 
+            shuffle = False,
+            batch_size = config.dataloader.batch_size,
+            drop_last = config.dataloader.drop_last,
+            num_workers = config.dataloader.num_workers,
+            collate_fn = train_datapipe,
+        )
 
-            (loss / num_utts / config.gradient_accumulation).backward()
-            if b % config.gradient_accumulation == 0:
-                if torch.isfinite(nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clipping)):
-                    optimizer.step()
-                optimizer.zero_grad()
-                scheduler.step()
-            
-            train_loss += loss.item()
-            train_utts += num_utts
-            train_frames += num_frames
-            train_utt_loss, train_frame_loss = train_loss/train_utts, train_loss/train_frames
+        vocab = Vocabulary(config.vocabulary)
 
-            if b % config.log_interval == 0:
-                logging.info(f'  [{e}/{config.num_epochs}]:[{b}/{num_batches}] {train_utt_loss:7.2f} LR={scheduler.get_last_lr()[0]:7.6f}')
+        # model
+        model = LoadModel(config.model, config.feature_extractors.fbank.num_mel_bins, vocab)
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        model.to(device)
 
-        torch.save(model.state_dict(), os.path.join(args.dir, 'checkpoints', f'{e}.pt'))
+        # optimizer
+        optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
 
-        # validation
-        logging.info(f'Validating epoch {e} ...')
-        with torch.no_grad():
-            model.eval()
-            valid_loss = 0.0
-            valid_utts, valid_frames = 0, 0
-            for b, batch in enumerate(valid_dataloader, 1):
+        # scheduler
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer, 
+            lr_lambda = lambda k: min(
+                (k+1)/config.scheduler.warmup_steps,
+                (config.scheduler.warmup_steps/(k+1))**0.5
+            )
+        )
+
+        os.makedirs(os.path.join(args.dir, 'checkpoints'), exist_ok = True)
+        for e in range(1, config.num_epochs + 1): # 1-based indexing
+            logging.info(f'Training epoch {e} ...')
+            model.train()
+            train_loss = 0.0
+            train_utts, train_frames = 0, 0
+            num_batches = len(train_dataloader)
+            for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
                 samples, num_utts, num_frames, X, T, Y, U = batch
 
                 X = X.to(device)
@@ -753,24 +722,101 @@ def run():
                 U = U.to(device)
                 loss = model(X, T, Y, U)
 
-                valid_loss += loss.item()
-                valid_utts += num_utts
-                valid_frames += num_frames
-                valid_utt_loss, valid_frame_loss = valid_loss/valid_utts, valid_loss/valid_frames
+                (loss / num_utts / config.gradient_accumulation).backward()
+                if b % config.gradient_accumulation == 0:
+                    if torch.isfinite(nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clipping)):
+                        optimizer.step()
+                    optimizer.zero_grad()
+                    scheduler.step()
+                
+                train_loss += loss.item()
+                train_utts += num_utts
+                train_frames += num_frames
+                train_utt_loss, train_frame_loss = train_loss/train_utts, train_loss/train_frames
 
-        # epoch summary
-        logging.info(
-            f'\nEpoch[{e}]'
-            f'  train_utt_loss:{train_utt_loss:7.2f}'
-            f'  valid_utt_loss:{valid_utt_loss:7.2f}'
-            f'  loss_diff:{train_utt_loss - valid_utt_loss:7.2f}'
+                if b % config.log_interval == 0:
+                    logging.info(f'  [{e}/{config.num_epochs}]:[{b}/{num_batches}] {train_utt_loss:7.2f} LR={scheduler.get_last_lr()[0]:7.6f}')
+
+            torch.save(model.state_dict(), os.path.join(args.dir, 'checkpoints', f'{e}.pt'))
+
+            # validation
+            logging.info(f'Validating epoch {e} ...')
+            with torch.no_grad():
+                model.eval()
+                valid_loss = 0.0
+                valid_utts, valid_frames = 0, 0
+                for b, batch in enumerate(valid_dataloader, 1):
+                    samples, num_utts, num_frames, X, T, Y, U = batch
+
+                    X = X.to(device)
+                    T = T.to(device)
+                    Y = Y.to(device)
+                    U = U.to(device)
+                    loss = model(X, T, Y, U)
+
+                    valid_loss += loss.item()
+                    valid_utts += num_utts
+                    valid_frames += num_frames
+                    valid_utt_loss, valid_frame_loss = valid_loss/valid_utts, valid_loss/valid_frames
+
+            # epoch summary
+            logging.info(
+                f'\nEpoch[{e}]'
+                f'  train_utt_loss:{train_utt_loss:7.2f}'
+                f'  valid_utt_loss:{valid_utt_loss:7.2f}'
+                f'  loss_diff:{train_utt_loss - valid_utt_loss:7.2f}'
+            )
+
+    elif config.mode == 'test':
+        logging.info('Decoding ...')
+        mean_var_stats_file = os.path.join(args.dir, 'mean_var_stats.json')
+        assert os.path.isfile(mean_var_stats_file)
+        logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
+        mean_var_stats = MeanVarStats()
+        mean_var_stats.load(mean_var_stats_file)
+        mvn = MeanVarNormalizer(mean_var_stats) 
+
+        tokenizer = Tokenizer(**config.tokenizer)
+        test_datapipe = DataPipe(
+            audio_loader = LoadAudio,
+            resampler = Resampler(**config.resampler),
+            feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
+            mean_var_normalizer = mvn,
+            text_normalizer = TextNormalizer(**config.text_normalizer),
+            tokenizer = tokenizer,
         )
 
+        test_dataset = Dataset(config.data_zoo, config.dataset.test, config.sample_loader)
+        test_dataloader = torch.utils.data.DataLoader(
+            test_dataset, 
+            shuffle = False,
+            batch_size = 1,
+            drop_last = False,
+            num_workers = 1,
+            collate_fn = test_datapipe,
+        )
 
-        #best_paths, b = model.decode(X, T)
-        #for p in best_paths:
-        #    print(tokenizer.sentence_piece.DecodeIds(p))
-                
+        vocab = vocab = Vocabulary(config.vocabulary)
+
+        test_model = LoadModel(config.model, config.feature_extractors.fbank.num_mel_bins, vocab)
+        checkpoint_path = os.path.join(args.dir, 'final.pt')
+        assert os.path.isfile(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path)
+        test_model.load_state_dict(checkpoint)
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        test_model.to(device)
+
+        with torch.no_grad():
+            test_model.eval()
+            for b, batch in enumerate(test_dataloader):
+                samples, num_utts, num_frames, X, T, Y, U = batch
+                assert num_utts == 1
+
+                X = X.to(device)
+                T = T.to(device)
+                hyps = test_model.decode(X, T)
+
+                print(f'{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}')
 
 
 def unit_test():
@@ -791,4 +837,3 @@ def unit_test():
 
 if __name__ == '__main__':
     run()
-    #unit_test()

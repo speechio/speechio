@@ -5,9 +5,10 @@ __pycache__
 
 *.json
 log.*
+log
+*.log
 tmp*
 *.pt
-log
 
 build
 
