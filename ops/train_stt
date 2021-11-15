@@ -706,6 +706,7 @@ def run():
         total_loss = 0.0
         total_utts, total_frames = 0, 0
         num_batches = len(train_dataloader)
+        model.train()
         for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
             samples, num_utts, num_frames, X, T, Y, U = batch
 
@@ -735,9 +736,10 @@ def run():
 
         # validation
         logging.info(f'Validating epoch {e} ...')
-        total_loss = 0.0
-        total_utts, total_frames = 0, 0
         with torch.no_grad():
+            model.eval()
+            total_loss = 0.0
+            total_utts, total_frames = 0, 0
             for b, batch in enumerate(valid_dataloader, 1):
                 samples, num_utts, num_frames, X, T, Y, U = batch
 
