@@ -453,7 +453,7 @@ class TextNormalizer:
         return text
 
 
-class DataPipeline:
+class DataPipe:
     def __init__(
         self,
         audio_loader:callable,
@@ -576,7 +576,7 @@ def move_tensor_to_device(*tensors):
     return tuple([t.to(device) for t in tensors])
 
 def compute_mean_var_stats(dataset, config):
-    feature_pipeline = DataPipeline(
+    feature_datapipe = DataPipe(
         audio_loader = LoadAudio,
         resampler = Resampler(**config.resampler),
         perturbation = Perturbation(**config.perturbation),
@@ -590,7 +590,7 @@ def compute_mean_var_stats(dataset, config):
         batch_size = 32, 
         drop_last = False,
         num_workers = 4,
-        collate_fn = feature_pipeline,
+        collate_fn = feature_datapipe,
     )
 
     stats = MeanVarStats()
@@ -599,6 +599,26 @@ def compute_mean_var_stats(dataset, config):
         for sample in samples:
             stats.accumulate_mean_var_stats(sample['feature'])  # [Time, Freq]
     return stats
+
+
+def LoadModel(model_name:str, input_dim, vocab):
+    sys.path.insert(0, 'nnet')
+    from conformer import Model
+    model = Model(
+        os.path.join('nnet', f'{model_name}.yaml'),
+        input_dim,
+        vocab.size(),
+        blk_index = vocab.blk_index,
+        bos_index = vocab.bos_index,
+        eos_index = vocab.eos_index,
+        unk_index = vocab.unk_index,
+        sil_index = vocab.sil_index,
+    )
+    logging.info(
+        f'Total params: {sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
+        f'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
+    )
+    return model
 
 
 def run():
@@ -639,7 +659,7 @@ def run():
     vocab = Vocabulary(config.vocabulary)
 
     # data processing pipline
-    data_pipeline = DataPipeline(
+    train_datapipe = DataPipe(
         audio_loader = LoadAudio,
         resampler = Resampler(**config.resampler),
         perturbation = Perturbation(**config.perturbation),
@@ -654,7 +674,7 @@ def run():
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, 
         **config.dataloader,
-        collate_fn = data_pipeline,
+        collate_fn = train_datapipe,
     )
 
     valid_dataloader = torch.utils.data.DataLoader(
@@ -663,29 +683,15 @@ def run():
         batch_size = config.dataloader.batch_size,
         drop_last = config.dataloader.drop_last,
         num_workers = config.dataloader.num_workers,
-        collate_fn = data_pipeline,
+        collate_fn = train_datapipe,
     )
 
     vocab = Vocabulary(config.vocabulary)
 
     # model
-    sys.path.insert(0, 'nnet')
-    from conformer import Model
-    model = Model(
-        os.path.join('nnet', f'{config.model}.yaml'),
-        config.feature_extractors.fbank.num_mel_bins, vocab.size(), 
-        blk_index = vocab.blk_index,
-        bos_index = vocab.bos_index,
-        eos_index = vocab.eos_index,
-        unk_index = vocab.unk_index,
-        sil_index = vocab.sil_index,
-    )
+    model = LoadModel(config.model, config.feature_extractors.fbank.num_mel_bins, vocab)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
-    logging.info(
-        f'Total params: {sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
-        f'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
-    )
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
@@ -700,13 +706,12 @@ def run():
     )
 
     os.makedirs(os.path.join(args.dir, 'checkpoints'), exist_ok = True)
-    num_epochs = config.num_epochs
-    for e in range(1, num_epochs + 1): # 1-based indexing
+    for e in range(1, config.num_epochs + 1): # 1-based indexing
         logging.info(f'Training epoch {e} ...')
-        total_loss = 0.0
-        total_utts, total_frames = 0, 0
-        num_batches = len(train_dataloader)
         model.train()
+        train_loss = 0.0
+        train_utts, train_frames = 0, 0
+        num_batches = len(train_dataloader)
         for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
             samples, num_utts, num_frames, X, T, Y, U = batch
 
@@ -723,23 +728,22 @@ def run():
                 optimizer.zero_grad()
                 scheduler.step()
             
-            total_loss += loss.item()
-            total_utts += num_utts
-            total_frames += num_frames
-            utt_loss, frame_loss = total_loss/total_utts, total_loss/total_frames
+            train_loss += loss.item()
+            train_utts += num_utts
+            train_frames += num_frames
+            train_utt_loss, train_frame_loss = train_loss/train_utts, train_loss/train_frames
 
             if b % config.log_interval == 0:
-                logging.info(f'  [{e}/{num_epochs}]:[{b}/{num_batches}] {utt_loss:7.2f} LR={scheduler.get_last_lr()[0]:7.6f}')
+                logging.info(f'  [{e}/{config.num_epochs}]:[{b}/{num_batches}] {train_utt_loss:7.2f} LR={scheduler.get_last_lr()[0]:7.6f}')
 
         torch.save(model.state_dict(), os.path.join(args.dir, 'checkpoints', f'{e}.pt'))
-        logging.info(f'TRAIN[{e}] {utt_loss:7.2f} over {total_utts} utts and {total_frames} frames.')
 
         # validation
         logging.info(f'Validating epoch {e} ...')
         with torch.no_grad():
             model.eval()
-            total_loss = 0.0
-            total_utts, total_frames = 0, 0
+            valid_loss = 0.0
+            valid_utts, valid_frames = 0, 0
             for b, batch in enumerate(valid_dataloader, 1):
                 samples, num_utts, num_frames, X, T, Y, U = batch
 
@@ -749,19 +753,24 @@ def run():
                 U = U.to(device)
                 loss = model(X, T, Y, U)
 
-                #best_paths, b = model.decode(X, T)
-                #for p in best_paths:
-                #    print(tokenizer.sentence_piece.DecodeIds(p))
-                
-                total_loss += loss.item()
-                total_utts += num_utts
-                total_frames += num_frames
-                utt_loss, frame_loss = total_loss/total_utts, total_loss/total_frames
-        logging.info(f'VALID[{e}] {utt_loss:7.2f} over {total_utts} utts and {total_frames} frames.')
+                valid_loss += loss.item()
+                valid_utts += num_utts
+                valid_frames += num_frames
+                valid_utt_loss, valid_frame_loss = valid_loss/valid_utts, valid_loss/valid_frames
 
-        # with torch.no_grad():
-        #     test_model = Model(config.model)
-        #     test_model.load_state_dict(torch.load(checkpoint))
+        # epoch summary
+        logging.info(
+            f'\nEpoch[{e}]'
+            f'  train_utt_loss:{train_utt_loss:7.2f}'
+            f'  valid_utt_loss:{valid_utt_loss:7.2f}'
+            f'  loss_diff:{train_utt_loss - valid_utt_loss:7.2f}'
+        )
+
+
+        #best_paths, b = model.decode(X, T)
+        #for p in best_paths:
+        #    print(tokenizer.sentence_piece.DecodeIds(p))
+                
 
 
 def unit_test():
