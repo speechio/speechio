@@ -602,10 +602,9 @@ def compute_mean_var_stats(dataset, config):
 
 
 def LoadModel(model_name:str, input_dim, vocab):
-    sys.path.insert(0, 'nnet')
-    from conformer import Model
+    from stt.conformer import Model
     model = Model(
-        os.path.join('nnet', f'{model_name}.yaml'),
+        os.path.join(os.path.dirname(__file__), f'{model_name}.yaml'),
         input_dim,
         vocab.size(),
         blk_index = vocab.blk_index,
@@ -621,7 +620,18 @@ def LoadModel(model_name:str, input_dim, vocab):
     return model
 
 
-def train(config, dir):
+def train(config_path, dir):
+    config = OmegaConf.load(config_path)
+    print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
+
+    # setup logging
+    import yaml 
+    if os.path.isfile(config.logging):
+        with open(config.logging, 'r', encoding='utf8') as f:
+            logging.config.dictConfig(yaml.safe_load(f))
+    else:
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+
     # load train/dev/test dataset from data zoo
     train_dataset = Dataset(config.data_zoo, config.dataset.train, config.sample_loader)
     valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
@@ -750,8 +760,19 @@ def train(config, dir):
             f'  loss_diff:{train_utt_loss - valid_utt_loss:7.2f}'
         )
 
-def test(config, dir):
-    logging.info('Decoding ...')
+
+def infer(config_path, dir):
+    config = OmegaConf.load(config_path)
+    print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
+
+    # setup logging
+    import yaml 
+    if os.path.isfile(config.logging):
+        with open(config.logging, 'r', encoding='utf8') as f:
+            logging.config.dictConfig(yaml.safe_load(f))
+    else:
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     assert os.path.isfile(mean_var_stats_file)
     logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
@@ -790,6 +811,7 @@ def test(config, dir):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
+    logging.info('Decoding ...')
     with torch.no_grad():
         model.eval()
         for b, batch in enumerate(test_dataloader):
@@ -801,45 +823,3 @@ def test(config, dir):
             hyps = model.decode(X, T)
 
             print(f'{b}\t{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}', file=sys.stderr)
-
-
-def unit_test():
-    def test_length_to_mask():
-        length=torch.Tensor([1,2,3])
-        mask=make_length_mask(length)
-        expected = torch.Tensor(
-            [
-                [1, 0, 0],
-                [1, 1, 0],
-                [1, 1, 1]
-            ]
-        ).bool()
-        assert torch.equal(mask, expected)
-
-    test_length_to_mask()
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('cmd', type = str, choices = ['train', 'test'])
-    parser.add_argument('--config', type = str, required = True)
-    parser.add_argument('dir', type = str)
-    args = parser.parse_args()
-
-    config = OmegaConf.load(args.config)
-    print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
-
-    # setup logging
-    import yaml 
-    if os.path.isfile(config.logging):
-        with open(config.logging, 'r', encoding='utf8') as f:
-            logging.config.dictConfig(yaml.safe_load(f))
-    else:
-        logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
-
-    if args.cmd == 'train':
-        train(config, args.dir)
-    elif args.cmd == 'test':
-        test(config, args.dir)
-    else:
-        raise NotImplementedError(f'Unsupported cmd: {args.cmd}')
