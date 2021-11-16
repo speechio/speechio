@@ -5,7 +5,7 @@
 # All rights reserved.
 
 import argparse
-import stt
+from core import stt
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -13,4 +13,4 @@ if __name__ == '__main__':
     parser.add_argument('dir', type = str)
     args = parser.parse_args()
 
-    stt.train(args.config, args.dir)
+    stt.recognize(args.config, args.dir)

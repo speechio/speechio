@@ -602,7 +602,7 @@ def compute_mean_var_stats(dataset, config):
 
 
 def LoadModel(model_name:str, input_dim, vocab):
-    from stt.conformer import Model
+    from core.conformer import Model
     model = Model(
         os.path.join(os.path.dirname(__file__), f'{model_name}.yaml'),
         input_dim,
@@ -761,7 +761,7 @@ def train(config_path, dir):
         )
 
 
-def infer(config_path, dir):
+def recognize(config_path, dir):
     config = OmegaConf.load(config_path)
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
@@ -781,7 +781,7 @@ def infer(config_path, dir):
     mvn = MeanVarNormalizer(mean_var_stats) 
 
     tokenizer = Tokenizer(**config.tokenizer)
-    test_datapipe = DataPipe(
+    datapipe = DataPipe(
         audio_loader = LoadAudio,
         resampler = Resampler(**config.resampler),
         feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
@@ -790,14 +790,14 @@ def infer(config_path, dir):
         tokenizer = tokenizer,
     )
 
-    test_dataset = Dataset(config.data_zoo, config.dataset.test, config.sample_loader)
-    test_dataloader = torch.utils.data.DataLoader(
-        test_dataset, 
+    dataset = Dataset(config.data_zoo, config.dataset.test, config.sample_loader)
+    dataloader = torch.utils.data.DataLoader(
+        dataset, 
         shuffle = False,
         batch_size = 1,
         drop_last = False,
         num_workers = 1,
-        collate_fn = test_datapipe,
+        collate_fn = datapipe,
     )
 
     vocab = vocab = Vocabulary(config.vocabulary)
@@ -814,7 +814,7 @@ def infer(config_path, dir):
     logging.info('Decoding ...')
     with torch.no_grad():
         model.eval()
-        for b, batch in enumerate(test_dataloader):
+        for b, batch in enumerate(dataloader):
             samples, num_utts, num_frames, X, T, _, _ = batch
             assert num_utts == 1
 
