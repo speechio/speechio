@@ -30,6 +30,18 @@ import sentencepiece as spm
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_PAD_ID = -1
 
+G_DEFAULT_DATA_ZOO = 'data/audio/zoo.yaml'
+G_DEFAULT_LOGGING_CONFIG = 'config/logging.yaml'
+# setup logging
+if os.path.isfile(G_DEFAULT_LOGGING_CONFIG):
+    import yaml
+    with open(G_DEFAULT_LOGGING_CONFIG, 'r', encoding='utf8') as f:
+        logging.config.dictConfig(yaml.safe_load(f))
+else:
+    logging.basicConfig(
+        stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s'
+    )
+
 
 @dataclass
 class Sample:
@@ -102,9 +114,9 @@ class SampleLoader:
 
 class Dataset:
     def __init__(self, 
-        data_zoo_path:str, 
         dataset_config:dict, 
         sample_loader_config:dict,
+        data_zoo_path:str = G_DEFAULT_DATA_ZOO,
     ) :
         self.samples = []
         data_zoo = OmegaConf.load(data_zoo_path)
@@ -159,7 +171,7 @@ def seconds_to_samples(sample_rate:int, seconds:float):
     )
 
 
-def LoadAudio(audio_path:str, begin:float, duration:float) :
+def torch_audio_load(audio_path:str, begin:float, duration:float) :
     '''
     https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
 
@@ -577,7 +589,7 @@ def move_tensor_to_device(*tensors):
 
 def compute_mean_var_stats(dataset, config):
     feature_datapipe = DataPipe(
-        audio_loader = LoadAudio,
+        audio_loader = torch_audio_load,
         resampler = Resampler(**config.Resampler),
         perturbation = Perturbation(**config.Perturbation),
         feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
@@ -629,18 +641,8 @@ def train(config_path, dir):
     config = OmegaConf.load(config_path)
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
-    # setup logging
-    import yaml 
-    if os.path.isfile(config.logging):
-        with open(config.logging, 'r', encoding='utf8') as f:
-            logging.config.dictConfig(yaml.safe_load(f))
-    else:
-        logging.basicConfig(
-            stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s'
-        )
-
-    train_dataset = Dataset(config.data_zoo, config.train_set, config.get('SampleLoader', {}))
-    valid_dataset = Dataset(config.data_zoo, config.valid_set, config.get('SampleLoader', {}))
+    train_dataset = Dataset(config.train_set, config.get('SampleLoader', {}))
+    valid_dataset = Dataset(config.valid_set, config.get('SampleLoader', {}))
 
     # mean var normalization
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
@@ -658,7 +660,7 @@ def train(config_path, dir):
     tokenizer = Tokenizer(**config.Tokenizer)
 
     train_datapipe = DataPipe(
-        audio_loader = LoadAudio,
+        audio_loader = torch_audio_load,
         resampler = Resampler(**config.Resampler) if config.get('Resampler') else None,
         perturbation = Perturbation(**config.Perturbation) if config.get('Perturbation') else None,
         feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
@@ -762,14 +764,6 @@ def recognize(config_path, dir):
     config = OmegaConf.load(config_path)
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
-    # setup logging
-    import yaml 
-    if os.path.isfile(config.logging):
-        with open(config.logging, 'r', encoding='utf8') as f:
-            logging.config.dictConfig(yaml.safe_load(f))
-    else:
-        logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
-
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     assert os.path.isfile(mean_var_stats_file)
     logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
@@ -779,8 +773,8 @@ def recognize(config_path, dir):
 
     tokenizer = Tokenizer(**config.Tokenizer)
 
-    test_datapipe = DataPipe(
-        audio_loader = LoadAudio,
+    datapipe = DataPipe(
+        audio_loader = torch_audio_load,
         resampler = Resampler(**config.Resampler) if config.get('Resampler') else None,
         perturbation = Perturbation(**config.Perturbation) if config.get('Perturbation') else None,
         feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
@@ -790,14 +784,14 @@ def recognize(config_path, dir):
         tokenizer = tokenizer,
     )
 
-    dataset = Dataset(config.data_zoo, config.test_set, config.get('SampleLoader', {}))
+    dataset = Dataset(config.test_set, config.get('SampleLoader', {}))
     dataloader = torch.utils.data.DataLoader(
         dataset, 
         shuffle = False,
         batch_size = 1,
         drop_last = False,
         num_workers = 1,
-        collate_fn = test_datapipe,
+        collate_fn = datapipe,
     )
 
     checkpoint_path = os.path.join(dir, 'final.pt')
@@ -820,4 +814,4 @@ def recognize(config_path, dir):
             T = T.to(device)
             hyps = model.decode(X, T)
 
-            print(f'{b}\t{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}', file=sys.stderr)
+            print(f'{b}\t{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}', file=sys.stderr, flush=True)

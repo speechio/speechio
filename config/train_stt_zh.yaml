@@ -1,6 +1,3 @@
-logging: config/logging.yaml
-data_zoo: data/audio/zoo.yaml
-
 SampleLoader:
     field_map:
         id: ID
