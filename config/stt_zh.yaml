@@ -62,6 +62,7 @@ text_normalizer:
 
 vocabulary: model/tokenizer/AISHELL-1.vocab
 tokenizer: 
+    type: sentence_piece
     model: model/tokenizer/AISHELL-1.model
 
 dataloader:
