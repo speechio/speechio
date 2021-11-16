@@ -254,19 +254,6 @@ class Perturbation:
         return key, waveform, sample_rate
 
 
-class FeatureExtractor:
-    def __init__(self, feature_extractors_config:dict, feature_type:str):
-        if feature_type == 'fbank':
-            self.extractor = FbankFeatureExtractor(**feature_extractors_config['fbank'])
-        elif feature_type == 'hires_mfcc':
-            raise NotImplementedError(f'feature_type:{feature_type} is not supported yet')
-        else:
-            raise RuntimeError(f'Unknown feature_type:{feature_type}')
-            
-    def __call__(self, waveform:torch.Tensor, sample_rate:int):
-        return self.extractor(waveform, sample_rate)
-
-
 class FbankFeatureExtractor:
     def __init__(self, num_mel_bins:int, dither:float = 0.0):
         self.num_mel_bins = num_mel_bins
@@ -302,6 +289,7 @@ class FbankFeatureExtractor:
         )
 
         return feature
+
 
 class MeanVarStats:
     def __init__(self):
@@ -343,6 +331,7 @@ class MeanVarStats:
         }
         with open(filename, 'w+') as f:
             json.dump(stats, f, indent=4)
+
 
 class MeanVarNormalizer:
     def __init__(self, mean_var_stats:MeanVarStats):
@@ -589,9 +578,9 @@ def move_tensor_to_device(*tensors):
 def compute_mean_var_stats(dataset, config):
     feature_datapipe = DataPipe(
         audio_loader = LoadAudio,
-        resampler = Resampler(**config.resampler),
-        perturbation = Perturbation(**config.perturbation),
-        feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
+        resampler = Resampler(**config.Resampler),
+        perturbation = Perturbation(**config.Perturbation),
+        feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
     )
 
     # data loaders
@@ -650,8 +639,8 @@ def train(config_path, dir):
             stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s'
         )
 
-    train_dataset = Dataset(config.data_zoo, config.dataset.train, config.get('sample_loader', {}))
-    valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.get('sample_loader', {}))
+    train_dataset = Dataset(config.data_zoo, config.train_set, config.get('SampleLoader', {}))
+    valid_dataset = Dataset(config.data_zoo, config.valid_set, config.get('SampleLoader', {}))
 
     # mean var normalization
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
@@ -666,34 +655,34 @@ def train(config_path, dir):
     mvn = MeanVarNormalizer(mean_var_stats)
     logging.info(mvn)
 
-    tokenizer = Tokenizer(**config.tokenizer)
+    tokenizer = Tokenizer(**config.Tokenizer)
 
     train_datapipe = DataPipe(
         audio_loader = LoadAudio,
-        resampler = Resampler(**config.resampler) if config.get('resampler') else None,
-        perturbation = Perturbation(**config.perturbation) if config.get('perturbation') else None,
-        feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
+        resampler = Resampler(**config.Resampler) if config.get('Resampler') else None,
+        perturbation = Perturbation(**config.Perturbation) if config.get('Perturbation') else None,
+        feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
         mean_var_normalizer = mvn,
-        spec_augment = SpecAugment(**config.spec_augment) if config.get('spec_augment') else None,
-        text_normalizer = TextNormalizer(**config.text_normalizer) if config.get('text_normalizer') else None,
+        spec_augment = SpecAugment(**config.SpecAugment) if config.get('SpecAugment') else None,
+        text_normalizer = TextNormalizer(**config.TextNormalizer) if config.get('TextNormalizer') else None,
         tokenizer = tokenizer,
     )
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, 
-        **config.dataloader,
+        **config.DataLoader,
         collate_fn = train_datapipe,
     )
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset, 
         shuffle = False,
-        batch_size = config.dataloader.batch_size,
-        drop_last = config.dataloader.drop_last,
-        num_workers = config.dataloader.num_workers,
+        batch_size = config.DataLoader.batch_size,
+        drop_last = config.DataLoader.drop_last,
+        num_workers = config.DataLoader.num_workers,
         collate_fn = train_datapipe,
     )
 
-    model = load_model(config.model, config.feature_extractors.fbank.num_mel_bins, tokenizer)
+    model = load_model(config.model, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
@@ -788,20 +777,20 @@ def recognize(config_path, dir):
     mean_var_stats.load(mean_var_stats_file)
     mvn = MeanVarNormalizer(mean_var_stats) 
 
-    tokenizer = Tokenizer(**config.tokenizer)
+    tokenizer = Tokenizer(**config.Tokenizer)
 
     test_datapipe = DataPipe(
         audio_loader = LoadAudio,
-        resampler = Resampler(**config.resampler) if config.get('resampler') else None,
-        perturbation = Perturbation(**config.perturbation) if config.get('perturbation') else None,
-        feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
+        resampler = Resampler(**config.Resampler) if config.get('Resampler') else None,
+        perturbation = Perturbation(**config.Perturbation) if config.get('Perturbation') else None,
+        feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
         mean_var_normalizer = mvn,
-        spec_augment = SpecAugment(**config.spec_augment) if config.get('spec_augment') else None,
-        text_normalizer = TextNormalizer(**config.text_normalizer) if config.get('text_normalizer') else None,
+        spec_augment = SpecAugment(**config.SpecAugment) if config.get('SpecAugment') else None,
+        text_normalizer = TextNormalizer(**config.TextNormalizer) if config.get('TextNormalizer') else None,
         tokenizer = tokenizer,
     )
 
-    dataset = Dataset(config.data_zoo, config.dataset.test, config.get('sample_loader', {}))
+    dataset = Dataset(config.data_zoo, config.test_set, config.get('SampleLoader', {}))
     dataloader = torch.utils.data.DataLoader(
         dataset, 
         shuffle = False,
@@ -815,7 +804,7 @@ def recognize(config_path, dir):
     assert os.path.isfile(checkpoint_path)
     checkpoint = torch.load(checkpoint_path)
 
-    model = load_model(config.model, config.feature_extractors.fbank.num_mel_bins, tokenizer)
+    model = load_model(config.model, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
     model.load_state_dict(checkpoint)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)

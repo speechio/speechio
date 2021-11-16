@@ -1,22 +1,19 @@
 logging: config/logging.yaml
 data_zoo: data/audio/zoo.yaml
 
-dataset:
-    test:
-        subsets:
-        -   id: AISHELL-1-TEST
-            max_num_samples: -1
+test_set:
+    subsets:
+    -   id: AISHELL-1-TEST
+        max_num_samples: -1
 
-resampler:
+Resampler:
     sample_rate: 16000
 
-feature_type: fbank # support fbank only now
-feature_extractors:
-    fbank:
-        dither: 0.0
-        num_mel_bins: 80
+FbankFeatureExtractor:
+    dither: 0.0
+    num_mel_bins: 80
 
-tokenizer: 
+Tokenizer: 
     vocab_path: model/tokenizer/AISHELL-1.vocab
     model_path: model/tokenizer/AISHELL-1.model
 

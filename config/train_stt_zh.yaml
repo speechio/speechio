@@ -1,7 +1,7 @@
 logging: config/logging.yaml
 data_zoo: data/audio/zoo.yaml
 
-sample_loader:
+SampleLoader:
     field_map:
         id: ID
         audio: AUDIO
@@ -14,52 +14,30 @@ sample_loader:
     min_text_length: 1
     max_text_length: 1024
 
-dataset:
-    train:
-        subsets:
-        -   id: AISHELL-1-TRAIN
-            max_num_samples: -1
-    valid:
-        subsets:
-        -   id: AISHELL-1-DEV
-            max_num_samples: 20
-    test:
-        subsets:
-        -   id: AISHELL-1-TEST
-            max_num_samples: -1
-
-resampler:
+Resampler:
     sample_rate: 16000
 
-perturbation:
+Perturbation:
     mark_key: True
     speeds: #[0.9, 1.0, 1.1]
     tempos: #[0.9, 1.0, 1.1]
     volumes: #[0.9, 1.0, 1.1]
 
-feature_type: fbank # support fbank only now
-feature_extractors:
-    fbank:
-        dither: 0.0
-        num_mel_bins: 80
-    hires_mfcc:
-        dither: 0.0
-        num_mel_bins: 40
-        num_ceps: 40
-        low_freq: 20
-        high_freq: -400
+FbankFeatureExtractor:
+    dither: 0.0
+    num_mel_bins: 80
 
-spec_augment:
+SpecAugment:
     mark_key: True
     num_t_masks: 2
     t_mask_width_max: 50
     num_f_masks: 2
     f_mask_width_max: 10
 
-text_normalizer:
+TextNormalizer:
     case: upper # either 'upper' or 'lower'
 
-tokenizer: 
+Tokenizer: 
     vocab_path: model/tokenizer/AISHELL-1.vocab
     model_path: model/tokenizer/AISHELL-1.model
     blk: '<blk>'
@@ -68,14 +46,24 @@ tokenizer:
     unk: '<unk>'
     sil: '<sil>'
 
-dataloader:
+DataLoader:
     num_workers: 8
     shuffle: True
     drop_last: False
     batch_size: 8
 
 # training
+train_set:
+    subsets:
+    -   id: AISHELL-1-TRAIN
+        max_num_samples: -1
+valid_set:
+    subsets:
+    -   id: AISHELL-1-DEV
+        max_num_samples: 20
+
 model: conformer
+
 num_epochs: 30
 gradient_accumulation: 2
 gradient_clipping: 5.0
