@@ -334,6 +334,7 @@ class MeanVarStats:
             self.o1_stats = torch.Tensor(stats['o1_stats'])
             self.o2_stats = torch.Tensor(stats['o2_stats'])
             self.n = stats['n']
+        return self
 
     def dump(self, filename:str):
         stats = {
@@ -648,8 +649,7 @@ def train(config_path, dir):
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if os.path.isfile(mean_var_stats_file):
         logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
-        mean_var_stats = MeanVarStats()
-        mean_var_stats.load(mean_var_stats_file)
+        mean_var_stats = MeanVarStats().load(mean_var_stats_file)
     else:
         logging.info(f'Computing mean/var stats -> {mean_var_stats_file}')
         mean_var_stats = compute_mean_var_stats(train_dataset, config)
@@ -765,11 +765,8 @@ def recognize(config_path, dir):
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
-    assert os.path.isfile(mean_var_stats_file)
     logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
-    mean_var_stats = MeanVarStats()
-    mean_var_stats.load(mean_var_stats_file)
-    mvn = MeanVarNormalizer(mean_var_stats) 
+    mvn = MeanVarNormalizer(MeanVarStats().load(mean_var_stats_file)) 
 
     tokenizer = Tokenizer(**config.Tokenizer)
 
