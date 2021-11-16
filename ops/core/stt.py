@@ -55,8 +55,18 @@ class SampleLoader:
         a Sample object or None
         None if an utterance doesn't satisfy constraints e.g. duration, text length
     '''
-    def __init__(self, field_map:dict, min_duration:float, max_duration:float, min_text_length:int = 1, max_text_length:int = 2048, data_dir:str = ''):
-        self.field_map = field_map
+    def __init__(self, min_duration:float = 0.0, max_duration:float = 60.0, min_text_length:int = 1, max_text_length:int = 2048, field_map:dict = None, data_dir:str = ''):
+        if field_map:
+            self.field_map = field_map
+        else:
+            self.field_map = {
+                'id': 'ID',
+                'audio': 'AUDIO',
+                'begin': 'BEGIN',
+                'duration': 'DURATION',
+                'text': 'TEXT',
+                'speaker': 'SPEAKER',
+            }
 
         self.min_duration = min_duration
         self.max_duration = max_duration
@@ -91,9 +101,13 @@ class SampleLoader:
 
 
 class Dataset:
-    def __init__(self, data_zoo_config, dataset_config, sample_loader_config) :
+    def __init__(self, 
+        data_zoo_path:str, 
+        dataset_config:dict, 
+        sample_loader_config:dict,
+    ) :
         self.samples = []
-        data_zoo = OmegaConf.load(data_zoo_config)
+        data_zoo = OmegaConf.load(data_zoo_path)
 
         for subset in dataset_config.subsets:
             if subset.max_num_samples == 0:
@@ -110,8 +124,8 @@ class Dataset:
                 else:
                     raise NotImplementedError
 
-                k = 0
                 sample_loader = SampleLoader(**sample_loader_config, data_dir = subset_dir)
+                k = 0
                 for utt in utterance_reader:
                     if k >= subset.max_num_samples:
                         break
@@ -390,39 +404,33 @@ class SpecAugment:
         return key, feature
 
 
-class Vocabulary:
-    def __init__(
-        self, 
-        filepath:str, 
+class Tokenizer:
+    def __init__(self, 
+        model_path:str,
+        vocab_path:str,
         blk:str = '<blk>',
         bos:str = '<s>',
         eos:str = '</s>',
         sil:str = '<sil>',
         unk:str = '<unk>',
     ) :
-        self.words = []
-        self.word_to_id = {}
-        with open(filepath, 'r') as f:
+        self.sentence_piece = spm.SentencePieceProcessor()
+        self.sentence_piece.load(model_path)
+
+        self.tokens = []
+        self.token_to_id = {}
+        with open(vocab_path, 'r') as f:
             for l in f:
                 if len(cols := l.strip().split()) == 2:
                     word = cols[0]
-                    self.word_to_id[word] = len(self.words)
-                    self.words.append(word)
+                    self.token_to_id[word] = len(self.tokens)
+                    self.tokens.append(word)
 
-        self.unk, self.unk_index = unk, self.word_to_id[unk]
-        self.bos, self.bos_index = bos, self.word_to_id[bos]
-        self.eos, self.eos_index = eos, self.word_to_id[eos]
-        self.sil, self.sil_index = sil, self.word_to_id.get(sil, self.unk_index)
-        self.blk, self.blk_index = blk, self.word_to_id.get(blk, self.unk_index)
-
-    def size(self):
-        return len(self.words)
-
-
-class Tokenizer:
-    def __init__(self, model:str):
-        self.sentence_piece = spm.SentencePieceProcessor()
-        self.sentence_piece.load(model)
+        self.unk, self.unk_index = unk, self.token_to_id[unk]
+        self.bos, self.bos_index = bos, self.token_to_id[bos]
+        self.eos, self.eos_index = eos, self.token_to_id[eos]
+        self.sil, self.sil_index = sil, self.token_to_id.get(sil, self.unk_index)
+        self.blk, self.blk_index = blk, self.token_to_id.get(blk, self.unk_index)
 
     def encode(self, text:str, mode) -> list[int]:
         tokens = []
@@ -436,6 +444,9 @@ class Tokenizer:
     
     def decode(self, tokens:list[int]) -> str:
         return self.sentence_piece.DecodeIds(tokens)
+
+    def size(self):
+        return len(self.tokens)
 
     def __call__(self, text) -> tuple[list[str], list[int]] :
         return self.encode(text, 'piece'), self.encode(text, 'id')
@@ -454,8 +465,7 @@ class TextNormalizer:
 
 
 class DataPipe:
-    def __init__(
-        self,
+    def __init__(self,
         audio_loader:callable,
         resampler:Optional[callable] = None,
         perturbation:Optional[callable] = None,
@@ -602,18 +612,18 @@ def compute_mean_var_stats(dataset, config):
     return stats
 
 
-def load_model(model_name:str, input_dim, vocab):
+def load_model(model_name:str, input_dim, tokenizer):
     if model_name == 'conformer':
         from core.conformer import Model
         model = Model(
             os.path.join(os.path.dirname(__file__), f'{model_name}.yaml'),
             input_dim,
-            vocab.size(),
-            blk_index = vocab.blk_index,
-            bos_index = vocab.bos_index,
-            eos_index = vocab.eos_index,
-            unk_index = vocab.unk_index,
-            sil_index = vocab.sil_index,
+            tokenizer.size(),
+            blk_index = tokenizer.blk_index,
+            bos_index = tokenizer.bos_index,
+            eos_index = tokenizer.eos_index,
+            unk_index = tokenizer.unk_index,
+            sil_index = tokenizer.sil_index,
         )
         logging.info(
             'Total params: '
@@ -640,8 +650,8 @@ def train(config_path, dir):
             stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s'
         )
 
-    train_dataset = Dataset(config.data_zoo, config.dataset.train, config.sample_loader)
-    valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
+    train_dataset = Dataset(config.data_zoo, config.dataset.train, config.get('sample_loader', {}))
+    valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.get('sample_loader', {}))
 
     # mean var normalization
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
@@ -656,15 +666,17 @@ def train(config_path, dir):
     mvn = MeanVarNormalizer(mean_var_stats)
     logging.info(mvn)
 
+    tokenizer = Tokenizer(**config.tokenizer)
+
     train_datapipe = DataPipe(
         audio_loader = LoadAudio,
-        resampler = Resampler(**config.resampler),
-        perturbation = Perturbation(**config.perturbation),
+        resampler = Resampler(**config.resampler) if config.get('resampler') else None,
+        perturbation = Perturbation(**config.perturbation) if config.get('perturbation') else None,
         feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
         mean_var_normalizer = mvn,
-        spec_augment = SpecAugment(**config.spec_augment) if config.apply_spec_augment else None,
-        text_normalizer = TextNormalizer(**config.text_normalizer),
-        tokenizer = Tokenizer(**config.tokenizer),
+        spec_augment = SpecAugment(**config.spec_augment) if config.get('spec_augment') else None,
+        text_normalizer = TextNormalizer(**config.text_normalizer) if config.get('text_normalizer') else None,
+        tokenizer = tokenizer,
     )
 
     train_dataloader = torch.utils.data.DataLoader(
@@ -681,9 +693,7 @@ def train(config_path, dir):
         collate_fn = train_datapipe,
     )
 
-    vocab = Vocabulary(config.vocabulary)
-
-    model = load_model(config.model, config.feature_extractors.fbank.num_mel_bins, vocab)
+    model = load_model(config.model, config.feature_extractors.fbank.num_mel_bins, tokenizer)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
@@ -779,32 +789,33 @@ def recognize(config_path, dir):
     mvn = MeanVarNormalizer(mean_var_stats) 
 
     tokenizer = Tokenizer(**config.tokenizer)
-    datapipe = DataPipe(
+
+    test_datapipe = DataPipe(
         audio_loader = LoadAudio,
-        resampler = Resampler(**config.resampler),
+        resampler = Resampler(**config.resampler) if config.get('resampler') else None,
+        perturbation = Perturbation(**config.perturbation) if config.get('perturbation') else None,
         feature_extractor = FeatureExtractor(config.feature_extractors, config.feature_type),
         mean_var_normalizer = mvn,
-        text_normalizer = TextNormalizer(**config.text_normalizer),
+        spec_augment = SpecAugment(**config.spec_augment) if config.get('spec_augment') else None,
+        text_normalizer = TextNormalizer(**config.text_normalizer) if config.get('text_normalizer') else None,
         tokenizer = tokenizer,
     )
 
-    dataset = Dataset(config.data_zoo, config.dataset.test, config.sample_loader)
+    dataset = Dataset(config.data_zoo, config.dataset.test, config.get('sample_loader', {}))
     dataloader = torch.utils.data.DataLoader(
         dataset, 
         shuffle = False,
         batch_size = 1,
         drop_last = False,
         num_workers = 1,
-        collate_fn = datapipe,
+        collate_fn = test_datapipe,
     )
-
-    vocab = vocab = Vocabulary(config.vocabulary)
 
     checkpoint_path = os.path.join(dir, 'final.pt')
     assert os.path.isfile(checkpoint_path)
     checkpoint = torch.load(checkpoint_path)
 
-    model = load_model( config.model, config.feature_extractors.fbank.num_mel_bins, vocab)
+    model = load_model(config.model, config.feature_extractors.fbank.num_mel_bins, tokenizer)
     model.load_state_dict(checkpoint)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)

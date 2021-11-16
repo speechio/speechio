@@ -11,5 +11,5 @@
 ## Train
 dir=exp/tmp
 mkdir -p $dir
-#ops/train_stt --config config/stt_zh.yaml $dir
+#ops/train_stt --config config/train_stt_zh.yaml $dir
 ops/stt --config config/stt_zh.yaml $dir
