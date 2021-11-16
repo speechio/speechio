@@ -575,6 +575,7 @@ def move_tensor_to_device(*tensors):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     return tuple([t.to(device) for t in tensors])
 
+
 def compute_mean_var_stats(dataset, config):
     feature_datapipe = DataPipe(
         audio_loader = LoadAudio,
@@ -601,23 +602,28 @@ def compute_mean_var_stats(dataset, config):
     return stats
 
 
-def LoadModel(model_name:str, input_dim, vocab):
-    from core.conformer import Model
-    model = Model(
-        os.path.join(os.path.dirname(__file__), f'{model_name}.yaml'),
-        input_dim,
-        vocab.size(),
-        blk_index = vocab.blk_index,
-        bos_index = vocab.bos_index,
-        eos_index = vocab.eos_index,
-        unk_index = vocab.unk_index,
-        sil_index = vocab.sil_index,
-    )
-    logging.info(
-        f'Total params: {sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
-        f'Trainable params: {sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
-    )
-    return model
+def load_model(model_name:str, input_dim, vocab):
+    if model_name == 'conformer':
+        from core.conformer import Model
+        model = Model(
+            os.path.join(os.path.dirname(__file__), f'{model_name}.yaml'),
+            input_dim,
+            vocab.size(),
+            blk_index = vocab.blk_index,
+            bos_index = vocab.bos_index,
+            eos_index = vocab.eos_index,
+            unk_index = vocab.unk_index,
+            sil_index = vocab.sil_index,
+        )
+        logging.info(
+            'Total params: '
+            f'{sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
+            'Trainable params: '
+            f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
+        )
+        return model
+    else:
+        raise NotImplementedError(f'Unsupported model: {model_name}')
 
 
 def train(config_path, dir):
@@ -630,9 +636,10 @@ def train(config_path, dir):
         with open(config.logging, 'r', encoding='utf8') as f:
             logging.config.dictConfig(yaml.safe_load(f))
     else:
-        logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+        logging.basicConfig(
+            stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s'
+        )
 
-    # load train/dev/test dataset from data zoo
     train_dataset = Dataset(config.data_zoo, config.dataset.train, config.sample_loader)
     valid_dataset = Dataset(config.data_zoo, config.dataset.valid, config.sample_loader)
 
@@ -649,10 +656,6 @@ def train(config_path, dir):
     mvn = MeanVarNormalizer(mean_var_stats)
     logging.info(mvn)
 
-    # vocab
-    vocab = Vocabulary(config.vocabulary)
-
-    # data processing pipline
     train_datapipe = DataPipe(
         audio_loader = LoadAudio,
         resampler = Resampler(**config.resampler),
@@ -664,13 +667,11 @@ def train(config_path, dir):
         tokenizer = Tokenizer(**config.tokenizer),
     )
 
-    # data loaders
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, 
         **config.dataloader,
         collate_fn = train_datapipe,
     )
-
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset, 
         shuffle = False,
@@ -682,15 +683,12 @@ def train(config_path, dir):
 
     vocab = Vocabulary(config.vocabulary)
 
-    # model
-    model = LoadModel(config.model, config.feature_extractors.fbank.num_mel_bins, vocab)
+    model = load_model(config.model, config.feature_extractors.fbank.num_mel_bins, vocab)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
-    # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
 
-    # scheduler
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer, 
         lr_lambda = lambda k: min(
@@ -806,7 +804,7 @@ def recognize(config_path, dir):
     assert os.path.isfile(checkpoint_path)
     checkpoint = torch.load(checkpoint_path)
 
-    model = LoadModel( config.model, config.feature_extractors.fbank.num_mel_bins, vocab)
+    model = load_model( config.model, config.feature_extractors.fbank.num_mel_bins, vocab)
     model.load_state_dict(checkpoint)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
