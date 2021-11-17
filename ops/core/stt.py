@@ -486,6 +486,9 @@ class DataPipe:
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
 
+        logging.info(f'\n    DataPipe components: {[ k for k,v in vars(self).items() if v ]}')
+
+
     def __call__(self, samples:list[Sample]):
         samples_processed = []
         for sample in samples:
