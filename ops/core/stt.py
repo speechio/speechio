@@ -30,7 +30,7 @@ import sentencepiece as spm
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_PAD_ID = -1
 
-G_DEFAULT_DATA_ZOO = 'data/audio/zoo.yaml'
+G_DEFAULT_DATA_ZOO = 'config/data_zoo.yaml'
 G_DEFAULT_LOGGING_CONFIG = 'config/logging.yaml'
 # setup logging
 if os.path.isfile(G_DEFAULT_LOGGING_CONFIG):
