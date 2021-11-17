@@ -59,7 +59,9 @@ valid_set:
     -   id: AISHELL-1-DEV
         max_num_samples: 20
 
-model: conformer
+# under ops/core/
+model_id: conformer
+model_hparam: conformer.yaml
 
 num_epochs: 30
 gradient_accumulation: 2

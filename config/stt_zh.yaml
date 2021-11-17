@@ -9,7 +9,10 @@ Tokenizer:
     vocab_path: model/tokenizer/AISHELL-1.vocab
     model_path: model/tokenizer/AISHELL-1.model
 
-model: conformer
+# under ops/core/
+model_id: conformer
+model_hparam: conformer.yaml
+
 test_set:
     subsets:
     -   id: AISHELL-1-TEST
