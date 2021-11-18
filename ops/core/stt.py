@@ -86,7 +86,7 @@ class SampleLoader:
         self.max_text_length = max_text_length
 
         self.data_dir = data_dir
-    
+
     def __call__(self, utt:dict) -> Optional[Sample] :
         sample = Sample()
         for attr, field in self.field_map.items():
@@ -113,8 +113,8 @@ class SampleLoader:
 
 
 class Dataset:
-    def __init__(self, 
-        dataset_config:dict, 
+    def __init__(self,
+        dataset_config:dict,
         sample_loader_config:dict,
         data_zoo_path:str = G_DEFAULT_DATA_ZOO,
     ) :
@@ -149,10 +149,10 @@ class Dataset:
         # length sort
 
         # shuffle
-             
+
     def __getitem__(self, index:int):
         return self.samples[index]
-    
+
     def __len__(self):
         return len(self.samples)
 
@@ -176,7 +176,7 @@ def torch_audio_load(audio_path:str, begin:float, duration:float) :
     https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
 
     torchaudio.info(sample.audio)
-    -> 
+    ->
     AudioMetaData(
         sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S,
     )
@@ -201,10 +201,10 @@ class Resampler:
 
 
 class Perturbation:
-    def __init__(self, 
+    def __init__(self,
         mark_key:bool = False,
-        speeds:Optional[list[float]] = None, 
-        tempos:Optional[list[float]] = None, 
+        speeds:Optional[list[float]] = None,
+        tempos:Optional[list[float]] = None,
         volumes:Optional[list[float]] = None,
     ) :
         self.mark_key = mark_key
@@ -239,7 +239,7 @@ class Perturbation:
                 ])
                 if self.mark_key:
                     key = f'{key}__speed{factor}'
-        
+
         if self.tempos:
             if (factor := random.choice(self.tempos)) != 1.0:
                 effects_chain.extend([
@@ -359,7 +359,7 @@ class MeanVarNormalizer:
             f'    mean_norm_shift:  {self.mean_norm_shift}\n'
             f'    var_norm_scale:  {self.var_norm_scale}\n'
         )
-    
+
     def __call__(self, feature:torch.Tensor):
         feature += self.mean_norm_shift
         feature *= self.var_norm_scale
@@ -370,10 +370,10 @@ class SpecAugment:
     def __init__(
         self,
         mark_key:bool = False,
-        num_t_masks:int = 2, 
+        num_t_masks:int = 2,
         t_mask_width_min:int = 1,
         t_mask_width_max:int = 50,
-        num_f_masks:int = 2, 
+        num_f_masks:int = 2,
         f_mask_width_min:int = 1,
         f_mask_width_max:int = 10,
     ) :
@@ -407,7 +407,7 @@ class SpecAugment:
 
 
 class Tokenizer:
-    def __init__(self, 
+    def __init__(self,
         model_path:str,
         vocab_path:str,
         blk:str = '<blk>',
@@ -443,7 +443,7 @@ class Tokenizer:
         else:
             raise RuntimeError
         return tokens
-    
+
     def decode(self, tokens:list[int]) -> str:
         return self.sentence_piece.DecodeIds(tokens)
 
@@ -457,7 +457,7 @@ class Tokenizer:
 class TextNormalizer:
     def __init__(self, case:str):
         self.case = case
-    
+
     def __call__(self, text):
         if self.case == 'upper':
             text = text.upper()
@@ -506,19 +506,19 @@ class DataPipe:
             # reverb
 
             # add noise
-            
+
             # feature extraction
-            feature = torch.Tensor([])
+            feature = torch.Tensor()  # default: an empty tensor
             if self.feature_extractor:
                 feature = self.feature_extractor(waveform, sample_rate)
-            
+
             if self.mean_var_normalizer:
                 feature = self.mean_var_normalizer(feature)
 
             # specaug
             if self.spec_augment:
                 key, feature = self.spec_augment(key, feature)
-            
+
             # detach
             feature = feature.detach()
 
@@ -545,20 +545,20 @@ class DataPipe:
             logging.debug(f'Processed sample {sample.id} -> {key}')
 
         features = [ x['feature'] for x in samples_processed ]
-        time_lengths = torch.tensor([ len(x) for x in features ]) # [N]
+        time_lengths = torch.tensor([ len(x) for x in features ])  # [batch_size]
         inputs = nn.utils.rnn.pad_sequence(
             features,
             batch_first = True,
             padding_value = G_FEATURE_PADDING_VALUE,
-        ) # [N, max(time_lengths), F]
+        )  # [batch_size, max(time_lengths), frequency]
 
         labels = [ x['token_ids'] for x in samples_processed ]
-        label_lengths = torch.tensor([ len(y) for y in labels ]) # [N]
+        label_lengths = torch.tensor([ len(y) for y in labels ])  # [batch_size]
         targets = nn.utils.rnn.pad_sequence(
             [ torch.tensor(l) for l in labels ],
             batch_first = True,
             padding_value = G_PAD_ID,
-        ) # [N, max(label_lengths)]
+        )  # [batch_size, max(label_lengths)]
 
         num_utts = len(samples_processed)
         num_frames = int(time_lengths.sum())
@@ -603,7 +603,7 @@ def compute_mean_var_stats(dataset, config):
     dataloader = torch.utils.data.DataLoader(
         dataset,
         shuffle = False,
-        batch_size = 32, 
+        batch_size = 32,
         drop_last = False,
         num_workers = 4,
         collate_fn = feature_datapipe,
@@ -674,12 +674,12 @@ def train(config_path, dir):
     )
 
     train_dataloader = torch.utils.data.DataLoader(
-        train_dataset, 
+        train_dataset,
         **config.DataLoader,
         collate_fn = train_datapipe,
     )
     valid_dataloader = torch.utils.data.DataLoader(
-        valid_dataset, 
+        valid_dataset,
         shuffle = False,
         batch_size = config.DataLoader.batch_size,
         drop_last = config.DataLoader.drop_last,
@@ -694,7 +694,7 @@ def train(config_path, dir):
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, 
+        optimizer,
         lr_lambda = lambda k: min(
             (k+1)/config.scheduler.warmup_steps,
             (config.scheduler.warmup_steps/(k+1))**0.5
@@ -723,7 +723,7 @@ def train(config_path, dir):
                     optimizer.step()
                 optimizer.zero_grad()
                 scheduler.step()
-            
+
             train_loss += loss.item()
             train_utts += num_utts
             train_frames += num_frames
@@ -769,7 +769,7 @@ def recognize(config_path, dir):
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
-    mvn = MeanVarNormalizer(MeanVarStats().load(mean_var_stats_file)) 
+    mvn = MeanVarNormalizer(MeanVarStats().load(mean_var_stats_file))
 
     tokenizer = Tokenizer(**config.Tokenizer)
 
@@ -786,7 +786,7 @@ def recognize(config_path, dir):
 
     dataset = Dataset(config.test_set, config.get('SampleLoader', {}))
     dataloader = torch.utils.data.DataLoader(
-        dataset, 
+        dataset,
         shuffle = False,
         batch_size = 1,
         drop_last = False,
