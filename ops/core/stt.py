@@ -329,6 +329,7 @@ class MeanVarStats:
         self.n += num_frames
 
     def load(self, filename:str):
+        logging.info(f'Loading mean/var stats <- {filename}')
         with open(filename, 'r') as f:
             stats = json.load(f)
             self.o1_stats = torch.Tensor(stats['o1_stats'])
@@ -337,6 +338,7 @@ class MeanVarStats:
         return self
 
     def dump(self, filename:str):
+        logging.info(f'Dumping mean/var stats -> {filename}')
         stats = {
             'o1_stats': self.o1_stats.tolist(),
             'o2_stats': self.o2_stats.tolist(),
@@ -352,6 +354,8 @@ class MeanVarNormalizer:
         var  = mean_var_stats.o2_stats / mean_var_stats.n - mean.square()
         self.mean_norm_shift = -mean
         self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
+
+        logging.info(self)
 
     def __repr__(self):
         return (
@@ -486,8 +490,10 @@ class DataPipe:
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
 
-        logging.info(f'\n    DataPipe components: {[ k for k,v in vars(self).items() if v ]}')
-
+        logging.info(self)
+    
+    def __repr__(self):
+        return f'\n    DataPipe: {[ k for k,v in vars(self).items() if v ]}'
 
     def __call__(self, samples:list[Sample]):
         samples_processed = []
@@ -648,17 +654,13 @@ def train(config_path, dir):
     train_dataset = Dataset(config.train_set, config.get('SampleLoader', {}))
     valid_dataset = Dataset(config.valid_set, config.get('SampleLoader', {}))
 
-    # mean var normalization
+    # mean var stats
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if os.path.isfile(mean_var_stats_file):
-        logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
         mean_var_stats = MeanVarStats().load(mean_var_stats_file)
     else:
-        logging.info(f'Computing mean/var stats -> {mean_var_stats_file}')
         mean_var_stats = compute_mean_var_stats(train_dataset, config)
         mean_var_stats.dump(mean_var_stats_file)
-    mvn = MeanVarNormalizer(mean_var_stats)
-    logging.info(mvn)
 
     tokenizer = Tokenizer(**config.Tokenizer)
 
@@ -667,7 +669,7 @@ def train(config_path, dir):
         resampler = Resampler(**config.Resampler) if config.get('Resampler') else None,
         perturbation = Perturbation(**config.Perturbation) if config.get('Perturbation') else None,
         feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
-        mean_var_normalizer = mvn,
+        mean_var_normalizer = MeanVarNormalizer(mean_var_stats),
         spec_augment = SpecAugment(**config.SpecAugment) if config.get('SpecAugment') else None,
         text_normalizer = TextNormalizer(**config.TextNormalizer) if config.get('TextNormalizer') else None,
         tokenizer = tokenizer,
@@ -768,8 +770,7 @@ def recognize(config_path, dir):
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
-    logging.info(f'Loading mean/var stats <- {mean_var_stats_file}')
-    mvn = MeanVarNormalizer(MeanVarStats().load(mean_var_stats_file)) 
+    mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
     tokenizer = Tokenizer(**config.Tokenizer)
 
@@ -778,7 +779,7 @@ def recognize(config_path, dir):
         resampler = Resampler(**config.Resampler) if config.get('Resampler') else None,
         perturbation = Perturbation(**config.Perturbation) if config.get('Perturbation') else None,
         feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
-        mean_var_normalizer = mvn,
+        mean_var_normalizer = MeanVarNormalizer(mean_var_stats),
         spec_augment = SpecAugment(**config.SpecAugment) if config.get('SpecAugment') else None,
         text_normalizer = TextNormalizer(**config.TextNormalizer) if config.get('TextNormalizer') else None,
         tokenizer = tokenizer,
