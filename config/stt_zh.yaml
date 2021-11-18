@@ -10,7 +10,7 @@ Tokenizer:
     model_path: model/tokenizer/AISHELL-1.model
 
 # under ops/core/
-model_id: conformer
+model_name: conformer
 model_hparam: conformer.yaml
 
 test_set:

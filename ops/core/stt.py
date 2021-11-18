@@ -623,8 +623,8 @@ def compute_mean_var_stats(dataset, config):
     return stats
 
 
-def load_model(model_id:str, model_hparam:str, input_dim, tokenizer):
-    if  model_id == 'conformer':
+def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
+    if  model_name == 'conformer':
         from core.conformer import Model
         model = Model(
             os.path.join(os.path.dirname(__file__), model_hparam),
@@ -644,7 +644,7 @@ def load_model(model_id:str, model_hparam:str, input_dim, tokenizer):
         )
         return model
     else:
-        raise NotImplementedError(f'Unsupported model_id: {model_id}')
+        raise NotImplementedError(f'Unsupported model: {model_name}')
 
 
 def train(config_path, dir):
@@ -689,7 +689,7 @@ def train(config_path, dir):
         collate_fn = train_datapipe,
     )
 
-    model = load_model(config.model_id, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
+    model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
@@ -802,7 +802,7 @@ def recognize(config_path, dir):
     assert os.path.isfile(checkpoint_path)
     checkpoint = torch.load(checkpoint_path)
 
-    model = load_model(config.model_id, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
+    model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
     model.load_state_dict(checkpoint)
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)

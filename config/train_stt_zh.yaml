@@ -60,7 +60,7 @@ valid_set:
         max_num_samples: 20
 
 # under ops/core/
-model_id: conformer
+model_name: conformer
 model_hparam: conformer.yaml
 
 num_epochs: 30
