@@ -578,20 +578,6 @@ class DataPipe:
         return samples_processed, num_utts, num_frames, inputs, input_lengths, targets, target_lengths
 
 
-def make_length_mask(lengths:torch.Tensor) -> torch.Tensor:
-    """Make mask tensor indicating in-length elements.
-    Args:
-        lengths (torch.Tensor): Batch of lengths (N,).
-    Returns:
-        torch.Tensor: Bool tensor mask indicating in-length elements.
-    """
-    B = int(lengths.size(0))
-    L = int(lengths.max().item())
-    range_tensor = torch.arange(0, L, dtype=torch.int64, device=lengths.device).unsqueeze(0).expand(B, L)
-    mask = range_tensor < lengths.unsqueeze(-1)
-    return mask
-
-
 def dump_tensor_to_csv(x:torch.Tensor, filename:str):
     import pandas as pd
     df = pd.DataFrame(x.numpy())
