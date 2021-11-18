@@ -73,7 +73,7 @@ class SampleLoader:
         max_duration:float = 60.0, 
         min_text_length:int = 1, 
         max_text_length:int = 2048, 
-        data_dir:str = ''
+        base_dir:str = ''
     ) :
         if field_map:
             self.field_map = field_map
@@ -92,7 +92,7 @@ class SampleLoader:
         self.min_text_length = min_text_length
         self.max_text_length = max_text_length
 
-        self.data_dir = data_dir
+        self.base_dir = base_dir
 
     def __call__(self, utt:dict) -> Optional[Sample] :
         sample = Sample()
@@ -101,7 +101,7 @@ class SampleLoader:
                 if attr in ['duration', 'begin', ]:
                     v = float(v)
                 elif attr == 'audio':
-                    v = os.path.join(self.data_dir, v)
+                    v = os.path.join(self.base_dir, v)
                 else:
                     v = str(v)
                 assert hasattr(sample, attr), f'{field} -> Sample.{attr} mapping failed, no such attribute'
@@ -135,15 +135,15 @@ class Dataset:
                 subset.max_num_samples = sys.maxsize # https://docs.python.org/3/library/sys.html#sys.maxsize
 
             # retrive dataset info from data zoo
-            subset_dir, subset_meta = data_zoo[subset.id].dir, data_zoo[subset.id].metadata
-            logging.info(f'Loading {subset.id} from ({subset_dir} : {subset_meta}) ...')
-            with open(subset_meta, 'r', encoding='utf8') as f:
-                if str.endswith(subset_meta, '.tsv'):
+            base_dir, metadata = data_zoo[subset.id].dir, data_zoo[subset.id].metadata
+            logging.info(f'Loading {subset.id} from ({base_dir} : {metadata}) ...')
+            with open(metadata, 'r', encoding='utf8') as f:
+                if str.endswith(metadata, '.tsv'):
                     utterance_reader = csv.DictReader(f, delimiter='\t')
                 else:
                     raise NotImplementedError
 
-                sample_loader = SampleLoader(**sample_loader_config, data_dir = subset_dir)
+                sample_loader = SampleLoader(**sample_loader_config, base_dir = base_dir)
                 k = 0
                 for utt in utterance_reader:
                     if k >= subset.max_num_samples:
@@ -692,7 +692,7 @@ def train(config_path, dir):
             (k+1)/config.scheduler.warmup_steps,
             (config.scheduler.warmup_steps/(k+1))**0.5
         )
-    )
+    ) # warmup scheduler
 
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
