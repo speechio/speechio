@@ -339,8 +339,8 @@ class MeanVarStats:
         logging.info(f'Loading mean/var stats <- {filename}')
         with open(filename, 'r') as f:
             stats = json.load(f)
-            self.o1_stats = torch.Tensor(stats['o1_stats'])
-            self.o2_stats = torch.Tensor(stats['o2_stats'])
+            self.o1_stats = torch.tensor(stats['o1_stats'])
+            self.o2_stats = torch.tensor(stats['o2_stats'])
             self.n = stats['n']
         return self
 
@@ -520,7 +520,7 @@ class DataPipe:
             # add noise
 
             # feature extraction
-            feature = torch.Tensor()  # default: an empty tensor
+            feature = torch.tensor([])  # default: an empty tensor
             if self.feature_extractor:
                 feature = self.feature_extractor(waveform, sample_rate)
 
@@ -556,26 +556,26 @@ class DataPipe:
             })
             logging.debug(f'Processed sample {sample.id} -> {key}')
 
-        features = [ x['feature'] for x in samples_processed ]
-        time_lengths = torch.tensor([ len(x) for x in features ])  # [batch_size]
+        features = [ s['feature'] for s in samples_processed ]
         inputs = nn.utils.rnn.pad_sequence(
             features,
             batch_first = True,
             padding_value = G_FEATURE_PADDING_VALUE,
-        )  # [batch_size, max(time_lengths), freq_feature_dim]
+        )  # [batch_size, max(num_time_frames), fbank_dim]
+        input_lengths = torch.tensor([ len(x) for x in features ])  # [batch_size]
 
-        labels = [ x['token_ids'] for x in samples_processed ]
-        label_lengths = torch.tensor([ len(y) for y in labels ])  # [batch_size]
+        labels = [ torch.tensor(s['token_ids']) for s in samples_processed ]
         targets = nn.utils.rnn.pad_sequence(
-            [ torch.tensor(l) for l in labels ],
+            labels,
             batch_first = True,
             padding_value = G_PAD_ID,
-        )  # [batch_size, max(label_lengths)]
+        )  # [batch_size, max(num_label_tokens)]
+        target_lengths = torch.tensor([ len(y) for y in labels ])  # [batch_size]
 
-        num_utts = len(samples_processed)
-        num_frames = int(time_lengths.sum())
+        num_utts = inputs.shape[0]
+        num_frames = input_lengths.sum().item()
 
-        return samples_processed, num_utts, num_frames, inputs, time_lengths, targets, label_lengths
+        return samples_processed, num_utts, num_frames, inputs, input_lengths, targets, target_lengths
 
 
 def make_length_mask(lengths:torch.Tensor) -> torch.Tensor:
@@ -611,7 +611,6 @@ def compute_mean_var_stats(dataset, config):
         feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
     )
 
-    # data loaders
     dataloader = torch.utils.data.DataLoader(
         dataset,
         shuffle = False,
