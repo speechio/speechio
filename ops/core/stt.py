@@ -67,7 +67,14 @@ class SampleLoader:
         a Sample object or None
         None if an utterance doesn't satisfy constraints e.g. duration, text length
     '''
-    def __init__(self, min_duration:float = 0.0, max_duration:float = 60.0, min_text_length:int = 1, max_text_length:int = 2048, field_map:dict = None, data_dir:str = ''):
+    def __init__(self, 
+        field_map:dict = None, 
+        min_duration:float = 0.0, 
+        max_duration:float = 60.0, 
+        min_text_length:int = 1, 
+        max_text_length:int = 2048, 
+        data_dir:str = ''
+    ) :
         if field_map:
             self.field_map = field_map
         else:
@@ -371,8 +378,7 @@ class MeanVarNormalizer:
 
 
 class SpecAugment:
-    def __init__(
-        self,
+    def __init__(self,
         mark_key:bool = False,
         num_t_masks:int = 2,
         t_mask_width_min:int = 1,
@@ -521,7 +527,7 @@ class DataPipe:
             if self.mean_var_normalizer:
                 feature = self.mean_var_normalizer(feature)
 
-            # specaug
+            # spec augment
             if self.spec_augment:
                 key, feature = self.spec_augment(key, feature)
 
@@ -556,7 +562,7 @@ class DataPipe:
             features,
             batch_first = True,
             padding_value = G_FEATURE_PADDING_VALUE,
-        )  # [batch_size, max(time_lengths), frequency]
+        )  # [batch_size, max(time_lengths), freq_feature_dim]
 
         labels = [ x['token_ids'] for x in samples_processed ]
         label_lengths = torch.tensor([ len(y) for y in labels ])  # [batch_size]
@@ -619,7 +625,7 @@ def compute_mean_var_stats(dataset, config):
     for batch in dataloader:
         samples, *_ = batch
         for sample in samples:
-            stats.accumulate_mean_var_stats(sample['feature'])  # [Time, Freq]
+            stats.accumulate_mean_var_stats(sample['feature'])
     return stats
 
 
