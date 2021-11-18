@@ -330,7 +330,7 @@ class MeanVarStats:
             self.o1_stats = torch.zeros(feature_dim)
             self.o2_stats = torch.zeros(feature_dim)
 
-        assert self.o1_stats.shape[0] == feature_dim, f'mvn accumulator dim {self.o1_stats.shape[0]} inconsistent with feature dim {feature_dim}'
+        assert self.o1_stats.shape[0] == feature_dim, f'mean_var_dim({self.o1_stats.shape[0]}) != feature_dim({feature_dim})'
         self.o1_stats += feature.sum(dim=0)
         self.o2_stats += feature.square().sum(dim=0)
         self.n += num_frames
