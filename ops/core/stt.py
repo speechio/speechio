@@ -770,7 +770,10 @@ def recognize(config_path, dir):
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
-    mean_var_stats = MeanVarStats().load(mean_var_stats_file)
+    if os.path.isfile(mean_var_stats_file):
+        mean_var_stats = MeanVarStats().load(mean_var_stats_file)
+    else:
+        raise FileNotFoundError(f'Cannot find mean var stats file: {mean_var_stats_file}')
 
     tokenizer = Tokenizer(**config.Tokenizer)
 
