@@ -117,7 +117,7 @@ class SampleLoader:
 class Dataset:
     def __init__(self,
         dataset_config:dict,
-        sample_loader:callable,
+        sample_loader:callable = SampleLoader(),
         data_zoo_path:str = G_DEFAULT_DATA_ZOO,
     ) :
         self.samples = []
