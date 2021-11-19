@@ -68,40 +68,35 @@ class SampleLoader:
         None if an utterance doesn't satisfy constraints e.g. duration, text length
     '''
     def __init__(self, 
-        field_map:dict = None, 
+        field_map:dict = {
+            'id': 'ID',
+            'audio': 'AUDIO',
+            'begin': 'BEGIN',
+            'duration': 'DURATION',
+            'text': 'TEXT',
+            'speaker': 'SPEAKER',
+        },
         min_duration:float = 0.0, 
         max_duration:float = 60.0, 
         min_text_length:int = 1, 
         max_text_length:int = 2048, 
-        base_dir:str = ''
     ) :
-        if field_map:
-            self.field_map = field_map
-        else:
-            self.field_map = {
-                'id': 'ID',
-                'audio': 'AUDIO',
-                'begin': 'BEGIN',
-                'duration': 'DURATION',
-                'text': 'TEXT',
-                'speaker': 'SPEAKER',
-            }
+        self.field_map = field_map
 
         self.min_duration = min_duration
         self.max_duration = max_duration
+
         self.min_text_length = min_text_length
         self.max_text_length = max_text_length
 
-        self.base_dir = base_dir
-
-    def __call__(self, utt:dict) -> Optional[Sample] :
+    def __call__(self, base_dir, utt:dict) -> Optional[Sample] :
         sample = Sample()
         for attr, field in self.field_map.items():
             if v := utt.get(field):
                 if attr in ['duration', 'begin', ]:
                     v = float(v)
                 elif attr == 'audio':
-                    v = os.path.join(self.base_dir, v)
+                    v = os.path.join(base_dir, v)
                 else:
                     v = str(v)
                 assert hasattr(sample, attr), f'{field} -> Sample.{attr} mapping failed, no such attribute'
@@ -122,7 +117,7 @@ class SampleLoader:
 class Dataset:
     def __init__(self,
         dataset_config:dict,
-        sample_loader_config:dict,
+        sample_loader:callable,
         data_zoo_path:str = G_DEFAULT_DATA_ZOO,
     ) :
         self.samples = []
@@ -143,12 +138,11 @@ class Dataset:
                 else:
                     raise NotImplementedError
 
-                sample_loader = SampleLoader(**sample_loader_config, base_dir = base_dir)
                 k = 0
                 for utt in utterance_reader:
                     if k >= subset.max_num_samples:
                         break
-                    if sample := sample_loader(utt):
+                    if sample := sample_loader(base_dir, utt):
                         self.samples.append(sample)
                         k += 1
                 logging.info(f'{k} samples loaded from {subset.id}')
@@ -501,9 +495,9 @@ class DataPipe:
     def __repr__(self):
         return f'\n    DataPipe: {[ k for k,v in vars(self).items() if v ]}'
 
-    def __call__(self, samples:list[Sample]):
-        samples_processed = []
-        for sample in samples:
+    def __call__(self, raw_samples:list[Sample]):
+        samples = []
+        for sample in raw_samples:
             # raw audio loading
             key = sample.id
 
@@ -545,7 +539,7 @@ class DataPipe:
                 token_pieces, token_ids = self.tokenizer(text)
 
             # store everything here for debug purpose
-            samples_processed.append({
+            samples.append({
                 'key': key,
                 'waveform': waveform,
                 'sample_rate': sample_rate,
@@ -556,7 +550,7 @@ class DataPipe:
             })
             logging.debug(f'Processed sample {sample.id} -> {key}')
 
-        features = [ s['feature'] for s in samples_processed ]
+        features = [ s['feature'] for s in samples ]
         inputs = nn.utils.rnn.pad_sequence(
             features,
             batch_first = True,
@@ -564,7 +558,7 @@ class DataPipe:
         )  # [batch_size, max(num_time_frames), fbank_dim]
         input_lengths = torch.tensor([ len(x) for x in features ])  # [batch_size]
 
-        labels = [ torch.tensor(s['token_ids']) for s in samples_processed ]
+        labels = [ torch.tensor(s['token_ids']) for s in samples ]
         targets = nn.utils.rnn.pad_sequence(
             labels,
             batch_first = True,
@@ -575,7 +569,7 @@ class DataPipe:
         num_utts = inputs.shape[0]
         num_frames = input_lengths.sum().item()
 
-        return samples_processed, num_utts, num_frames, inputs, input_lengths, targets, target_lengths
+        return samples, num_utts, num_frames, inputs, input_lengths, targets, target_lengths
 
 
 def dump_tensor_to_csv(x:torch.Tensor, filename:str):
@@ -642,8 +636,10 @@ def train(config_path, dir):
     config = OmegaConf.load(config_path)
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
-    train_dataset = Dataset(config.train_set, config.get('SampleLoader', {}))
-    valid_dataset = Dataset(config.valid_set, config.get('SampleLoader', {}))
+    sample_loader = SampleLoader(**config.get('SampleLoader', {}))
+
+    train_dataset = Dataset(config.train_set, sample_loader)
+    valid_dataset = Dataset(config.valid_set, sample_loader)
 
     # mean var stats
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
@@ -779,7 +775,8 @@ def recognize(config_path, dir):
         tokenizer = tokenizer,
     )
 
-    dataset = Dataset(config.test_set, config.get('SampleLoader', {}))
+    sample_loader = SampleLoader(**config.get('SampleLoader', {}))
+    dataset = Dataset(config.test_set, sample_loader)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         shuffle = False,
