@@ -550,7 +550,7 @@ class DataPipe:
                 'token_pieces': token_pieces,
                 'token_ids': token_ids,
             })
-            logging.debug(f'Processed sample {sample.id} -> {key}')
+            #logging.debug(f'Processed sample {sample.id} -> {key}')
 
         features = [ s['feature'] for s in samples ]
         inputs = nn.utils.rnn.pad_sequence(
@@ -723,18 +723,13 @@ def train(config, dir, node_rank = 0, local_rank = 0):
         if distributed:
             train_dataloader.sampler.set_epoch(e)
 
-        if distributed:
-            context = model.join            
-        else:
-            context = nullcontext
-
-        with context():
+        join_context = model.join if distributed else nullcontext
+        with join_context():
             train_loss = 0.0
             train_utts, train_frames = 0, 0
             num_batches = len(train_dataloader)
             for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
                 samples, num_utts, num_frames, X, T, Y, U = batch
-                logging.debug(f'{node_rank}:{local_rank}:{b} {[s["key"] for s in samples]}')
 
                 X = X.to(device)
                 T = T.to(device)
