@@ -4,13 +4,32 @@
 # Copyright (c) 2021 Jiayu DU
 # All rights reserved.
 
+import os, sys
 import argparse
+import torch.distributed as dist
+import torch.multiprocessing
+from omegaconf import OmegaConf
 from core import stt
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type = str, required = True)
+    parser.add_argument('--node_rank', type = int, default = 0)
+    parser.add_argument('config', type = str)
     parser.add_argument('dir', type = str)
     args = parser.parse_args()
+    print(args)
 
-    stt.train(args.config, args.dir)
+    config = OmegaConf.load(args.config)
+    print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
+
+    processes = []
+    for local_rank in range(config.nproc_per_node):
+        p = torch.multiprocessing.Process(
+            target=stt.train,
+            args=(config, args.dir, args.node_rank, local_rank)
+        )
+        p.start()
+        processes.append(p)
+
+    for p in processes:
+        p.join()

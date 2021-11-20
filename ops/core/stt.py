@@ -9,6 +9,7 @@ import argparse
 from typing import Optional
 from dataclasses import dataclass
 import logging.config
+from contextlib import nullcontext
 
 import decimal
 import random
@@ -21,12 +22,13 @@ import torchaudio.sox_effects
 
 import csv   # metadata
 import json  # mvn stats
-from omegaconf import OmegaConf  # various configs
+from omegaconf import OmegaConf
 
 import sentencepiece as spm
 #import k2
 
 # Global Constants
+G_BASE_SEED = 37927
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_PAD_ID = -1
 
@@ -594,12 +596,13 @@ def compute_mean_var_stats(dataset, config):
     dataloader = torch.utils.data.DataLoader(
         dataset,
         shuffle = False,
-        batch_size = 32,
+        batch_size = 16,
         drop_last = False,
-        num_workers = 4,
+        num_workers = 8,
         collate_fn = feature_datapipe,
     )
 
+    logging.info(f'Computing mean var stats ...')
     stats = MeanVarStats()
     for batch in dataloader:
         samples, *_ = batch
@@ -632,9 +635,24 @@ def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
         raise NotImplementedError(f'Unsupported model: {model_name}')
 
 
-def train(config_path, dir):
-    config = OmegaConf.load(config_path)
-    print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
+def train(config, dir, node_rank = 0, local_rank = 0):
+    torch.manual_seed(G_BASE_SEED)
+
+    world_size = config.nnodes * config.nproc_per_node
+    rank = node_rank * config.nproc_per_node + local_rank
+    distributed = True if world_size > 1 else False
+
+    device_id = local_rank
+    device = torch.device(f'cuda:{device_id}' if torch.cuda.is_available() else 'cpu')
+
+    if distributed:
+        logging.info(f'Enabling DDP ...')
+        import torch.distributed as dist
+        from torch.nn.parallel import DistributedDataParallel as DDP
+        from torch.utils.data.distributed import DistributedSampler
+        os.environ['MASTER_ADDR'] = str(config.ddp_master_addr)
+        os.environ['MASTER_PORT'] = str(config.ddp_master_port)
+        dist.init_process_group(config.ddp_backend, rank = rank, world_size = world_size)
 
     sample_loader = SampleLoader(**config.get('SampleLoader', {}))
 
@@ -643,11 +661,15 @@ def train(config_path, dir):
 
     # mean var stats
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
-    if os.path.isfile(mean_var_stats_file):
-        mean_var_stats = MeanVarStats().load(mean_var_stats_file)
-    else:
-        mean_var_stats = compute_mean_var_stats(train_dataset, config)
-        mean_var_stats.dump(mean_var_stats_file)
+    if not os.path.isfile(mean_var_stats_file):
+        if rank == 0:
+            mean_var_stats = compute_mean_var_stats(train_dataset, config)
+            mean_var_stats.dump(mean_var_stats_file)
+
+    if torch.distributed.is_initialized():
+        torch.distributed.barrier(device_ids = [device_id])
+
+    mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
     tokenizer = Tokenizer(**config.Tokenizer)
 
@@ -666,19 +688,21 @@ def train(config_path, dir):
         train_dataset,
         **config.DataLoader,
         collate_fn = train_datapipe,
+        shuffle = False if distributed else True,
+        sampler = DistributedSampler(train_dataset, shuffle=True) if distributed else None,
     )
+
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset,
         shuffle = False,
-        batch_size = config.DataLoader.batch_size,
-        drop_last = config.DataLoader.drop_last,
-        num_workers = config.DataLoader.num_workers,
+        **config.DataLoader,
         collate_fn = train_datapipe,
     )
 
     model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
+    if distributed:
+        model = DDP(model, find_unused_parameters=True)#, device_ids = [device_id], output_device = device_id)
 
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
 
@@ -693,35 +717,57 @@ def train(config_path, dir):
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
         logging.info(f'Training epoch {e} ...')
+
         model.train()
-        train_loss = 0.0
-        train_utts, train_frames = 0, 0
-        num_batches = len(train_dataloader)
-        for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
-            samples, num_utts, num_frames, X, T, Y, U = batch
 
-            X = X.to(device)
-            T = T.to(device)
-            Y = Y.to(device)
-            U = U.to(device)
-            loss = model(X, T, Y, U)
+        if distributed:
+            train_dataloader.sampler.set_epoch(e)
 
-            (loss / num_utts / config.gradient_accumulation).backward()
-            if b % config.gradient_accumulation == 0:
-                if torch.isfinite(nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clipping)):
-                    optimizer.step()
-                optimizer.zero_grad()
-                scheduler.step()
+        if distributed:
+            context = model.join            
+        else:
+            context = nullcontext
 
-            train_loss += loss.item()
-            train_utts += num_utts
-            train_frames += num_frames
-            train_utt_loss, train_frame_loss = train_loss/train_utts, train_loss/train_frames
+        with context():
+            train_loss = 0.0
+            train_utts, train_frames = 0, 0
+            num_batches = len(train_dataloader)
+            for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
+                samples, num_utts, num_frames, X, T, Y, U = batch
+                logging.debug(f'{node_rank}:{local_rank}:{b} {[s["key"] for s in samples]}')
 
-            if b % config.log_interval == 0:
-                logging.info(f'  [{e}/{config.num_epochs}]:[{b}/{num_batches}] {train_utt_loss:7.2f} LR={scheduler.get_last_lr()[0]:7.6f}')
+                X = X.to(device)
+                T = T.to(device)
+                Y = Y.to(device)
+                U = U.to(device)
 
-        torch.save(model.state_dict(), os.path.join(dir, 'checkpoints', f'{e}.pt'))
+                if distributed and b % config.gradient_accumulation != 0:
+                    sync_context = model.no_sync
+                else:
+                    sync_context = nullcontext
+                with sync_context():
+                    loss = model(X, T, Y, U)
+                    (loss / num_utts / config.gradient_accumulation).backward()
+
+                if b % config.gradient_accumulation == 0:
+                    if torch.isfinite(nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clipping)):
+                        optimizer.step()
+                    optimizer.zero_grad()
+                    scheduler.step()
+
+                train_loss += loss.item()
+                train_utts += num_utts
+                train_frames += num_frames
+                train_utt_loss, train_frame_loss = train_loss/train_utts, train_loss/train_frames
+
+                if b % config.log_interval == 0:
+                    logging.info(
+                        f'  [Rank-{rank}/{world_size}]:[{e}/{config.num_epochs}]:[{b}/{num_batches}]'
+                        f'  {train_utt_loss:7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
+                    )
+
+        if rank == 0:
+            torch.save(model.state_dict(), os.path.join(dir, 'checkpoints', f'{e}.pt'))
 
         # validation
         logging.info(f'Validating epoch {e} ...')
