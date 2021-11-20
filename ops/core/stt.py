@@ -646,7 +646,7 @@ def train(config, dir, node_rank = 0, local_rank = 0):
     device = torch.device(f'cuda:{device_id}' if torch.cuda.is_available() else 'cpu')
 
     if distributed:
-        logging.info(f'Enabling DDP ...')
+        logging.info(f'Initiating DDP process rank {rank} ...')
         import torch.distributed as dist
         from torch.nn.parallel import DistributedDataParallel as DDP
         from torch.utils.data.distributed import DistributedSampler
