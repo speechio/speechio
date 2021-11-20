@@ -639,12 +639,12 @@ def train(config, dir, node_rank = 0, local_rank = 0):
     torch.manual_seed(G_BASE_SEED)
 
     world_size = config.nnodes * config.nproc_per_node
-    rank = node_rank * config.nproc_per_node + local_rank
     distributed = True if world_size > 1 else False
 
+    rank = node_rank * config.nproc_per_node + local_rank
     if distributed:
         import torch.distributed as dist
-        logging.info(f'Initiating DDP process rank {rank} ...')
+        logging.info(f'Initiating DDP process rank {rank} on node {node_rank} ...')
         os.environ['MASTER_ADDR'] = str(config.ddp_master_addr)
         os.environ['MASTER_PORT'] = str(config.ddp_master_port)
         dist.init_process_group(config.ddp_backend, rank = rank, world_size = world_size)
@@ -652,8 +652,8 @@ def train(config, dir, node_rank = 0, local_rank = 0):
     tokenizer = Tokenizer(**config.Tokenizer)
     model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
 
-    if cuda_visible_devices := os.environ.get('CUDA_VISIBLE_DEVICES'):
-        cuda_devices = [ int(x) for x in cuda_visible_devices ]
+    if CUDA_VISIBLE_DEVICES := os.environ.get('CUDA_VISIBLE_DEVICES'):
+        cuda_devices = [ int(x) for x in CUDA_VISIBLE_DEVICES.split(',') ]
     else:
         cuda_devices = [ x for x in range(config.nproc_per_node) ]
 
