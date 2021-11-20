@@ -9,6 +9,6 @@
 # cat misc/encoded2 | ops/tokenizer_decode --model misc/tokenizer > misc/decoded2
 
 ## Train
-dir=exp/tmp && mkdir -p $dir
+dir=exp/ddp && mkdir -p $dir
 ops/train_stt config/train_stt_zh.yaml $dir
 #ops/stt config/stt_zh.yaml $dir

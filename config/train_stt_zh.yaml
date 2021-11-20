@@ -46,7 +46,7 @@ Tokenizer:
 DataLoader:
     num_workers: 2
     drop_last: False
-    batch_size: 8
+    batch_size: 16
 
 # training
 train_set:
@@ -56,14 +56,14 @@ train_set:
 valid_set:
     subsets:
     -   id: AISHELL-1-DEV
-        max_num_samples: 20
+        max_num_samples: 2000
 
 # under ops/core/
 model_name: conformer
 model_hparam: conformer.yaml
 
-num_epochs: 30
-gradient_accumulation: 2
+num_epochs: 180
+gradient_accumulation: 4
 gradient_clipping: 5.0
 log_interval: 100
 optimizer:

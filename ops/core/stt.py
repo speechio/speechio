@@ -757,7 +757,7 @@ def train(config, dir, node_rank = 0, local_rank = 0):
 
                 if b % config.log_interval == 0:
                     logging.info(
-                        f'  [Rank {rank}/{world_size}]:[Iter {e}/{config.num_epochs}]:[Batch {b}/{num_batches}]'
+                        f'  [Rank {rank}/{world_size}]:[Epoch {e}/{config.num_epochs}]:[Batch {b}/{num_batches}]'
                         f'  {train_utt_loss:7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
                     )
 
