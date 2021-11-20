@@ -28,22 +28,22 @@ LIBRISPEECH_TEST_OTHER:
 
 # AISHELL-1
 AISHELL-1-TRAIN:
-    dir: /data/disk001/AISHELL-1/train/
-    metadata: /data/disk001/AISHELL-1/train/metadata.tsv
+    dir: data/audio/AISHELL-1/train/
+    metadata: data/audio/AISHELL-1/train/metadata.tsv
 AISHELL-1-DEV:
-    dir: /data/disk001/AISHELL-1/dev/
-    metadata: /data/disk001/AISHELL-1/dev/metadata.tsv
+    dir: data/audio/AISHELL-1/dev/
+    metadata: data/audio/AISHELL-1/dev/metadata.tsv
 AISHELL-1-TEST:
-    dir: /data/disk001/AISHELL-1/test/
-    metadata: /data/disk001/AISHELL-1/test/metadata.tsv
+    dir: data/audio/AISHELL-1/test/
+    metadata: data/audio/AISHELL-1/test/metadata.tsv
 
 # AISHELL-2
 AISHELL-2-IOS-TRAIN:
-    dir: /data/disk001/AISHELL-2/iOS/train/
-    metadata: /data/disk001/AISHELL-2/iOS/train/metadata.tsv
+    dir: data/audio/AISHELL-2/iOS/train/
+    metadata: data/audio/AISHELL-2/iOS/train/metadata.tsv
 AISHELL-2-IOS-DEV:
-    dir: /data/disk001/AISHELL-2/iOS/dev/
-    metadata: /data/disk001/AISHELL-2/iOS/dev/metadata.tsv
+    dir: data/audio/AISHELL-2/iOS/dev/
+    metadata: data/audio/AISHELL-2/iOS/dev/metadata.tsv
 AISHELL-2-IOS-TEST:
-    dir: /data/disk001/AISHELL-2/iOS/test/
-    metadata: /data/disk001/AISHELL-2/iOS/test/metadata.tsv
+    dir: data/audio/AISHELL-2/iOS/test/
+    metadata: data/audio/AISHELL-2/iOS/test/metadata.tsv
