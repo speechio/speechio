@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-. utils/env.sh
+. util/env.sh
 
-conda activate speechio || exit 1
+#conda activate speechio || exit 1
 
 #conda install -c nvidia cudatoolkit=$CUDA_VERSION
 conda install -c anaconda numpy
