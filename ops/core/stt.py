@@ -642,17 +642,28 @@ def train(config, dir, node_rank = 0, local_rank = 0):
     rank = node_rank * config.nproc_per_node + local_rank
     distributed = True if world_size > 1 else False
 
-    device_id = local_rank
-    device = torch.device(f'cuda:{device_id}' if torch.cuda.is_available() else 'cpu')
-
     if distributed:
-        logging.info(f'Initiating DDP process rank {rank} ...')
         import torch.distributed as dist
-        from torch.nn.parallel import DistributedDataParallel as DDP
-        from torch.utils.data.distributed import DistributedSampler
+        logging.info(f'Initiating DDP process rank {rank} ...')
         os.environ['MASTER_ADDR'] = str(config.ddp_master_addr)
         os.environ['MASTER_PORT'] = str(config.ddp_master_port)
         dist.init_process_group(config.ddp_backend, rank = rank, world_size = world_size)
+
+    tokenizer = Tokenizer(**config.Tokenizer)
+    model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
+
+    if cuda_visible_devices := os.environ.get('CUDA_VISIBLE_DEVICES'):
+        cuda_devices = [ int(x) for x in cuda_visible_devices ]
+    else:
+        cuda_devices = [ x for x in range(config.nproc_per_node) ]
+
+    device_id = cuda_devices[local_rank]
+    device = torch.device(f'cuda:{device_id}' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+
+    if distributed:
+        from torch.nn.parallel import DistributedDataParallel as DDP
+        model = DDP(model, find_unused_parameters=True)
 
     sample_loader = SampleLoader(**config.get('SampleLoader', {}))
 
@@ -666,12 +677,11 @@ def train(config, dir, node_rank = 0, local_rank = 0):
             mean_var_stats = compute_mean_var_stats(train_dataset, config)
             mean_var_stats.dump(mean_var_stats_file)
 
-    if torch.distributed.is_initialized():
-        torch.distributed.barrier(device_ids = [device_id])
+    if distributed:
+        assert dist.is_initialized()
+        dist.barrier()
 
     mean_var_stats = MeanVarStats().load(mean_var_stats_file)
-
-    tokenizer = Tokenizer(**config.Tokenizer)
 
     train_datapipe = DataPipe(
         audio_loader = torch_audio_load,
@@ -684,25 +694,27 @@ def train(config, dir, node_rank = 0, local_rank = 0):
         tokenizer = tokenizer,
     )
 
+    if distributed:
+        from torch.utils.data.distributed import DistributedSampler
+        sampler = DistributedSampler(train_dataset, shuffle=True) 
+    else:
+        sampler = None
+
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         **config.DataLoader,
         collate_fn = train_datapipe,
         shuffle = False if distributed else True,
-        sampler = DistributedSampler(train_dataset, shuffle=True) if distributed else None,
+        sampler = sampler,
     )
 
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset,
-        shuffle = False,
         **config.DataLoader,
         collate_fn = train_datapipe,
+        shuffle = False,
     )
 
-    model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
-    model.to(device)
-    if distributed:
-        model = DDP(model, find_unused_parameters=True)#, device_ids = [device_id], output_device = device_id)
 
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
 
