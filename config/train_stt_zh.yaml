@@ -16,7 +16,7 @@ Resampler:
 
 Perturbation:
     mark_key: True
-    speeds: #[0.9, 1.0, 1.1]
+    speeds: [0.9, 1.0, 1.1]
     tempos: #[0.9, 1.0, 1.1]
     volumes: #[0.9, 1.0, 1.1]
 
@@ -63,7 +63,7 @@ model_name: conformer
 model_hparam: conformer.yaml
 
 num_epochs: 180
-gradient_accumulation: 4
+gradient_accumulation: 2
 gradient_clipping: 5.0
 log_interval: 100
 optimizer:
@@ -73,7 +73,7 @@ scheduler:
     warmup_steps: 25000
 
 nnodes: 1
-nproc_per_node: 2
+nproc_per_node: 4
 ddp_backend: nccl
 ddp_master_addr: 'localhost'
 ddp_master_port: '12355'
