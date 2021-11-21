@@ -677,12 +677,13 @@ def train(config, dir, device_name, world_size, rank):
 
     sample_loader = SampleLoader(**config.get('SampleLoader', {}))
 
-    if rank == 0: logging.info('Loading train/valid sets')
+    if rank == 0: logging.info('Loading train set ...')
     train_dataset = Dataset(config.train_set, sample_loader)
+    if rank == 0: logging.info(f'Loaded: {train_dataset}')
+
+    if rank == 0: logging.info('Loading valid set ...')
     valid_dataset = Dataset(config.valid_set, sample_loader)
-    if rank == 0:
-        logging.info(f'train_set: {train_dataset}')
-        logging.info(f'valid_set: {valid_dataset}')
+    if rank == 0: logging.info(f'Loaded: {valid_dataset}')
 
     # mean var stats
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
