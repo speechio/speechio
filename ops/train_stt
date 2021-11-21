@@ -4,29 +4,35 @@
 # Copyright (c) 2021 Jiayu DU
 # All rights reserved.
 
-import os, sys
+import os
 import argparse
-import torch.distributed as dist
 import torch.multiprocessing
 from omegaconf import OmegaConf
 from core import stt
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--node_rank', type = int, default = 0)
+    parser.add_argument('--node_rank', type = int, required = True)
     parser.add_argument('config', type = str)
     parser.add_argument('dir', type = str)
     args = parser.parse_args()
     print(args)
 
     config = OmegaConf.load(args.config)
-    print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
+    if CUDA_VISIBLE_DEVICES := os.environ.get('CUDA_VISIBLE_DEVICES'):
+        cuda_devices = [ int(x) for x in CUDA_VISIBLE_DEVICES.split(',') ]
+    else:
+        cuda_devices = [ x for x in range(config.nproc_per_node) ]
+
+    world_size = config.nnodes * config.nproc_per_node
     processes = []
     for local_rank in range(config.nproc_per_node):
+        rank = args.node_rank * config.nproc_per_node + local_rank
+        device_name = f'cuda:{cuda_devices[local_rank]}'
         p = torch.multiprocessing.Process(
             target=stt.train,
-            args=(config, args.dir, args.node_rank, local_rank)
+            args=(config, args.dir, device_name, world_size, rank)
         )
         p.start()
         processes.append(p)

@@ -28,7 +28,7 @@ import sentencepiece as spm
 #import k2
 
 # Global Constants
-G_BASE_SEED = 37927
+G_SEED = 37927
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_PAD_ID = -1
 
@@ -624,41 +624,42 @@ def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
             unk_index = tokenizer.unk_index,
             sil_index = tokenizer.sil_index,
         )
+        return model
+    else:
+        raise NotImplementedError(f'Unsupported model: {model_name}')
+
+
+def train(config, dir, device_name, world_size, rank):
+    print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
+
+    if world_size > 1:
+        import torch.distributed as dist
+        logging.info(f'Initiating DDP rank {rank} process ...')
+        os.environ['MASTER_ADDR'] = str(config.ddp_master_addr)
+        os.environ['MASTER_PORT'] = str(config.ddp_master_port)
+        dist.init_process_group(config.ddp_backend, rank = rank, world_size = world_size)
+        distributed = True
+    else:
+        distributed = False
+    
+    tokenizer = Tokenizer(**config.Tokenizer)
+
+    torch.manual_seed(G_SEED)
+    model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
+    if rank == 0:
         logging.info(
             'Total params: '
             f'{sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
             'Trainable params: '
             f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
         )
-        return model
+
+    if torch.cuda.is_available():
+        logging.info(f'Rank {rank} <-> {device_name}')
+        device = torch.device(device_name)
     else:
-        raise NotImplementedError(f'Unsupported model: {model_name}')
-
-
-def train(config, dir, node_rank = 0, local_rank = 0):
-    torch.manual_seed(G_BASE_SEED)
-
-    world_size = config.nnodes * config.nproc_per_node
-    distributed = True if world_size > 1 else False
-
-    rank = node_rank * config.nproc_per_node + local_rank
-    if distributed:
-        import torch.distributed as dist
-        logging.info(f'Initiating DDP process rank {rank} on node {node_rank} ...')
-        os.environ['MASTER_ADDR'] = str(config.ddp_master_addr)
-        os.environ['MASTER_PORT'] = str(config.ddp_master_port)
-        dist.init_process_group(config.ddp_backend, rank = rank, world_size = world_size)
-
-    tokenizer = Tokenizer(**config.Tokenizer)
-    model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
-
-    if CUDA_VISIBLE_DEVICES := os.environ.get('CUDA_VISIBLE_DEVICES'):
-        cuda_devices = [ int(x) for x in CUDA_VISIBLE_DEVICES.split(',') ]
-    else:
-        cuda_devices = [ x for x in range(config.nproc_per_node) ]
-
-    device_id = cuda_devices[local_rank]
-    device = torch.device(f'cuda:{device_id}' if torch.cuda.is_available() else 'cpu')
+        logging.warn('No GPU available, fallback to CPU.')
+        device = torch.device('cpu')
     model.to(device)
 
     if distributed:
@@ -715,7 +716,6 @@ def train(config, dir, node_rank = 0, local_rank = 0):
         shuffle = False,
     )
 
-
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(
@@ -769,8 +769,8 @@ def train(config, dir, node_rank = 0, local_rank = 0):
 
                 if b % config.log_interval == 0:
                     logging.info(
-                        f'  [Rank {rank}/{world_size}]:[Epoch {e}/{config.num_epochs}]:[Batch {b}/{num_batches}]'
-                        f'  {train_utt_loss:7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
+                        f'Rank:{rank}/{world_size} Epoch:{e}/{config.num_epochs} Batch:{b}/{num_batches} '
+                        f'{train_utt_loss:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
                     )
 
         if rank == 0:
