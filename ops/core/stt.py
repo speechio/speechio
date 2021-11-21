@@ -632,16 +632,14 @@ def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
 
 
 def train(config, dir, device_name, world_size, rank):
-    # setup logging
     logging.basicConfig(
         stream=sys.stderr, 
         level=logging.DEBUG if rank == 0 else logging.INFO,
         format = '\x1B[1;32m%(asctime)s [%(levelname)s] %(message)s\x1B[0m',
-        #format = '%(asctime)s [%(levelname)s] %(message)s'
     )
 
     logging.debug(f'\n{OmegaConf.to_yaml(config)}')
-    time.sleep(0.5)
+    time.sleep(0.1)
 
     if world_size > 1:
         import torch.distributed as dist
@@ -663,6 +661,7 @@ def train(config, dir, device_name, world_size, rank):
         'Trainable params: '
         f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
     )
+    time.sleep(0.1)
 
     if torch.cuda.is_available():
         logging.info(f'Rank {rank} -> {device_name}')
