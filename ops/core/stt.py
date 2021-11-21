@@ -33,17 +33,11 @@ G_FEATURE_PADDING_VALUE = float(0.0)
 G_PAD_ID = -1
 
 G_DEFAULT_DATA_ZOO = 'config/data_zoo.yaml'
-G_DEFAULT_LOGGING_CONFIG = 'config/logging.yaml'
-# setup logging
-if os.path.isfile(G_DEFAULT_LOGGING_CONFIG):
-    import yaml
-    with open(G_DEFAULT_LOGGING_CONFIG, 'r', encoding='utf8') as f:
-        logging.config.dictConfig(yaml.safe_load(f))
-else:
-    logging.basicConfig(
-        stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s'
-    )
-
+#G_DEFAULT_LOGGING_CONFIG = 'config/logging.yaml'
+#if os.path.isfile(G_DEFAULT_LOGGING_CONFIG):
+#    import yaml
+#    with open(G_DEFAULT_LOGGING_CONFIG, 'r', encoding='utf8') as f:
+#        logging.config.dictConfig(yaml.safe_load(f))
 
 @dataclass
 class Sample:
@@ -135,7 +129,7 @@ class Dataset:
 
             # retrive dataset info from data zoo
             base_dir, metadata = data_zoo[subset.id].dir, data_zoo[subset.id].metadata
-            logging.debug(f'Loading {subset.id} from ({base_dir} : {metadata}) ...')
+            logging.debug(f'  Loading {subset.id} from ({base_dir} : {metadata}) ...')
             with open(metadata, 'r', encoding='utf8') as f:
                 if str.endswith(metadata, '.tsv'):
                     utterance_reader = csv.DictReader(f, delimiter='\t')
@@ -156,7 +150,7 @@ class Dataset:
                     'metadata': metadata,
                     'num_utts': k,
                 })
-                logging.debug(f'{k} samples loaded from {subset.id}')
+                logging.debug(f'  {k} samples loaded from {subset.id}')
         logging.debug(f'Total {len(self.samples)} loaded.')
         # length sort
 
@@ -638,7 +632,15 @@ def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
 
 
 def train(config, dir, device_name, world_size, rank):
-    if rank == 0: logging.info(OmegaConf.to_yaml(config))
+    # setup logging
+    logging.basicConfig(
+        stream=sys.stderr, 
+        level=logging.DEBUG if rank == 0 else logging.INFO,
+        format = '\x1B[1;32m%(asctime)s [%(levelname)s] %(message)s\x1B[0m',
+        #format = '%(asctime)s [%(levelname)s] %(message)s'
+    )
+
+    logging.debug(f'\n{OmegaConf.to_yaml(config)}')
     time.sleep(0.5)
 
     if world_size > 1:
@@ -655,13 +657,12 @@ def train(config, dir, device_name, world_size, rank):
 
     torch.manual_seed(G_SEED)
     model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
-    if rank == 0:
-        logging.info(
-            'Total params: '
-            f'{sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
-            'Trainable params: '
-            f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
-        )
+    logging.debug(
+        'Total params: '
+        f'{sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
+        'Trainable params: '
+        f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
+    )
 
     if torch.cuda.is_available():
         logging.info(f'Rank {rank} -> {device_name}')
@@ -677,13 +678,10 @@ def train(config, dir, device_name, world_size, rank):
 
     sample_loader = SampleLoader(**config.get('SampleLoader', {}))
 
-    if rank == 0: logging.info('Loading train set ...')
+    logging.debug('Loading train set ...')
     train_dataset = Dataset(config.train_set, sample_loader)
-    if rank == 0: logging.info(f'Loaded: {train_dataset}')
-
-    if rank == 0: logging.info('Loading valid set ...')
+    logging.debug('Loading valid set ...')
     valid_dataset = Dataset(config.valid_set, sample_loader)
-    if rank == 0: logging.info(f'Loaded: {valid_dataset}')
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if not os.path.isfile(mean_var_stats_file):
@@ -706,9 +704,8 @@ def train(config, dir, device_name, world_size, rank):
         text_normalizer = TextNormalizer(**config.TextNormalizer) if config.get('TextNormalizer') else None,
         tokenizer = tokenizer,
     )
-    if rank == 0:
-        logging.info(train_datapipe.mean_var_normalizer)
-        logging.info(train_datapipe)
+    logging.debug(train_datapipe.mean_var_normalizer)
+    logging.debug(train_datapipe)
 
     if distributed:
         from torch.utils.data.distributed import DistributedSampler
@@ -743,7 +740,7 @@ def train(config, dir, device_name, world_size, rank):
 
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
-        if rank == 0: logging.info(f'Epoch {e} training ...')
+        logging.info(f'Epoch {e} training on rank {rank} ...')
         model.train()
 
         if distributed:
@@ -785,10 +782,10 @@ def train(config, dir, device_name, world_size, rank):
 
         if rank == 0:
             checkpoint_file = os.path.join(dir, 'checkpoints', f'{e}.pt')
-            logging.info('Writing checkpoint written to {checkpoint_file}')
             torch.save(model.state_dict(), checkpoint_file)
+            logging.debug('Checkpoint written to {checkpoint_file}')
 
-        if rank == 0: logging.info(f'Epoch {e} validation ...')
+        logging.info(f'Epoch {e} validation on rank {rank}...')
         model.eval()
         valid_loss = 0.0
         valid_utts, valid_frames = 0, 0
@@ -807,8 +804,8 @@ def train(config, dir, device_name, world_size, rank):
                 valid_frames += num_frames
                 valid_utt_loss = valid_loss/valid_utts
 
-        if rank == 0: logging.info(
-            f'Epoch {e} summary: '
+        logging.info(
+            f'Epoch {e} summary on rank {rank}: '
             f'train_utt_loss={train_utt_loss:<7.2f} '
             f'valid_utt_loss={valid_utt_loss:<7.2f} '
             f'loss_diff={train_utt_loss - valid_utt_loss:<7.2f} '
