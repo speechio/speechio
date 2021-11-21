@@ -687,10 +687,7 @@ def train(config, dir, device_name, world_size, rank):
         if rank == 0:
             mean_var_stats = compute_mean_var_stats(train_dataset, config)
             mean_var_stats.dump(mean_var_stats_file)
-
-    if distributed:
-        assert dist.is_initialized()
-        dist.barrier()
+        if distributed: dist.barrier()
     mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
     train_datapipe = DataPipe(
@@ -783,6 +780,7 @@ def train(config, dir, device_name, world_size, rank):
             checkpoint_file = os.path.join(dir, 'checkpoints', f'{e}.pt')
             torch.save(model.state_dict(), checkpoint_file)
             logging.debug('Checkpoint written to {checkpoint_file}')
+        if distributed: dist.barrier()
 
         logging.info(f'Epoch {e} validation on rank {rank}...')
         model.eval()
@@ -803,6 +801,7 @@ def train(config, dir, device_name, world_size, rank):
                 valid_frames += num_frames
                 valid_utt_loss = valid_loss/valid_utts
 
+        if distributed: dist.barrier()
         logging.info(
             f'Epoch {e} summary on rank {rank}: '
             f'train_utt_loss={train_utt_loss:<7.2f} '
