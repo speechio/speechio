@@ -5,7 +5,7 @@
 # All rights reserved.
 
 import os, sys
-import argparse
+import time
 from typing import Optional
 from dataclasses import dataclass
 import logging.config
@@ -122,8 +122,10 @@ class Dataset:
         sample_loader:callable = SampleLoader(),
         data_zoo_path:str = G_DEFAULT_DATA_ZOO,
     ) :
-        self.samples = []
         data_zoo = OmegaConf.load(data_zoo_path)
+
+        self.samples = []
+        self.subsets_info = []
 
         for subset in dataset_config.subsets:
             if subset.max_num_samples == 0:
@@ -133,7 +135,7 @@ class Dataset:
 
             # retrive dataset info from data zoo
             base_dir, metadata = data_zoo[subset.id].dir, data_zoo[subset.id].metadata
-            logging.info(f'Loading {subset.id} from ({base_dir} : {metadata}) ...')
+            logging.debug(f'Loading {subset.id} from ({base_dir} : {metadata}) ...')
             with open(metadata, 'r', encoding='utf8') as f:
                 if str.endswith(metadata, '.tsv'):
                     utterance_reader = csv.DictReader(f, delimiter='\t')
@@ -147,11 +149,21 @@ class Dataset:
                     if sample := sample_loader(base_dir, utt):
                         self.samples.append(sample)
                         k += 1
-                logging.info(f'{k} samples loaded from {subset.id}')
-        logging.info(F'Total {len(self.samples)} loaded.')
+
+                self.subsets_info.append({
+                    'id': subset.id,
+                    'dir': base_dir,
+                    'metadata': metadata,
+                    'num_utts': k,
+                })
+                logging.debug(f'{k} samples loaded from {subset.id}')
+        logging.debug(f'Total {len(self.samples)} loaded.')
         # length sort
 
         # shuffle
+    
+    def __repr__(self):
+        return repr([ f"{x['id']}:{x['num_utts']}" for x in self.subsets_info ])
 
     def __getitem__(self, index:int):
         return self.samples[index]
@@ -358,8 +370,6 @@ class MeanVarNormalizer:
         self.mean_norm_shift = -mean
         self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
 
-        logging.info(self)
-
     def __repr__(self):
         return (
             '\nGlobal MEAN/VAR normalizer:\n'
@@ -491,8 +501,6 @@ class DataPipe:
         self.spec_augment = spec_augment
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
-
-        logging.info(self)
     
     def __repr__(self):
         return f'\n    DataPipe: {[ k for k,v in vars(self).items() if v ]}'
@@ -630,7 +638,8 @@ def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
 
 
 def train(config, dir, device_name, world_size, rank):
-    print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
+    if rank == 0: logging.info(OmegaConf.to_yaml(config))
+    time.sleep(0.5)
 
     if world_size > 1:
         import torch.distributed as dist
@@ -668,8 +677,12 @@ def train(config, dir, device_name, world_size, rank):
 
     sample_loader = SampleLoader(**config.get('SampleLoader', {}))
 
+    if rank == 0: logging.info('Loading train/valid sets')
     train_dataset = Dataset(config.train_set, sample_loader)
     valid_dataset = Dataset(config.valid_set, sample_loader)
+    if rank == 0:
+        logging.info(f'train_set: {train_dataset}')
+        logging.info(f'valid_set: {valid_dataset}')
 
     # mean var stats
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
@@ -694,6 +707,9 @@ def train(config, dir, device_name, world_size, rank):
         text_normalizer = TextNormalizer(**config.TextNormalizer) if config.get('TextNormalizer') else None,
         tokenizer = tokenizer,
     )
+    if rank == 0:
+        logging.info(train_datapipe.mean_var_normalizer)
+        logging.info(train_datapipe)
 
     if distributed:
         from torch.utils.data.distributed import DistributedSampler
@@ -728,17 +744,17 @@ def train(config, dir, device_name, world_size, rank):
 
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
-        logging.info(f'Training epoch {e} ...')
-
+        if rank == 0: logging.info(f'Epoch {e} training ...')
         model.train()
 
         if distributed:
             train_dataloader.sampler.set_epoch(e)
 
+        train_loss = 0.0
+        train_utts, train_frames = 0, 0
+
+        num_batches = len(train_dataloader)
         with model.join() if distributed else nullcontext():
-            train_loss = 0.0
-            train_utts, train_frames = 0, 0
-            num_batches = len(train_dataloader)
             for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
                 samples, num_utts, num_frames, X, T, Y, U = batch
 
@@ -760,23 +776,24 @@ def train(config, dir, device_name, world_size, rank):
                 train_loss += loss.item()
                 train_utts += num_utts
                 train_frames += num_frames
-                train_utt_loss, train_frame_loss = train_loss/train_utts, train_loss/train_frames
+                train_utt_loss = train_loss/train_utts
 
                 if b % config.log_interval == 0:
                     logging.info(
-                        f'Rank:{rank}/{world_size} Epoch:{e}/{config.num_epochs} Batch:{b}/{num_batches} '
+                        f'Rank={rank}/{world_size} Epoch={e}/{config.num_epochs} Batch={b}/{num_batches} '
                         f'{train_utt_loss:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
                     )
 
         if rank == 0:
-            torch.save(model.state_dict(), os.path.join(dir, 'checkpoints', f'{e}.pt'))
+            checkpoint_file = os.path.join(dir, 'checkpoints', f'{e}.pt')
+            logging.info('Writing checkpoint written to {checkpoint_file}')
+            torch.save(model.state_dict(), checkpoint_file)
 
-        # validation
-        logging.info(f'Validating epoch {e} ...')
+        if rank == 0: logging.info(f'Epoch {e} validation ...')
+        model.eval()
+        valid_loss = 0.0
+        valid_utts, valid_frames = 0, 0
         with torch.no_grad():
-            model.eval()
-            valid_loss = 0.0
-            valid_utts, valid_frames = 0, 0
             for b, batch in enumerate(valid_dataloader, 1):
                 samples, num_utts, num_frames, X, T, Y, U = batch
 
@@ -789,14 +806,13 @@ def train(config, dir, device_name, world_size, rank):
                 valid_loss += loss.item()
                 valid_utts += num_utts
                 valid_frames += num_frames
-                valid_utt_loss, valid_frame_loss = valid_loss/valid_utts, valid_loss/valid_frames
+                valid_utt_loss = valid_loss/valid_utts
 
-        # epoch summary
-        logging.info(
-            f'\nEpoch[{e}]'
-            f'  train_utt_loss:{train_utt_loss:7.2f}'
-            f'  valid_utt_loss:{valid_utt_loss:7.2f}'
-            f'  loss_diff:{train_utt_loss - valid_utt_loss:7.2f}'
+        if rank == 0: logging.info(
+            f'Epoch {e} summary: '
+            f'train_utt_loss={train_utt_loss:<7.2f} '
+            f'valid_utt_loss={valid_utt_loss:<7.2f} '
+            f'loss_diff={train_utt_loss - valid_utt_loss:<7.2f} '
         )
 
 
