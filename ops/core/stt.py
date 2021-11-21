@@ -685,7 +685,6 @@ def train(config, dir, device_name, world_size, rank):
     valid_dataset = Dataset(config.valid_set, sample_loader)
     if rank == 0: logging.info(f'Loaded: {valid_dataset}')
 
-    # mean var stats
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if not os.path.isfile(mean_var_stats_file):
         if rank == 0:
@@ -695,7 +694,6 @@ def train(config, dir, device_name, world_size, rank):
     if distributed:
         assert dist.is_initialized()
         dist.barrier()
-
     mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
     train_datapipe = DataPipe(
