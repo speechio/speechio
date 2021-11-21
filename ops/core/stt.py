@@ -655,7 +655,7 @@ def train(config, dir, device_name, world_size, rank):
         )
 
     if torch.cuda.is_available():
-        logging.info(f'Rank {rank} <-> {device_name}')
+        logging.info(f'Rank {rank} -> {device_name}')
         device = torch.device(device_name)
     else:
         logging.warn('No GPU available, fallback to CPU.')
@@ -735,8 +735,7 @@ def train(config, dir, device_name, world_size, rank):
         if distributed:
             train_dataloader.sampler.set_epoch(e)
 
-        join_context = model.join if distributed else nullcontext
-        with join_context():
+        with model.join() if distributed else nullcontext():
             train_loss = 0.0
             train_utts, train_frames = 0, 0
             num_batches = len(train_dataloader)
@@ -748,11 +747,7 @@ def train(config, dir, device_name, world_size, rank):
                 Y = Y.to(device)
                 U = U.to(device)
 
-                if distributed and b % config.gradient_accumulation != 0:
-                    sync_context = model.no_sync
-                else:
-                    sync_context = nullcontext
-                with sync_context():
+                with model.no_sync() if distributed and b % config.gradient_accumulation != 0 else nullcontext():
                     loss = model(X, T, Y, U)
                     (loss / num_utts / config.gradient_accumulation).backward()
 
