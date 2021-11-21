@@ -29,10 +29,10 @@ if __name__ == '__main__':
     processes = []
     for local_rank in range(config.nproc_per_node):
         rank = args.node_rank * config.nproc_per_node + local_rank
-        device_name = f'cuda:{cuda_devices[local_rank]}'
+        device_id = cuda_devices[local_rank]
         p = torch.multiprocessing.Process(
             target=stt.train,
-            args=(config, args.dir, device_name, world_size, rank)
+            args=(config, args.dir, device_id, world_size, rank)
         )
         p.start()
         processes.append(p)

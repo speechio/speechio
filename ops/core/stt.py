@@ -631,29 +631,31 @@ def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
         raise NotImplementedError(f'Unsupported model: {model_name}')
 
 
-def train(config, dir, device_name, world_size, rank):
+def train(config, dir:str, device_id:int, world_size:int, rank:int):
     logging.basicConfig(
         stream=sys.stderr, 
         level=logging.DEBUG if rank == 0 else logging.INFO,
         format = '\x1B[1;32m%(asctime)s [%(levelname)s] %(message)s\x1B[0m',
     )
 
-    logging.debug(f'\n{OmegaConf.to_yaml(config)}')
-    time.sleep(0.1)
-
     if world_size > 1:
         import torch.distributed as dist
-        logging.info(f'Initiating DDP rank {rank} process ...')
         os.environ['MASTER_ADDR'] = str(config.ddp_master_addr)
         os.environ['MASTER_PORT'] = str(config.ddp_master_port)
         dist.init_process_group(config.ddp_backend, rank = rank, world_size = world_size)
         distributed = True
     else:
         distributed = False
-    
+
+    device = torch.device('cuda', device_id) if torch.cuda.is_available() else torch.device('cpu')
+    logging.info(f'Rank:{rank} -> device:{device}')
+
+
+    logging.debug(f'\n{OmegaConf.to_yaml(config)}')
+    torch.manual_seed(G_SEED)
+
     tokenizer = Tokenizer(**config.Tokenizer)
 
-    torch.manual_seed(G_SEED)
     model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
     logging.debug(
         'Total params: '
@@ -661,14 +663,6 @@ def train(config, dir, device_name, world_size, rank):
         'Trainable params: '
         f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
     )
-    time.sleep(0.1)
-
-    if torch.cuda.is_available():
-        logging.info(f'Rank {rank} -> {device_name}')
-        device = torch.device(device_name)
-    else:
-        logging.warn('No GPU available, fallback to CPU.')
-        device = torch.device('cpu')
     model.to(device)
 
     if distributed:
@@ -736,6 +730,7 @@ def train(config, dir, device_name, world_size, rank):
 
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
+        if distributed: dist.barrier()
         logging.info(f'Epoch {e} training on rank {rank} ...')
         model.train()
 

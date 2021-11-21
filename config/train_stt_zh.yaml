@@ -76,4 +76,4 @@ nnodes: 1
 nproc_per_node: 4
 ddp_backend: nccl
 ddp_master_addr: 'localhost'
-ddp_master_port: '12355'
+ddp_master_port: '12345'
