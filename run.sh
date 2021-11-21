@@ -10,5 +10,5 @@
 
 ## Train
 dir=exp/ddp && mkdir -p $dir
-ops/train_stt config/train_stt_zh.yaml $dir
+ops/train_stt --node_rank 0 config/train_stt_zh.yaml $dir
 #ops/stt config/stt_zh.yaml $dir
