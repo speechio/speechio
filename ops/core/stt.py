@@ -613,7 +613,7 @@ def compute_mean_var_stats(dataset, config):
     return stats
 
 
-def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
+def create_model(model_name:str, model_hparam:str, input_dim, tokenizer):
     if  model_name == 'conformer':
         from core.conformer import Model
         model = Model(
@@ -629,6 +629,22 @@ def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
         return model
     else:
         raise NotImplementedError(f'Unsupported model: {model_name}')
+
+
+def load_checkpoint(model:torch.nn.Module, filepath:str):
+    if torch.cuda.is_available():
+        state_dict = torch.load(filepath)
+    else:
+        state_dict = torch.load(filepath, map_location = 'cpu')
+    model.load_state_dict({ k.removeprefix('module.') : v for k,v in state_dict.items() })
+
+
+def dump_checkpoint(model:torch.nn.Module, filepath:str):
+    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+        state_dict = model.module.state_dict()
+    else:
+        state_dict = model.state_dict()
+    torch.save(state_dict, filepath)
 
 
 def train(config, dir:str, device_id:int, world_size:int, rank:int):
@@ -656,7 +672,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     tokenizer = Tokenizer(**config.Tokenizer)
 
-    model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
+    model = create_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
     logging.debug(
         'Total params: '
         f'{sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
@@ -773,8 +789,8 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
         if rank == 0:
             checkpoint_file = os.path.join(dir, 'checkpoints', f'{e}.pt')
-            torch.save(model.state_dict(), checkpoint_file)
-            logging.debug('Checkpoint written to {checkpoint_file}')
+            logging.debug('Dumping checkpoint to {checkpoint_file}')
+            dump_checkpoint(model, checkpoint_file)
         if distributed: dist.barrier()
 
         logging.info(f'Epoch {e} validation on rank {rank}...')
@@ -839,12 +855,13 @@ def recognize(config_path, dir):
         collate_fn = datapipe,
     )
 
-    checkpoint_path = os.path.join(dir, 'final.pt')
-    assert os.path.isfile(checkpoint_path)
-    checkpoint = torch.load(checkpoint_path)
-
-    model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
-    model.load_state_dict(checkpoint)
+    model = create_model(
+        config.model_name, 
+        config.model_hparam, 
+        config.FbankFeatureExtractor.num_mel_bins, 
+        tokenizer
+    )
+    load_checkpoint(model, os.path.join(dir, 'final.pt'))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
