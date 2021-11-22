@@ -5,11 +5,13 @@
 # All rights reserved.
 
 import os, sys
-import argparse
+import time
 from typing import Optional
 from dataclasses import dataclass
 import logging.config
+from contextlib import nullcontext
 
+from functools import reduce
 import decimal
 import random
 
@@ -21,27 +23,22 @@ import torchaudio.sox_effects
 
 import csv   # metadata
 import json  # mvn stats
-from omegaconf import OmegaConf  # various configs
+from omegaconf import OmegaConf
 
 import sentencepiece as spm
 #import k2
 
 # Global Constants
+G_SEED = 37927
 G_FEATURE_PADDING_VALUE = float(0.0)
 G_PAD_ID = -1
 
 G_DEFAULT_DATA_ZOO = 'config/data_zoo.yaml'
-G_DEFAULT_LOGGING_CONFIG = 'config/logging.yaml'
-# setup logging
-if os.path.isfile(G_DEFAULT_LOGGING_CONFIG):
-    import yaml
-    with open(G_DEFAULT_LOGGING_CONFIG, 'r', encoding='utf8') as f:
-        logging.config.dictConfig(yaml.safe_load(f))
-else:
-    logging.basicConfig(
-        stream=sys.stderr, level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s'
-    )
-
+#G_DEFAULT_LOGGING_CONFIG = 'config/logging.yaml'
+#if os.path.isfile(G_DEFAULT_LOGGING_CONFIG):
+#    import yaml
+#    with open(G_DEFAULT_LOGGING_CONFIG, 'r', encoding='utf8') as f:
+#        logging.config.dictConfig(yaml.safe_load(f))
 
 @dataclass
 class Sample:
@@ -120,8 +117,10 @@ class Dataset:
         sample_loader:callable = SampleLoader(),
         data_zoo_path:str = G_DEFAULT_DATA_ZOO,
     ) :
-        self.samples = []
         data_zoo = OmegaConf.load(data_zoo_path)
+
+        self.samples = []
+        self.subsets_info = []
 
         for subset in dataset_config.subsets:
             if subset.max_num_samples == 0:
@@ -131,7 +130,7 @@ class Dataset:
 
             # retrive dataset info from data zoo
             base_dir, metadata = data_zoo[subset.id].dir, data_zoo[subset.id].metadata
-            logging.info(f'Loading {subset.id} from ({base_dir} : {metadata}) ...')
+            logging.debug(f'  Loading {subset.id} from ({base_dir} : {metadata}) ...')
             with open(metadata, 'r', encoding='utf8') as f:
                 if str.endswith(metadata, '.tsv'):
                     utterance_reader = csv.DictReader(f, delimiter='\t')
@@ -145,11 +144,21 @@ class Dataset:
                     if sample := sample_loader(base_dir, utt):
                         self.samples.append(sample)
                         k += 1
-                logging.info(f'{k} samples loaded from {subset.id}')
-        logging.info(F'Total {len(self.samples)} loaded.')
+
+                self.subsets_info.append({
+                    'id': subset.id,
+                    'dir': base_dir,
+                    'metadata': metadata,
+                    'num_utts': k,
+                })
+                logging.debug(f'  {k} samples loaded from {subset.id}')
+        logging.debug(f'Total {len(self.samples)} loaded.')
         # length sort
 
         # shuffle
+    
+    def __repr__(self):
+        return repr([ f"{x['id']}:{x['num_utts']}" for x in self.subsets_info ])
 
     def __getitem__(self, index:int):
         return self.samples[index]
@@ -356,8 +365,6 @@ class MeanVarNormalizer:
         self.mean_norm_shift = -mean
         self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
 
-        logging.info(self)
-
     def __repr__(self):
         return (
             '\nGlobal MEAN/VAR normalizer:\n'
@@ -489,8 +496,6 @@ class DataPipe:
         self.spec_augment = spec_augment
         self.text_normalizer = text_normalizer
         self.tokenizer = tokenizer
-
-        logging.info(self)
     
     def __repr__(self):
         return f'\n    DataPipe: {[ k for k,v in vars(self).items() if v ]}'
@@ -548,7 +553,7 @@ class DataPipe:
                 'token_pieces': token_pieces,
                 'token_ids': token_ids,
             })
-            logging.debug(f'Processed sample {sample.id} -> {key}')
+            #logging.debug(f'Processed sample {sample.id} -> {key}')
 
         features = [ s['feature'] for s in samples ]
         inputs = nn.utils.rnn.pad_sequence(
@@ -594,12 +599,13 @@ def compute_mean_var_stats(dataset, config):
     dataloader = torch.utils.data.DataLoader(
         dataset,
         shuffle = False,
-        batch_size = 32,
+        batch_size = 16,
         drop_last = False,
-        num_workers = 4,
+        num_workers = 8,
         collate_fn = feature_datapipe,
     )
 
+    logging.info(f'Computing mean var stats ...')
     stats = MeanVarStats()
     for batch in dataloader:
         samples, *_ = batch
@@ -608,7 +614,7 @@ def compute_mean_var_stats(dataset, config):
     return stats
 
 
-def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
+def create_model(model_name:str, model_hparam:str, input_dim, tokenizer):
     if  model_name == 'conformer':
         from core.conformer import Model
         model = Model(
@@ -621,35 +627,93 @@ def load_model(model_name:str, model_hparam:str, input_dim, tokenizer):
             unk_index = tokenizer.unk_index,
             sil_index = tokenizer.sil_index,
         )
-        logging.info(
-            'Total params: '
-            f'{sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
-            'Trainable params: '
-            f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
-        )
         return model
     else:
         raise NotImplementedError(f'Unsupported model: {model_name}')
 
 
-def train(config_path, dir):
-    config = OmegaConf.load(config_path)
-    print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
+def load_checkpoint(model:torch.nn.Module, filepath:str):
+    if torch.cuda.is_available():
+        state_dict = torch.load(filepath)
+    else:
+        state_dict = torch.load(filepath, map_location = 'cpu')
+    model.load_state_dict({ k.removeprefix('module.') : v for k,v in state_dict.items() })
+
+
+def dump_checkpoint(model:torch.nn.Module, filepath:str):
+    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+        state_dict = model.module.state_dict()
+    else:
+        state_dict = model.state_dict()
+    torch.save(state_dict, filepath)
+
+
+def average_checkpoints(ckpt_paths:list):
+    N = len(ckpt_paths)
+    print(f'averaging {N} models: {ckpt_paths}', file=sys.stderr, flush=True)
+    
+    state_dicts = [ torch.load(p, map_location=torch.device('cpu')) for p in ckpt_paths ]
+    state_dict = reduce(
+        lambda x, y: { k: x[k] + y[k] for k in x.keys() }, 
+        state_dicts,
+    )
+    state_dict = { k : torch.true_divide(v, N) for k,v in state_dict.items() }
+
+    return state_dict
+
+
+def train(config, dir:str, device_id:int, world_size:int, rank:int):
+    logging.basicConfig(
+        stream=sys.stderr, 
+        level=logging.DEBUG if rank == 0 else logging.INFO,
+        format = '\x1B[1;32m%(asctime)s [%(levelname)s] %(message)s\x1B[0m',
+    )
+
+    if world_size > 1:
+        import torch.distributed as dist
+        os.environ['MASTER_ADDR'] = str(config.ddp_master_addr)
+        os.environ['MASTER_PORT'] = str(config.ddp_master_port)
+        dist.init_process_group(config.ddp_backend, rank = rank, world_size = world_size)
+        distributed = True
+    else:
+        distributed = False
+
+    device = torch.device('cuda', device_id) if torch.cuda.is_available() else torch.device('cpu')
+    logging.info(f'Rank:{rank} -> device:{device}')
+
+
+    logging.debug(f'\n{OmegaConf.to_yaml(config)}')
+    torch.manual_seed(G_SEED)
+
+    tokenizer = Tokenizer(**config.Tokenizer)
+
+    model = create_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
+    logging.debug(
+        'Total params: '
+        f'{sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
+        'Trainable params: '
+        f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
+    )
+    model.to(device)
+
+    if distributed:
+        from torch.nn.parallel import DistributedDataParallel as DDP
+        model = DDP(model, find_unused_parameters=True)
 
     sample_loader = SampleLoader(**config.get('SampleLoader', {}))
 
+    logging.debug('Loading train set ...')
     train_dataset = Dataset(config.train_set, sample_loader)
+    logging.debug('Loading valid set ...')
     valid_dataset = Dataset(config.valid_set, sample_loader)
 
-    # mean var stats
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
-    if os.path.isfile(mean_var_stats_file):
-        mean_var_stats = MeanVarStats().load(mean_var_stats_file)
-    else:
-        mean_var_stats = compute_mean_var_stats(train_dataset, config)
-        mean_var_stats.dump(mean_var_stats_file)
-
-    tokenizer = Tokenizer(**config.Tokenizer)
+    if not os.path.isfile(mean_var_stats_file):
+        if rank == 0:
+            mean_var_stats = compute_mean_var_stats(train_dataset, config)
+            mean_var_stats.dump(mean_var_stats_file)
+        if distributed: dist.barrier()
+    mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
     train_datapipe = DataPipe(
         audio_loader = torch_audio_load,
@@ -661,24 +725,29 @@ def train(config_path, dir):
         text_normalizer = TextNormalizer(**config.TextNormalizer) if config.get('TextNormalizer') else None,
         tokenizer = tokenizer,
     )
+    logging.debug(train_datapipe.mean_var_normalizer)
+    logging.debug(train_datapipe)
+
+    if distributed:
+        from torch.utils.data.distributed import DistributedSampler
+        sampler = DistributedSampler(train_dataset, shuffle=True) 
+    else:
+        sampler = None
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         **config.DataLoader,
         collate_fn = train_datapipe,
-    )
-    valid_dataloader = torch.utils.data.DataLoader(
-        valid_dataset,
-        shuffle = False,
-        batch_size = config.DataLoader.batch_size,
-        drop_last = config.DataLoader.drop_last,
-        num_workers = config.DataLoader.num_workers,
-        collate_fn = train_datapipe,
+        shuffle = False if distributed else True,
+        sampler = sampler,
     )
 
-    model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
+    valid_dataloader = torch.utils.data.DataLoader(
+        valid_dataset,
+        **config.DataLoader,
+        collate_fn = train_datapipe,
+        shuffle = False,
+    )
 
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
 
@@ -692,43 +761,58 @@ def train(config_path, dir):
 
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
-        logging.info(f'Training epoch {e} ...')
+        if distributed: dist.barrier()
+        logging.info(f'Epoch {e} training on rank {rank} ...')
         model.train()
+
+        if distributed:
+            train_dataloader.sampler.set_epoch(e)
+
         train_loss = 0.0
         train_utts, train_frames = 0, 0
+
         num_batches = len(train_dataloader)
-        for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
-            samples, num_utts, num_frames, X, T, Y, U = batch
+        with model.join() if distributed else nullcontext():
+            for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
+                samples, num_utts, num_frames, X, T, Y, U = batch
 
-            X = X.to(device)
-            T = T.to(device)
-            Y = Y.to(device)
-            U = U.to(device)
-            loss = model(X, T, Y, U)
+                X = X.to(device)
+                T = T.to(device)
+                Y = Y.to(device)
+                U = U.to(device)
 
-            (loss / num_utts / config.gradient_accumulation).backward()
-            if b % config.gradient_accumulation == 0:
-                if torch.isfinite(nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clipping)):
-                    optimizer.step()
-                optimizer.zero_grad()
-                scheduler.step()
+                with model.no_sync() if distributed and b % config.gradient_accumulation != 0 else nullcontext():
+                    loss = model(X, T, Y, U)
+                    (loss / num_utts / config.gradient_accumulation).backward()
 
-            train_loss += loss.item()
-            train_utts += num_utts
-            train_frames += num_frames
-            train_utt_loss, train_frame_loss = train_loss/train_utts, train_loss/train_frames
+                if b % config.gradient_accumulation == 0:
+                    if torch.isfinite(nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clipping)):
+                        optimizer.step()
+                    optimizer.zero_grad()
+                    scheduler.step()
 
-            if b % config.log_interval == 0:
-                logging.info(f'  [{e}/{config.num_epochs}]:[{b}/{num_batches}] {train_utt_loss:7.2f} LR={scheduler.get_last_lr()[0]:7.6f}')
+                train_loss += loss.item()
+                train_utts += num_utts
+                train_frames += num_frames
+                train_utt_loss = train_loss/train_utts
 
-        torch.save(model.state_dict(), os.path.join(dir, 'checkpoints', f'{e}.pt'))
+                if b % config.log_interval == 0:
+                    logging.info(
+                        f'Rank={rank}/{world_size} Epoch={e}/{config.num_epochs} Batch={b}/{num_batches} '
+                        f'{train_utt_loss:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
+                    )
 
-        # validation
-        logging.info(f'Validating epoch {e} ...')
+        if rank == 0:
+            checkpoint_file = os.path.join(dir, 'checkpoints', f'{e}.ckpt')
+            logging.debug('Dumping checkpoint to {checkpoint_file}')
+            dump_checkpoint(model, checkpoint_file)
+        if distributed: dist.barrier()
+
+        logging.info(f'Epoch {e} validation on rank {rank}...')
+        model.eval()
+        valid_loss = 0.0
+        valid_utts, valid_frames = 0, 0
         with torch.no_grad():
-            model.eval()
-            valid_loss = 0.0
-            valid_utts, valid_frames = 0, 0
             for b, batch in enumerate(valid_dataloader, 1):
                 samples, num_utts, num_frames, X, T, Y, U = batch
 
@@ -741,14 +825,14 @@ def train(config_path, dir):
                 valid_loss += loss.item()
                 valid_utts += num_utts
                 valid_frames += num_frames
-                valid_utt_loss, valid_frame_loss = valid_loss/valid_utts, valid_loss/valid_frames
+                valid_utt_loss = valid_loss/valid_utts
 
-        # epoch summary
+        if distributed: dist.barrier()
         logging.info(
-            f'\nEpoch[{e}]'
-            f'  train_utt_loss:{train_utt_loss:7.2f}'
-            f'  valid_utt_loss:{valid_utt_loss:7.2f}'
-            f'  loss_diff:{train_utt_loss - valid_utt_loss:7.2f}'
+            f'Epoch {e} summary on rank {rank}: '
+            f'train_utt_loss={train_utt_loss:<7.2f} '
+            f'valid_utt_loss={valid_utt_loss:<7.2f} '
+            f'loss_diff={train_utt_loss - valid_utt_loss:<7.2f} '
         )
 
 
@@ -786,12 +870,13 @@ def recognize(config_path, dir):
         collate_fn = datapipe,
     )
 
-    checkpoint_path = os.path.join(dir, 'final.pt')
-    assert os.path.isfile(checkpoint_path)
-    checkpoint = torch.load(checkpoint_path)
-
-    model = load_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
-    model.load_state_dict(checkpoint)
+    model = create_model(
+        config.model_name, 
+        config.model_hparam, 
+        config.FbankFeatureExtractor.num_mel_bins, 
+        tokenizer
+    )
+    load_checkpoint(model, os.path.join(dir, 'final.ckpt'))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
@@ -806,4 +891,4 @@ def recognize(config_path, dir):
             T = T.to(device)
             hyps = model.decode(X, T)
 
-            print(f'{b}\t{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}', file=sys.stderr, flush=True)
+            print(f'{b}\t{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}', file=sys.stdout, flush=True)

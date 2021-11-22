@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+# coding=utf8
+
+# Copyright  2021  Jiayu DU
+
+import os
+import argparse
+
+import torch
+from core.stt import average_checkpoints
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--begin', type = int, default = 0)
+    parser.add_argument('--end', type = int, default = 10000)
+    parser.add_argument('checkpoints_dir', type = str)
+    parser.add_argument('output_checkpoint', type = str)
+    args = parser.parse_args()
+
+    checkpoints = [ 
+        os.path.join(args.checkpoints_dir, f'{e}.ckpt') for e in range(args.begin, args.end) 
+    ]
+
+    torch.save(average_checkpoints(checkpoints), args.output_checkpoint)

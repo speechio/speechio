@@ -9,6 +9,7 @@ log
 *.log
 tmp*
 *.pt
+nohup.out
 
 build
 
@@ -30,3 +31,4 @@ test.wav
 
 toolkit/speechbrain
 toolkit/wenet
+exp
