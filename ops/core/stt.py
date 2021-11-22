@@ -631,7 +631,7 @@ def create_model(model_name:str, model_hparam:str, input_dim, tokenizer):
         raise NotImplementedError(f'Unsupported model: {model_name}')
 
 
-def load_checkpoint(model:torch.nn.Module, filepath:str):
+def load_checkpoint(model:nn.Module, filepath:str):
     if torch.cuda.is_available():
         state_dict = torch.load(filepath)
     else:
@@ -639,8 +639,8 @@ def load_checkpoint(model:torch.nn.Module, filepath:str):
     model.load_state_dict({ k.removeprefix('module.') : v for k,v in state_dict.items() })
 
 
-def dump_checkpoint(model:torch.nn.Module, filepath:str):
-    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+def dump_checkpoint(model:nn.Module, filepath:str):
+    if isinstance(model, nn.parallel.DistributedDataParallel):
         state_dict = model.module.state_dict()
     else:
         state_dict = model.state_dict()
@@ -697,7 +697,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     model.to(device)
 
     if distributed:
-        from torch.nn.parallel import DistributedDataParallel as DDP
+        from nn.parallel import DistributedDataParallel as DDP
         model = DDP(model, find_unused_parameters=True)
 
     sample_loader = SampleLoader(**config.get('SampleLoader', {}))
