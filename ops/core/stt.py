@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import logging.config
 from contextlib import nullcontext
 
+from functools import reduce
 import decimal
 import random
 
@@ -647,6 +648,20 @@ def dump_checkpoint(model:torch.nn.Module, filepath:str):
     torch.save(state_dict, filepath)
 
 
+def average_checkpoints(ckpt_paths:list):
+    N = len(ckpt_paths)
+    print(f'averaging {N} models: {ckpt_paths}', file=sys.stderr, flush=True)
+    
+    state_dicts = [ torch.load(p, map_location=torch.device('cpu')) for p in ckpt_paths ]
+    state_dict = reduce(
+        lambda x, y: { k: x[k] + y[k] for k in x.keys() }, 
+        state_dicts,
+    )
+    state_dict = { k : torch.true_divide(v, N) for k,v in state_dict.items() }
+
+    return state_dict
+
+
 def train(config, dir:str, device_id:int, world_size:int, rank:int):
     logging.basicConfig(
         stream=sys.stderr, 
@@ -788,7 +803,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                     )
 
         if rank == 0:
-            checkpoint_file = os.path.join(dir, 'checkpoints', f'{e}.pt')
+            checkpoint_file = os.path.join(dir, 'checkpoints', f'{e}.ckpt')
             logging.debug('Dumping checkpoint to {checkpoint_file}')
             dump_checkpoint(model, checkpoint_file)
         if distributed: dist.barrier()
@@ -861,7 +876,7 @@ def recognize(config_path, dir):
         config.FbankFeatureExtractor.num_mel_bins, 
         tokenizer
     )
-    load_checkpoint(model, os.path.join(dir, 'final.pt'))
+    load_checkpoint(model, os.path.join(dir, 'final.ckpt'))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
@@ -876,4 +891,4 @@ def recognize(config_path, dir):
             T = T.to(device)
             hyps = model.decode(X, T)
 
-            print(f'{b}\t{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}', file=sys.stderr, flush=True)
+            print(f'{b}\t{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}', file=sys.stdout, flush=True)
