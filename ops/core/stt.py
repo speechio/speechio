@@ -11,7 +11,6 @@ from dataclasses import dataclass
 import logging.config
 from contextlib import nullcontext
 
-from functools import reduce
 import decimal
 import random
 
@@ -648,18 +647,19 @@ def dump_checkpoint(model:torch.nn.Module, filepath:str):
     torch.save(state_dict, filepath)
 
 
-def average_checkpoints(ckpt_paths:list):
-    N = len(ckpt_paths)
-    print(f'averaging {N} models: {ckpt_paths}', file=sys.stderr, flush=True)
-    
-    state_dicts = [ torch.load(p, map_location=torch.device('cpu')) for p in ckpt_paths ]
-    state_dict = reduce(
-        lambda x, y: { k: x[k] + y[k] for k in x.keys() }, 
-        state_dicts,
-    )
-    state_dict = { k : torch.true_divide(v, N) for k,v in state_dict.items() }
+def average_checkpoints(checkpoint_files:list[str]):
+    from functools import reduce
 
-    return state_dict
+    N = len(checkpoint_files)
+    print(f'averaging {N} models: {checkpoint_files}', file=sys.stderr, flush=True)
+    
+    summed = reduce(
+        lambda x, y: { k: x[k] + y[k] for k in x.keys() }, # sum two pytorch "state dicts"
+        [ torch.load(f, map_location=torch.device('cpu')) for f in checkpoint_files],
+    )
+    averaged = { k : torch.true_divide(v, N) for k,v in summed.items() }
+
+    return averaged
 
 
 def train(config, dir:str, device_id:int, world_size:int, rank:int):
