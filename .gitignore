@@ -32,3 +32,8 @@ test.wav
 toolkit/speechbrain
 toolkit/wenet
 exp
+
+RESULT
+rec.txt
+ref.txt
+res.test
