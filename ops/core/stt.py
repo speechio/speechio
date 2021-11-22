@@ -697,7 +697,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     model.to(device)
 
     if distributed:
-        from nn.parallel import DistributedDataParallel as DDP
+        from torch.nn.parallel import DistributedDataParallel as DDP
         model = DDP(model, find_unused_parameters=True)
 
     sample_loader = SampleLoader(**config.get('SampleLoader', {}))
@@ -804,7 +804,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
         if rank == 0:
             checkpoint_file = os.path.join(dir, 'checkpoints', f'{e}.ckpt')
-            logging.debug('Dumping checkpoint to {checkpoint_file}')
+            logging.debug(f'Dumping checkpoint to {checkpoint_file}')
             dump_checkpoint(model, checkpoint_file)
         if distributed: dist.barrier()
 

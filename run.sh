@@ -15,7 +15,7 @@ ops/tokenizer_train --config config/tokenizer_zh.yaml --input data/text/AISHELL-
 
 # Train stt model
 dir=exp/ddp && mkdir -p $dir
-ops/stt_train --node_rank 0 --config config/train_stt_zh.yaml $dir 2> $dir/log.train
+ops/stt_train --node_rank 0 --config config/stt_train_zh.yaml $dir 2> $dir/log.train
 ops/model_average --begin 161 --end 181 $dir/checkpoints $dir/final.ckpt
 
 # Inference on test set
