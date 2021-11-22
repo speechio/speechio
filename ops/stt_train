@@ -13,7 +13,7 @@ from core import stt
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--node_rank', type = int, required = True)
-    parser.add_argument('config', type = str)
+    parser.add_argument('--config', type = str, required = True)
     parser.add_argument('dir', type = str)
     args = parser.parse_args()
     print(args)
