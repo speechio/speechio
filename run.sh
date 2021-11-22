@@ -19,9 +19,9 @@
 #ops/model_average --begin 161 --end 181 $dir/checkpoints $dir/final.ckpt
 
 ## Inference on test set
-#ops/stt_test --config config/stt_test_zh.yaml $dir 1> res.test
+#ops/stt_test --config config/stt_test_zh.yaml $dir 1> $dir/res.test
 
 ## Error rate evaluation
-awk -F'\t' '{print $2, $3}' res.test > rec.txt
-ops/compute_error_rate --tokenizer char --ref ref.txt --hyp rec.txt RESULT
+awk -F'\t' '{print $2, $3}' $dir/res.test > $dir/rec.txt
+ops/compute_error_rate --tokenizer char --ref $dir/ref.txt --hyp $dir/rec.txt $dir/RESULT
 
