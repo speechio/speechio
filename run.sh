@@ -14,11 +14,11 @@
 #ops/tokenizer_train --config config/tokenizer_zh.yaml --input data/text/AISHELL-1_trn.txt --model model/tokenizer/AISHELL-1
 
 ## Train stt model
-dir=exp/ddp && mkdir -p $dir
+#dir=exp/ddp && mkdir -p $dir
 #ops/stt_train --node_rank 0 --config config/train_stt_zh.yaml $dir
 #ops/model_average --begin 161 --end 181 $dir/checkpoints $dir/final.ckpt
 
-## Infererence
+## Inference on test set
 #ops/stt_test --config config/stt_test_zh.yaml $dir 1> res.test
 
 ## Error rate evaluation
