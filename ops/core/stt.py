@@ -537,7 +537,6 @@ class DataPipe:
             if self.tokenizer:
                 token_pieces, token_ids = self.tokenizer(text)
 
-            # store everything here for debug purpose
             samples.append({
                 'key': key,
                 'waveform': waveform,
@@ -661,7 +660,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     logging.basicConfig(
         stream=sys.stderr, 
         level=logging.DEBUG if rank == 0 else logging.INFO,
-        format = '\x1B[1;32m%(asctime)s [%(levelname)s] %(message)s\x1B[0m',
+        format = f'\x1B[1;32m%(asctime)s [Rank={rank}/{world_size}:%(levelname)s] %(message)s\x1B[0m',
     )
 
     if world_size > 1:
@@ -696,11 +695,11 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         model = DDP(model, find_unused_parameters=True)
 
     sample_loader = SampleLoader(**config.get('SampleLoader', {}))
-
-    logging.debug('Loading train set ...')
+    logging.debug('Loading train_set ...')
     train_dataset = Dataset(config.train_set, sample_loader)
-    logging.debug('Loading valid set ...')
+    logging.debug('Loading valid_set ...')
     valid_dataset = Dataset(config.valid_set, sample_loader)
+    if distributed: dist.barrier()
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if not os.path.isfile(mean_var_stats_file):
@@ -757,7 +756,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
         if distributed: dist.barrier()
-        logging.info(f'Epoch {e} training on rank {rank} ...')
+        logging.info(f'Epoch {e} training ...')
         model.train()
 
         if distributed:
@@ -793,7 +792,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
                 if b % config.log_interval == 0:
                     logging.info(
-                        f'Rank={rank}/{world_size} Epoch={e}/{config.num_epochs} Batch={b}/{num_batches} '
+                        f'Epoch={e}/{config.num_epochs} Batch={b}/{num_batches} '
                         f'{train_utt_loss:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
                     )
 
@@ -803,7 +802,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
             dump_checkpoint(model, checkpoint_file)
         if distributed: dist.barrier()
 
-        logging.info(f'Epoch {e} validation on rank {rank}...')
+        logging.info(f'Epoch {e} validation ...')
         model.eval()
         valid_loss = 0.0
         valid_utts, valid_frames = 0, 0
@@ -824,7 +823,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
         if distributed: dist.barrier()
         logging.info(
-            f'Epoch {e} summary on rank {rank}: '
+            f'Epoch {e} summary: '
             f'train_utt_loss={train_utt_loss:<7.2f} '
             f'valid_utt_loss={valid_utt_loss:<7.2f} '
             f'loss_diff={train_utt_loss - valid_utt_loss:<7.2f} '
