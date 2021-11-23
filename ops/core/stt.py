@@ -29,15 +29,10 @@ import sentencepiece as spm
 
 # Global Constants
 G_SEED = 37927
-G_FEATURE_PADDING_VALUE = float(0.0)
+G_FEATURE_PADDING_VALUE = 0.0
 G_PAD_ID = -1
-
 G_DEFAULT_DATA_ZOO = 'config/data_zoo.yaml'
-#G_DEFAULT_LOGGING_CONFIG = 'config/logging.yaml'
-#if os.path.isfile(G_DEFAULT_LOGGING_CONFIG):
-#    import yaml
-#    with open(G_DEFAULT_LOGGING_CONFIG, 'r', encoding='utf8') as f:
-#        logging.config.dictConfig(yaml.safe_load(f))
+
 
 @dataclass
 class Sample:
@@ -682,7 +677,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     logging.info(f'Rank:{rank} -> device:{device}')
 
 
-    logging.debug(f'\n{OmegaConf.to_yaml(config)}')
+    logging.debug(f'\n{OmegaConf.to_yaml(config)}\n')
     torch.manual_seed(G_SEED)
 
     tokenizer = Tokenizer(**config.Tokenizer)
