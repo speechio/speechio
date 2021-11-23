@@ -25,6 +25,7 @@ root:
     handlers: [console, file_handler]
 
 ## To use this logging config:
+#import logging.config
 #G_DEFAULT_LOGGING_CONFIG = 'config/logging.yaml'
 #if os.path.isfile(G_DEFAULT_LOGGING_CONFIG):
 #    import yaml
