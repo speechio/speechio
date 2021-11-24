@@ -592,9 +592,9 @@ def move_tensor_to_device(*tensors):
 
 def compute_mean_var_stats(dataset, config):
     feature_datapipe = DataPipe(
-        resampler = Resampler(**config.Resampler),
-        perturbation = Perturbation(**config.Perturbation),
-        feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
+        resampler = Resampler(**config.resampler),
+        perturbation = Perturbation(**config.perturbation),
+        feature_extractor = FbankFeatureExtractor(**config.fbank_feature_extractor),
     )
 
     dataloader = torch.utils.data.DataLoader(
@@ -657,7 +657,7 @@ def average_checkpoints(checkpoint_paths:list[str]):
     
     summed = reduce(
         lambda x, y: { k: x[k] + y[k] for k in x.keys() }, # sum two pytorch "state dicts"
-        [ torch.load(f, map_location=torch.device('cpu')) for f in checkpoint_paths],
+        [ torch.load(f, map_location=torch.device('cpu')) for f in checkpoint_paths ],
     )
     averaged = { k : torch.true_divide(v, N) for k,v in summed.items() }
 
@@ -693,9 +693,14 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     debug(f'\n{OmegaConf.to_yaml(config)}\n')
     seed_all(G_SEED)
 
-    tokenizer = Tokenizer(**config.Tokenizer)
+    tokenizer = Tokenizer(**config.tokenizer)
 
-    model = create_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
+    model = create_model(
+        config.model_name, 
+        config.model_hparam, 
+        config.fbank_feature_extractor.num_mel_bins, 
+        tokenizer,
+    )
     debug(
         'Total params: '
         f'{sum([ p.numel() for p in model.parameters() ])/1e6:.2f}M '
@@ -708,7 +713,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         from torch.nn.parallel import DistributedDataParallel as DDP
         model = DDP(model, find_unused_parameters=True)
 
-    sample_loader = SampleLoader(**config.get('SampleLoader', {}))
+    sample_loader = SampleLoader(**config.get('sample_loader', {}))
     debug('Loading train_set ...')
     train_dataset = Dataset(config.train_set, sample_loader)
     debug('Loading valid_set ...')
@@ -724,12 +729,12 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
     train_datapipe = DataPipe(
-        resampler = Resampler(**config.Resampler) if config.get('Resampler') else None,
-        perturbation = Perturbation(**config.Perturbation) if config.get('Perturbation') else None,
-        feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
+        resampler = Resampler(**c) if (c := config.get('resampler')) else None,
+        perturbation = Perturbation(**c) if (c := config.get('perturbation')) else None,
+        feature_extractor = FbankFeatureExtractor(**config.fbank_feature_extractor),
         mean_var_normalizer = MeanVarNormalizer(mean_var_stats),
-        spec_augment = SpecAugment(**config.SpecAugment) if config.get('SpecAugment') else None,
-        text_normalizer = TextNormalizer(**config.TextNormalizer) if config.get('TextNormalizer') else None,
+        spec_augment = SpecAugment(**c) if (c := config.get('spec_augment')) else None,
+        text_normalizer = TextNormalizer(**c) if (c := config.get('text_normalizer')) else None,
         tokenizer = tokenizer,
     )
     debug(train_datapipe.mean_var_normalizer)
@@ -743,7 +748,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
-        **config.DataLoader,
+        **config.data_loader,
         collate_fn = train_datapipe,
         shuffle = False if distributed else True,
         sampler = sampler,
@@ -751,7 +756,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset,
-        **config.DataLoader,
+        **config.data_loader,
         collate_fn = train_datapipe,
         shuffle = False,
     )
@@ -852,19 +857,19 @@ def recognize(config_path, dir):
     else:
         raise FileNotFoundError(f'Cannot find mean var stats file: {mean_var_stats_file}')
 
-    tokenizer = Tokenizer(**config.Tokenizer)
+    tokenizer = Tokenizer(**config.tokenizer)
 
     datapipe = DataPipe(
-        resampler = Resampler(**config.Resampler) if config.get('Resampler') else None,
-        perturbation = Perturbation(**config.Perturbation) if config.get('Perturbation') else None,
-        feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
+        resampler = Resampler(**c) if (c := config.get('resampler')) else None,
+        perturbation = Perturbation(**c) if (c := config.get('perturbation')) else None,
+        feature_extractor = FbankFeatureExtractor(**config.fbank_feature_extractor),
         mean_var_normalizer = MeanVarNormalizer(mean_var_stats),
-        spec_augment = SpecAugment(**config.SpecAugment) if config.get('SpecAugment') else None,
-        text_normalizer = TextNormalizer(**config.TextNormalizer) if config.get('TextNormalizer') else None,
+        spec_augment = SpecAugment(**c) if (c := config.get('spec_augment')) else None,
+        text_normalizer = TextNormalizer(**c) if (c := config.get('text_normalizer')) else None,
         tokenizer = tokenizer,
     )
 
-    sample_loader = SampleLoader(**config.get('SampleLoader', {}))
+    sample_loader = SampleLoader(**config.get('sample_loader', {}))
     dataset = Dataset(config.test_set, sample_loader)
     dataloader = torch.utils.data.DataLoader(
         dataset,
@@ -878,7 +883,7 @@ def recognize(config_path, dir):
     model = create_model(
         config.model_name, 
         config.model_hparam, 
-        config.FbankFeatureExtractor.num_mel_bins, 
+        config.fbank_feature_extractor.num_mel_bins, 
         tokenizer
     )
     load_checkpoint(model, os.path.join(dir, 'final.ckpt'))
