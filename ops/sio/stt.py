@@ -504,7 +504,6 @@ class DataPipe:
     def __call__(self, raw_samples:list[Sample]):
         samples = []
         for sample in raw_samples:
-            # raw audio loading
             key = sample.id
 
             waveform, sample_rate, sample.duration = load_audio(
@@ -521,7 +520,6 @@ class DataPipe:
 
             # add noise
 
-            # feature extraction
             feature = torch.tensor([])  # default: an empty tensor
             if self.feature_extractor:
                 feature = self.feature_extractor(waveform, sample_rate)
@@ -529,7 +527,6 @@ class DataPipe:
             if self.mean_var_normalizer:
                 feature = self.mean_var_normalizer(feature)
 
-            # spec augment
             if self.spec_augment:
                 key, feature = self.spec_augment(key, feature)
 
@@ -537,11 +534,9 @@ class DataPipe:
             feature = feature.detach()
 
             text = sample.text
-            # text normalization
             if self.text_normalizer:
                 text = self.text_normalizer(text)
 
-            # tokenization
             token_pieces, token_ids = [], []
             if self.tokenizer:
                 token_pieces, token_ids = self.tokenizer(text)
@@ -638,7 +633,8 @@ def load_checkpoint(model:nn.Module, path:str):
         state_dict = torch.load(path)
     else:
         state_dict = torch.load(path, map_location = 'cpu')
-    model.load_state_dict({ k.removeprefix('module.') : v for k,v in state_dict.items() })
+    #model.load_state_dict({ k.removeprefix('module.') : v for k,v in state_dict.items() })
+    model.load_state_dict(state_dict)
 
 
 def dump_checkpoint(model:nn.Module, path:str):
@@ -656,7 +652,7 @@ def average_checkpoints(checkpoint_paths:list[str]):
     print(f'averaging {N} models: {checkpoint_paths}', file=sys.stderr, flush=True)
     
     summed = reduce(
-        lambda x, y: { k: x[k] + y[k] for k in x.keys() }, # sum two pytorch "state dicts"
+        lambda x, y: { k: x[k] + y[k] for k in x.keys() }, # sum of pytorch "state dicts"
         [ torch.load(f, map_location=torch.device('cpu')) for f in checkpoint_paths ],
     )
     averaged = { k : torch.true_divide(v, N) for k,v in summed.items() }
@@ -775,15 +771,11 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     for e in range(1, config.num_epochs + 1): # 1-based indexing
         if distributed: dist.barrier()
         info(f'Epoch {e} training ...')
+
         model.train()
+        train_loss, train_utts = 0.0, 0
+        if distributed: train_dataloader.sampler.set_epoch(e)
 
-        if distributed:
-            train_dataloader.sampler.set_epoch(e)
-
-        train_loss = 0.0
-        train_utts, train_frames = 0, 0
-
-        num_batches = len(train_dataloader)
         with model.join() if distributed else nullcontext():
             for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
                 samples, num_utts, num_frames, X, T, Y, U = batch
@@ -803,15 +795,14 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                     optimizer.zero_grad()
                     scheduler.step()
 
-                train_loss += loss.item()
                 train_utts += num_utts
-                train_frames += num_frames
-                train_utt_loss = train_loss/train_utts
+                train_loss += loss.item()
+                train_loss_per_utt = train_loss/train_utts
 
                 if b % config.log_interval == 0:
                     info(
-                        f'Epoch={e}/{config.num_epochs} Batch={b}/{num_batches} '
-                        f'{train_utt_loss:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
+                        f'Epoch={e}/{config.num_epochs} Batch={b}/{len(train_dataloader)} '
+                        f'{train_loss_per_utt:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
                     )
 
         if rank == 0:
@@ -820,9 +811,10 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         if distributed: dist.barrier()
 
         info(f'Epoch {e} validation ...')
+
         model.eval()
-        valid_loss = 0.0
-        valid_utts, valid_frames = 0, 0
+        valid_loss, valid_utts = 0.0, 0
+
         with torch.no_grad():
             for b, batch in enumerate(valid_dataloader, 1):
                 samples, num_utts, num_frames, X, T, Y, U = batch
@@ -833,17 +825,16 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 U = U.to(device)
                 loss = model(X, T, Y, U)
 
-                valid_loss += loss.item()
                 valid_utts += num_utts
-                valid_frames += num_frames
-                valid_utt_loss = valid_loss/valid_utts
+                valid_loss += loss.item()
+                valid_loss_per_utt = valid_loss/valid_utts
 
         if distributed: dist.barrier()
         info(
             f'Epoch {e} summary: '
-            f'train_utt_loss={train_utt_loss:<7.2f} '
-            f'valid_utt_loss={valid_utt_loss:<7.2f} '
-            f'loss_diff={train_utt_loss - valid_utt_loss:<7.2f} '
+            f'train_loss_per_utt={train_loss_per_utt:<7.2f} '
+            f'valid_loss_per_utt={valid_loss_per_utt:<7.2f} '
+            f'diff={train_loss_per_utt - valid_loss_per_utt:<7.2f} '
         )
 
 
@@ -894,7 +885,7 @@ def recognize(config_path, dir):
     with torch.no_grad():
         model.eval()
         for b, batch in enumerate(dataloader):
-            samples, num_utts, num_frames, X, T, _, _ = batch
+            samples, num_utts, num_frames, X, T, *_ = batch
             assert num_utts == 1
 
             X = X.to(device)
