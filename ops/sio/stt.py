@@ -5,12 +5,14 @@
 # All rights reserved.
 
 import os, sys
-import logging
 import decimal
 import random
 from dataclasses import dataclass
 from typing import Optional
 from contextlib import nullcontext
+
+import logging
+from logging import debug, info, warning
 
 import csv   # metadata
 import json  # mvn stats
@@ -114,9 +116,7 @@ class Dataset:
         data_zoo_path:str = G_DEFAULT_DATA_ZOO,
     ) :
         data_zoo = OmegaConf.load(data_zoo_path)
-
         self.samples = []
-        self.subsets_info = []
 
         for subset in dataset_config.subsets:
             if subset.max_num_samples == 0:
@@ -125,21 +125,21 @@ class Dataset:
                 subset.max_num_samples = sys.maxsize
 
             base_dir, metadata = data_zoo[subset.id].dir, data_zoo[subset.id].metadata
-            logging.debug(f'  Loading {subset.id} from ({base_dir} : {metadata}) ...')
+            debug(f'  Loading {subset.id} from ({base_dir} : {metadata}) ...')
 
             with open(metadata, 'r', encoding='utf8') as f:
                 if str.endswith(metadata, '.tsv'):
                     utts_reader = csv.DictReader(f, delimiter='\t')
 
                     if sample_loader.field_map['begin'] not in utts_reader.fieldnames:
-                        logging.warning('No explicit Sample::begin info from metadata, using default value 0.0')
+                        warning('No explicit Sample::begin info from metadata, using default value 0.0')
                     if sample_loader.field_map['duration'] not in utts_reader.fieldnames:
-                        logging.warning(
+                        warning(
                             'No explicit Sample::duration info from metadata, '
                             'min/max_duration filtering will be turned OFF.'
                         )
                     if sample_loader.field_map['text'] not in utts_reader.fieldnames:
-                        logging.warning(
+                        warning(
                             'No explicit Sample::text info from metadata, '
                             'min/max_text_length filtering will be turned OFF.'
                         )
@@ -153,9 +153,8 @@ class Dataset:
                     if sample := sample_loader(base_dir, utt):
                         self.samples.append(sample)
                         k += 1
-
-                logging.debug(f'  {k} samples loaded from {subset.id}')
-        logging.debug(f'Total {len(self.samples)} loaded.')
+                debug(f'  {k} samples loaded from {subset.id}')
+        debug(f'Total {len(self.samples)} loaded.')
         # length sort
 
         # shuffle
@@ -343,7 +342,7 @@ class MeanVarStats:
         self.n += num_frames
 
     def load(self, path:str):
-        logging.info(f'Loading mean/var stats <- {path}')
+        info(f'Loading mean/var stats <- {path}')
         with open(path, 'r') as f:
             stats = json.load(f)
             self.o1_sum = torch.tensor(stats['o1_sum'])
@@ -352,7 +351,7 @@ class MeanVarStats:
         return self
 
     def dump(self, path:str):
-        logging.info(f'Dumping mean/var stats -> {path}')
+        info(f'Dumping mean/var stats -> {path}')
         stats = {
             'o1_sum': self.o1_sum.tolist(),
             'o2_sum': self.o2_sum.tolist(),
@@ -556,7 +555,7 @@ class DataPipe:
                 'token_pieces': token_pieces,
                 'token_ids': token_ids,
             })
-            #logging.debug(f'Processed sample {sample.id} -> {key}')
+            #debug(f'Processed sample {sample.id} -> {key}')
 
         features = [ s['feature'] for s in samples ]
         inputs = nn.utils.rnn.pad_sequence(
@@ -607,7 +606,7 @@ def compute_mean_var_stats(dataset, config):
         collate_fn = feature_datapipe,
     )
 
-    logging.info(f'Computing mean var stats ...')
+    info(f'Computing mean var stats ...')
     stats = MeanVarStats()
     for batch in dataloader:
         samples, *_ = batch
@@ -688,16 +687,16 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         distributed = False
 
     device = torch.device('cuda', device_id) if torch.cuda.is_available() else torch.device('cpu')
-    logging.info(f'Rank:{rank} -> device:{device}')
+    info(f'Rank:{rank} -> device:{device}')
 
 
-    logging.debug(f'\n{OmegaConf.to_yaml(config)}\n')
+    debug(f'\n{OmegaConf.to_yaml(config)}\n')
     seed_all(G_SEED)
 
     tokenizer = Tokenizer(**config.Tokenizer)
 
     model = create_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
-    logging.debug(
+    debug(
         'Total params: '
         f'{sum([ p.numel() for p in model.parameters() ])/1e6:.2f}M '
         'Trainable params: '
@@ -710,9 +709,9 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         model = DDP(model, find_unused_parameters=True)
 
     sample_loader = SampleLoader(**config.get('SampleLoader', {}))
-    logging.debug('Loading train_set ...')
+    debug('Loading train_set ...')
     train_dataset = Dataset(config.train_set, sample_loader)
-    logging.debug('Loading valid_set ...')
+    debug('Loading valid_set ...')
     valid_dataset = Dataset(config.valid_set, sample_loader)
     if distributed: dist.barrier()
 
@@ -733,8 +732,8 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         text_normalizer = TextNormalizer(**config.TextNormalizer) if config.get('TextNormalizer') else None,
         tokenizer = tokenizer,
     )
-    logging.debug(train_datapipe.mean_var_normalizer)
-    logging.debug(train_datapipe)
+    debug(train_datapipe.mean_var_normalizer)
+    debug(train_datapipe)
 
     if distributed:
         from torch.utils.data.distributed import DistributedSampler
@@ -770,7 +769,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
         if distributed: dist.barrier()
-        logging.info(f'Epoch {e} training ...')
+        info(f'Epoch {e} training ...')
         model.train()
 
         if distributed:
@@ -805,17 +804,17 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 train_utt_loss = train_loss/train_utts
 
                 if b % config.log_interval == 0:
-                    logging.info(
+                    info(
                         f'Epoch={e}/{config.num_epochs} Batch={b}/{num_batches} '
                         f'{train_utt_loss:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
                     )
 
         if rank == 0:
             dump_checkpoint(model, path := os.path.join(dir, 'checkpoints', f'{e}.ckpt'))
-            logging.debug(f'Checkpoint dumped to {path}')
+            debug(f'Checkpoint dumped to {path}')
         if distributed: dist.barrier()
 
-        logging.info(f'Epoch {e} validation ...')
+        info(f'Epoch {e} validation ...')
         model.eval()
         valid_loss = 0.0
         valid_utts, valid_frames = 0, 0
@@ -835,7 +834,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 valid_utt_loss = valid_loss/valid_utts
 
         if distributed: dist.barrier()
-        logging.info(
+        info(
             f'Epoch {e} summary: '
             f'train_utt_loss={train_utt_loss:<7.2f} '
             f'valid_utt_loss={valid_utt_loss:<7.2f} '
@@ -886,7 +885,7 @@ def recognize(config_path, dir):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
-    logging.info('Decoding ...')
+    info('Decoding ...')
     with torch.no_grad():
         model.eval()
         for b, batch in enumerate(dataloader):
