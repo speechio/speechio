@@ -1,11 +1,11 @@
-Resampler:
+resampler:
     sample_rate: 16000
 
-FbankFeatureExtractor:
+fbank_feature_extractor:
     dither: 0.0
     num_mel_bins: 80
 
-Tokenizer: 
+tokenizer: 
     vocab_path: model/tokenizer/AISHELL-1.vocab
     model_path: model/tokenizer/AISHELL-1.model
 

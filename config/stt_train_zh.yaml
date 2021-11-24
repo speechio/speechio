@@ -1,4 +1,4 @@
-SampleLoader:
+sample_loader:
     field_map:
         id: ID
         audio: AUDIO
@@ -11,30 +11,30 @@ SampleLoader:
     min_text_length: 1
     max_text_length: 1024
 
-Resampler:
+resampler:
     sample_rate: 16000
 
-Perturbation:
+perturbation:
     mark_key: True
     speeds: [0.9, 1.0, 1.1]
     tempos: #[0.9, 1.0, 1.1]
     volumes: #[0.9, 1.0, 1.1]
 
-FbankFeatureExtractor:
+fbank_feature_extractor:
     dither: 0.0
     num_mel_bins: 80
 
-SpecAugment:
+spec_augment:
     mark_key: True
     num_t_masks: 2
     t_mask_width_max: 50
     num_f_masks: 2
     f_mask_width_max: 10
 
-TextNormalizer:
+text_normalizer:
     case: upper # either 'upper' or 'lower'
 
-Tokenizer: 
+tokenizer: 
     vocab_path: model/tokenizer/AISHELL-1.vocab
     model_path: model/tokenizer/AISHELL-1.model
     blk: '<blk>'
@@ -43,7 +43,7 @@ Tokenizer:
     unk: '<unk>'
     sil: '<sil>'
 
-DataLoader:
+data_loader:
     num_workers: 2
     drop_last: False
     batch_size: 16
