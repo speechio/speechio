@@ -5,7 +5,7 @@
 # All rights reserved.
 
 import argparse
-from core import stt
+from sio import stt
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
