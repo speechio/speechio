@@ -26,6 +26,7 @@ import sentencepiece as spm
 #import k2
 
 # Global Constants
+G_FLOAT_INF = float('inf')
 G_SEED = 37927
 G_FEATURE_PADDING_VALUE = 0.0
 G_PAD_ID = -1
@@ -37,7 +38,7 @@ class Sample:
     id:str = ''
     audio:str = ''
     begin:float = 0.0
-    duration:float = 0.0
+    duration:float = G_FLOAT_INF
     text:str = ''
     speaker:str = ''
 
@@ -66,9 +67,9 @@ class SampleLoader:
             'speaker': 'SPEAKER',
         },
         min_duration:float = 0.0, 
-        max_duration:float = 60.0, 
-        min_text_length:int = 1, 
-        max_text_length:int = 2048, 
+        max_duration:float = G_FLOAT_INF,
+        min_text_length:int = 0, 
+        max_text_length:int = sys.maxsize,
     ) :
         self.field_map = field_map
 
@@ -91,14 +92,17 @@ class SampleLoader:
                 assert hasattr(sample, attr), f'{field} -> Sample.{attr} mapping failed, no such attribute'
                 setattr(sample, attr, v)
 
-        if sample.duration < self.min_duration:
-            return None
-        if sample.duration > self.max_duration:
-            return None
-        if len(sample.text) < self.min_text_length:
-            return None
-        if len(sample.text) > self.max_text_length:
-            return None
+        if sample.duration != G_FLOAT_INF:
+            if sample.duration < self.min_duration:
+                return None
+            if sample.duration > self.max_duration:
+                return None
+        
+        if sample.text:
+            if len(sample.text) < self.min_text_length:
+                return None
+            if len(sample.text) > self.max_text_length:
+                return None
 
         return sample
 
@@ -118,39 +122,43 @@ class Dataset:
             if subset.max_num_samples == 0:
                 continue
             elif subset.max_num_samples < 0:
-                subset.max_num_samples = sys.maxsize # https://docs.python.org/3/library/sys.html#sys.maxsize
+                subset.max_num_samples = sys.maxsize
 
-            # retrive dataset info from data zoo
             base_dir, metadata = data_zoo[subset.id].dir, data_zoo[subset.id].metadata
             logging.debug(f'  Loading {subset.id} from ({base_dir} : {metadata}) ...')
+
             with open(metadata, 'r', encoding='utf8') as f:
                 if str.endswith(metadata, '.tsv'):
-                    utterance_reader = csv.DictReader(f, delimiter='\t')
+                    utts_reader = csv.DictReader(f, delimiter='\t')
+
+                    if sample_loader.field_map['begin'] not in utts_reader.fieldnames:
+                        logging.warning('No explicit Sample::begin info from metadata, using default value 0.0')
+                    if sample_loader.field_map['duration'] not in utts_reader.fieldnames:
+                        logging.warning(
+                            'No explicit Sample::duration info from metadata, '
+                            'min/max_duration filtering will be turned OFF.'
+                        )
+                    if sample_loader.field_map['text'] not in utts_reader.fieldnames:
+                        logging.warning(
+                            'No explicit Sample::text info from metadata, '
+                            'min/max_text_length filtering will be turned OFF.'
+                        )
                 else:
                     raise NotImplementedError
 
                 k = 0
-                for utt in utterance_reader:
+                for utt in utts_reader:
                     if k >= subset.max_num_samples:
                         break
                     if sample := sample_loader(base_dir, utt):
                         self.samples.append(sample)
                         k += 1
 
-                self.subsets_info.append({
-                    'id': subset.id,
-                    'dir': base_dir,
-                    'metadata': metadata,
-                    'num_utts': k,
-                })
                 logging.debug(f'  {k} samples loaded from {subset.id}')
         logging.debug(f'Total {len(self.samples)} loaded.')
         # length sort
 
         # shuffle
-    
-    def __repr__(self):
-        return repr([ f"{x['id']}:{x['num_utts']}" for x in self.subsets_info ])
 
     def __getitem__(self, index:int):
         return self.samples[index]
@@ -173,7 +181,7 @@ def seconds_to_samples(sample_rate:int, seconds:float):
     )
 
 
-def torch_audio_load(audio_path:str, begin:float, duration:float) :
+def load_audio(path:str, begin:float = 0.0, duration:float = G_FLOAT_INF) :
     '''
     https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
 
@@ -183,13 +191,17 @@ def torch_audio_load(audio_path:str, begin:float, duration:float) :
         sample_rate=16000, num_frames=31872, num_channels=1, bits_per_sample=16, encoding=PCM_S,
     )
     '''
-    info = torchaudio.info(audio_path)
-    waveform, sample_rate = torchaudio.load(
-        audio_path,
-        frame_offset = seconds_to_samples(info.sample_rate, begin),
-        num_frames   = seconds_to_samples(info.sample_rate, duration),
+    meta = torchaudio.info(path)
+    actual_duration = min(
+        meta.num_frames / meta.sample_rate - begin,
+        duration,
     )
-    return waveform, sample_rate
+    waveform, sample_rate = torchaudio.load(
+        path,
+        frame_offset = seconds_to_samples(meta.sample_rate, begin),
+        num_frames   = seconds_to_samples(meta.sample_rate, actual_duration),
+    )
+    return waveform, sample_rate, actual_duration
 
 
 class Resampler:
@@ -471,7 +483,6 @@ class TextNormalizer:
 
 class DataPipe:
     def __init__(self,
-        audio_loader:callable,
         resampler:Optional[callable] = None,
         perturbation:Optional[callable] = None,
         feature_extractor:Optional[callable] = None,
@@ -480,7 +491,6 @@ class DataPipe:
         text_normalizer:Optional[callable] = None,
         tokenizer:Optional[callable] = None,
     ) :
-        self.audio_loader = audio_loader
         self.resampler = resampler
         self.perturbation = perturbation
         self.feature_extractor = feature_extractor
@@ -498,7 +508,9 @@ class DataPipe:
             # raw audio loading
             key = sample.id
 
-            waveform, sample_rate = self.audio_loader(sample.audio, sample.begin, sample.duration)
+            waveform, sample_rate, sample.duration = load_audio(
+                sample.audio, sample.begin, sample.duration
+            ) # This ensures sample.duration consistent with actually loaded wave length
 
             if self.resampler:
                 waveform, sample_rate = self.resampler(waveform, sample_rate)
@@ -581,7 +593,6 @@ def move_tensor_to_device(*tensors):
 
 def compute_mean_var_stats(dataset, config):
     feature_datapipe = DataPipe(
-        audio_loader = torch_audio_load,
         resampler = Resampler(**config.Resampler),
         perturbation = Perturbation(**config.Perturbation),
         feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
@@ -682,9 +693,9 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     model = create_model(config.model_name, config.model_hparam, config.FbankFeatureExtractor.num_mel_bins, tokenizer)
     logging.debug(
         'Total params: '
-        f'{sum([ p.numel() for p in model.parameters() ])/float(1e6):.2f}M '
+        f'{sum([ p.numel() for p in model.parameters() ])/1e6:.2f}M '
         'Trainable params: '
-        f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/float(1e6):.2f}M '
+        f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/1e6:.2f}M '
     )
     model.to(device)
 
@@ -708,7 +719,6 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
     train_datapipe = DataPipe(
-        audio_loader = torch_audio_load,
         resampler = Resampler(**config.Resampler) if config.get('Resampler') else None,
         perturbation = Perturbation(**config.Perturbation) if config.get('Perturbation') else None,
         feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
@@ -840,7 +850,6 @@ def recognize(config_path, dir):
     tokenizer = Tokenizer(**config.Tokenizer)
 
     datapipe = DataPipe(
-        audio_loader = torch_audio_load,
         resampler = Resampler(**config.Resampler) if config.get('Resampler') else None,
         perturbation = Perturbation(**config.Perturbation) if config.get('Perturbation') else None,
         feature_extractor = FbankFeatureExtractor(**config.FbankFeatureExtractor),
