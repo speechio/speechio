@@ -252,7 +252,7 @@ class Perturbation:
                     ['rate', str(sample_rate)]
                 ])
                 if self.mark_key:
-                    key = f'{key}__speed{factor}'
+                    key += f'__speed{factor}'
 
         if self.tempos:
             if (factor := random.choice(self.tempos)) != 1.0:
@@ -261,13 +261,13 @@ class Perturbation:
                     ['rate', str(sample_rate)]
                 ])
                 if self.mark_key:
-                    key = f'{key}__tempo{factor}'
+                    key += f'__tempo{factor}'
 
         if self.volumes:
             if (factor := random.choice(self.volumes)) != 1.0:
                 effects_chain.append(['vol', str(factor)])
                 if self.mark_key:
-                    key = f'{key}__vol{factor}'
+                    key += f'__vol{factor}'
 
         if effects_chain:
             new_waveform, new_sample_rate = torchaudio.sox_effects.apply_effects_tensor(
@@ -417,7 +417,7 @@ class SpecAugment:
             feature[:, f : f + k] = 0.0
 
         if self.mark_key:
-            key = f'{key}__SpecAugment'
+            key += '__SpecAugment'
         return key, feature
 
 
@@ -665,6 +665,12 @@ def average_checkpoints(checkpoint_paths:list[str]):
     return averaged
 
 
+def seed_all(seed:int):
+    random.seed(seed)
+    #np.random.seed(seed) # numpy not used for now
+    torch.manual_seed(seed)
+
+
 def train(config, dir:str, device_id:int, world_size:int, rank:int):
     logging.basicConfig(
         stream=sys.stderr, 
@@ -686,7 +692,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
 
     logging.debug(f'\n{OmegaConf.to_yaml(config)}\n')
-    torch.manual_seed(G_SEED)
+    seed_all(G_SEED)
 
     tokenizer = Tokenizer(**config.Tokenizer)
 
