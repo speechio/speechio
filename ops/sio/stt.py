@@ -307,43 +307,43 @@ class FbankFeatureExtractor:
 
 class MeanVarStats:
     def __init__(self):
-        self.o1_stats = None
-        self.o2_stats = None
+        self.o1_sum = None
+        self.o2_sum = None
         self.n = 0
 
     def __repr__(self):
         return (
             '\nGlobal MEAN/VAR stats:\n'
-            f'    1st_order:  {self.o1_stats}\n'
-            f'    2nd_order:  {self.o2_stats}\n'
+            f'    1st_order:  {self.o1_sum}\n'
+            f'    2nd_order:  {self.o2_sum}\n'
             f'    frames:   {self.n}\n'
         )
 
     def accumulate_mean_var_stats(self, feature:torch.Tensor):
         num_frames, feature_dim = feature.shape
         if self.n == 0:
-            self.o1_stats = torch.zeros(feature_dim)
-            self.o2_stats = torch.zeros(feature_dim)
+            self.o1_sum = torch.zeros(feature_dim)
+            self.o2_sum = torch.zeros(feature_dim)
 
-        assert self.o1_stats.shape[0] == feature_dim, f'mean_var_dim({self.o1_stats.shape[0]}) != feature_dim({feature_dim})'
-        self.o1_stats += feature.sum(dim=0)
-        self.o2_stats += feature.square().sum(dim=0)
+        assert self.o1_sum.shape[0] == feature_dim, f'mean_var_dim({self.o1_sum.shape[0]}) != feature_dim({feature_dim})'
+        self.o1_sum += feature.sum(dim=0)
+        self.o2_sum += feature.square().sum(dim=0)
         self.n += num_frames
 
     def load(self, path:str):
         logging.info(f'Loading mean/var stats <- {path}')
         with open(path, 'r') as f:
             stats = json.load(f)
-            self.o1_stats = torch.tensor(stats['o1_stats'])
-            self.o2_stats = torch.tensor(stats['o2_stats'])
+            self.o1_sum = torch.tensor(stats['o1_sum'])
+            self.o2_sum = torch.tensor(stats['o2_sum'])
             self.n = stats['n']
         return self
 
     def dump(self, path:str):
         logging.info(f'Dumping mean/var stats -> {path}')
         stats = {
-            'o1_stats': self.o1_stats.tolist(),
-            'o2_stats': self.o2_stats.tolist(),
+            'o1_sum': self.o1_sum.tolist(),
+            'o2_sum': self.o2_sum.tolist(),
             'n': self.n,
         }
         with open(path, 'w+') as f:
@@ -352,8 +352,8 @@ class MeanVarStats:
 
 class MeanVarNormalizer:
     def __init__(self, mean_var_stats:MeanVarStats):
-        mean = mean_var_stats.o1_stats / mean_var_stats.n
-        var  = mean_var_stats.o2_stats / mean_var_stats.n - mean.square()
+        mean = mean_var_stats.o1_sum / mean_var_stats.n
+        var  = mean_var_stats.o2_sum / mean_var_stats.n - mean.square()
         self.mean_norm_shift = -mean
         self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
 
