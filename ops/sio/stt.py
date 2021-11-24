@@ -608,7 +608,7 @@ def compute_mean_var_stats(dataset, config):
 
 def create_model(model_name:str, model_hparam:str, input_dim, tokenizer):
     if  model_name == 'conformer':
-        from core.conformer import Model
+        from .conformer import Model
         model = Model(
             os.path.join(os.path.dirname(__file__), model_hparam),
             input_dim,
