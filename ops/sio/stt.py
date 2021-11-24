@@ -5,23 +5,22 @@
 # All rights reserved.
 
 import os, sys
-from typing import Optional
-from dataclasses import dataclass
 import logging
-from contextlib import nullcontext
-
 import decimal
 import random
+from dataclasses import dataclass
+from typing import Optional
+from contextlib import nullcontext
+
+import csv   # metadata
+import json  # mvn stats
+from omegaconf import OmegaConf
 
 #import numpy
 import torch
 import torch.nn as nn
 import torchaudio
 import torchaudio.sox_effects
-
-import csv   # metadata
-import json  # mvn stats
-from omegaconf import OmegaConf
 
 import sentencepiece as spm
 #import k2
@@ -331,23 +330,23 @@ class MeanVarStats:
         self.o2_stats += feature.square().sum(dim=0)
         self.n += num_frames
 
-    def load(self, filename:str):
-        logging.info(f'Loading mean/var stats <- {filename}')
-        with open(filename, 'r') as f:
+    def load(self, path:str):
+        logging.info(f'Loading mean/var stats <- {path}')
+        with open(path, 'r') as f:
             stats = json.load(f)
             self.o1_stats = torch.tensor(stats['o1_stats'])
             self.o2_stats = torch.tensor(stats['o2_stats'])
             self.n = stats['n']
         return self
 
-    def dump(self, filename:str):
-        logging.info(f'Dumping mean/var stats -> {filename}')
+    def dump(self, path:str):
+        logging.info(f'Dumping mean/var stats -> {path}')
         stats = {
             'o1_stats': self.o1_stats.tolist(),
             'o2_stats': self.o2_stats.tolist(),
             'n': self.n,
         }
-        with open(filename, 'w+') as f:
+        with open(path, 'w+') as f:
             json.dump(stats, f, indent=4)
 
 
@@ -569,10 +568,10 @@ class DataPipe:
         return samples, num_utts, num_frames, inputs, input_lengths, targets, target_lengths
 
 
-def dump_tensor_to_csv(x:torch.Tensor, filename:str):
+def dump_tensor_to_csv(x:torch.Tensor, path:str):
     import pandas as pd
     df = pd.DataFrame(x.numpy())
-    df.to_csv(filename)
+    df.to_csv(path)
 
 
 def move_tensor_to_device(*tensors):
@@ -624,31 +623,31 @@ def create_model(model_name:str, model_hparam:str, input_dim, tokenizer):
         raise NotImplementedError(f'Unsupported model: {model_name}')
 
 
-def load_checkpoint(model:nn.Module, filepath:str):
+def load_checkpoint(model:nn.Module, path:str):
     if torch.cuda.is_available():
-        state_dict = torch.load(filepath)
+        state_dict = torch.load(path)
     else:
-        state_dict = torch.load(filepath, map_location = 'cpu')
+        state_dict = torch.load(path, map_location = 'cpu')
     model.load_state_dict({ k.removeprefix('module.') : v for k,v in state_dict.items() })
 
 
-def dump_checkpoint(model:nn.Module, filepath:str):
+def dump_checkpoint(model:nn.Module, path:str):
     if isinstance(model, nn.parallel.DistributedDataParallel):
         state_dict = model.module.state_dict()
     else:
         state_dict = model.state_dict()
-    torch.save(state_dict, filepath)
+    torch.save(state_dict, path)
 
 
-def average_checkpoints(checkpoint_files:list[str]):
+def average_checkpoints(checkpoint_paths:list[str]):
     from functools import reduce
 
-    N = len(checkpoint_files)
-    print(f'averaging {N} models: {checkpoint_files}', file=sys.stderr, flush=True)
+    N = len(checkpoint_paths)
+    print(f'averaging {N} models: {checkpoint_paths}', file=sys.stderr, flush=True)
     
     summed = reduce(
         lambda x, y: { k: x[k] + y[k] for k in x.keys() }, # sum two pytorch "state dicts"
-        [ torch.load(f, map_location=torch.device('cpu')) for f in checkpoint_files],
+        [ torch.load(f, map_location=torch.device('cpu')) for f in checkpoint_paths],
     )
     averaged = { k : torch.true_divide(v, N) for k,v in summed.items() }
 
@@ -796,9 +795,8 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                     )
 
         if rank == 0:
-            checkpoint_file = os.path.join(dir, 'checkpoints', f'{e}.ckpt')
-            logging.debug(f'Dumping checkpoint to {checkpoint_file}')
-            dump_checkpoint(model, checkpoint_file)
+            dump_checkpoint(model, path := os.path.join(dir, 'checkpoints', f'{e}.ckpt'))
+            logging.debug(f'Checkpoint dumped to {path}')
         if distributed: dist.barrier()
 
         logging.info(f'Epoch {e} validation ...')
