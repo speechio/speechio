@@ -658,7 +658,7 @@ def average_checkpoints(checkpoint_paths:list[str]):
     print(f'averaging {N} models: {checkpoint_paths}', file=sys.stderr, flush=True)
     
     summed = reduce(
-        lambda x, y: { k: x[k] + y[k] for k in x.keys() }, # sum of pytorch "state dicts"
+        lambda x, y: { k: x[k] + y[k] for k in x.keys() }, # sum of two "pytorch state dicts"
         [ torch.load(f, map_location=torch.device('cpu')) for f in checkpoint_paths ],
     )
     averaged = { k : torch.true_divide(v, N) for k,v in summed.items() }
@@ -827,10 +827,8 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
             for b, batch in enumerate(valid_dataloader, 1):
                 samples, num_utts, num_frames, X, T, Y, U = batch
 
-                X = X.to(device)
-                T = T.to(device)
-                Y = Y.to(device)
-                U = U.to(device)
+                X, T = X.to(device), T.to(device)
+                Y, U = Y.to(device), U.to(device)
                 loss = model(X, T, Y, U)
 
                 valid_utts += num_utts
@@ -851,7 +849,7 @@ def recognize(config_path, dir):
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
     data_zoo = OmegaConf.load(G_DEFAULT_DATA_ZOO)
-    dataset = Dataset(data_zoo, config.test_set)
+    dataset = Dataset(data_zoo, config.test_set) # with default sample loader
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if os.path.isfile(mean_var_stats_file):
@@ -897,8 +895,7 @@ def recognize(config_path, dir):
             samples, num_utts, num_frames, X, T, *_ = batch
             assert num_utts == 1
 
-            X = X.to(device)
-            T = T.to(device)
+            X, T = X.to(device), T.to(device)
             hyps = model.decode(X, T)
 
             print(f'{b}\t{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}', file=sys.stdout, flush=True)
