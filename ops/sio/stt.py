@@ -132,32 +132,35 @@ class Dataset:
                     utts_reader = csv.DictReader(f, delimiter='\t')
 
                     if sample_loader.field_map['begin'] not in utts_reader.fieldnames:
-                        warning('No explicit Sample::begin info from metadata, using default value 0.0')
+                        warning(
+                            'Metadata provides nothing for Sample::begin to load, '
+                            'fallback begin attr to default value 0.0'
+                        )
                     if sample_loader.field_map['duration'] not in utts_reader.fieldnames:
                         warning(
-                            'No explicit Sample::duration info from metadata, '
+                            'Metadata provides nothing for Sample::duration to load, '
                             'min/max_duration filtering will be turned OFF.'
                         )
                     if sample_loader.field_map['text'] not in utts_reader.fieldnames:
                         warning(
-                            'No explicit Sample::text info from metadata, '
+                            'Metadata provides nothing for Sample::text to load, '
                             'min/max_text_length filtering will be turned OFF.'
                         )
                 else:
                     raise NotImplementedError
 
-                k = 0
+                # Invariant: self.samples[0, k) are loaded
+                k = 0  # Precondition: k == 0
                 for utt in utts_reader:
-                    if k >= subset.max_num_samples:
+                    if k < subset.max_num_samples:
+                        if sample := sample_loader(base_dir, utt):
+                            self.samples.append(sample)
+                            k += 1
+                    else:
                         break
-                    if sample := sample_loader(base_dir, utt):
-                        self.samples.append(sample)
-                        k += 1
+                # Postcondition: k == min(length of utts_reader, subset.max_num_samples)
                 debug(f'  {k} samples loaded from {subset.id}')
         debug(f'Total {len(self.samples)} loaded.')
-        # length sort
-
-        # shuffle
 
     def __getitem__(self, index:int):
         return self.samples[index]
