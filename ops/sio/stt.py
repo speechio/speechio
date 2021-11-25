@@ -120,12 +120,13 @@ class Dataset:
         self.samples = []
 
         for subset in dataset_config.subsets:
-            if subset.max_num_samples == 0:
+            if subset.max_num_samples == 0:  # set this to 0 in config means skipping
                 continue
             elif subset.max_num_samples < 0:
                 subset.max_num_samples = sys.maxsize
 
-            base_dir, metadata = data_zoo[subset.id].dir, data_zoo[subset.id].metadata
+            base_dir = data_zoo[subset.id].dir
+            metadata = data_zoo[subset.id].metadata
             debug(f'  Loading {subset.id} from ({base_dir} : {metadata}) ...')
 
             with open(metadata, 'r', encoding='utf8') as f:
