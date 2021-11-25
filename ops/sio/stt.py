@@ -299,8 +299,10 @@ class FbankFeatureExtractor:
         # To use Kaldi compliance function, 
         # waveform needs to be convert to 16bits signed-interger PCM [-32768, 32767]
         # TODO:
-        # torchaudio's feature extraction is not consistent with Kaldi https://github.com/pytorch/audio/issues/400
-        # torchaudio official plan to bind kaldi feat lib: https://github.com/pytorch/audio/issues/1269
+        # torchaudio's feature extraction is not consistent with Kaldi:
+        #   https://github.com/pytorch/audio/issues/400
+        # torchaudio official plan to bind kaldi feat lib: 
+        #   https://github.com/pytorch/audio/issues/1269
         # to not finished up to 2021-10-02 : https://github.com/pytorch/audio/pull/1326
         # keep an eye on this work and do it myself if necessary
         assert waveform.dtype == torch.float32
