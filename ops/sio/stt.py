@@ -791,10 +791,8 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
             for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
                 samples, num_utts, num_frames, X, T, Y, U = batch
 
-                X = X.to(device)
-                T = T.to(device)
-                Y = Y.to(device)
-                U = U.to(device)
+                X, T = X.to(device), T.to(device)
+                Y, U = Y.to(device), U.to(device)
 
                 with model.no_sync() if distributed and b % config.gradient_accumulation != 0 else nullcontext():
                     loss = model(X, T, Y, U)
