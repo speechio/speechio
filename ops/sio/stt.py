@@ -46,17 +46,19 @@ class Sample:
 
 
 class SampleLoader:
-    ''' A callable wrapper class to load one utterance dict (a tsv/jsonl/yaml item)
+    ''' A callable wrapper class to load one utterance dict (a tsv/json/jsonl item)
     input:
         utt_dict = {
-            'ID': 'utt_key_1',
-            'AUDIO': 'audio/one_utterance.wav',
-            'DURATION': '1.28',
-            'TEXT': 'Hello World'
+            'ID': 'foo_bar',
+            'AUDIO': 'audio/foo_bar.wav',
+            'BEGIN': 0.0,
+            'DURATION': 1.28,
+            'TEXT': 'Hey, Siri',
+            'SPEAKER': 'Jerry'
         }
 
     return:
-        a Sample object or None
+        a Sample object, or None
         None if an utterance doesn't satisfy constraints e.g. duration, text length
     '''
     def __init__(self, 
@@ -91,7 +93,7 @@ class SampleLoader:
                     v = os.path.join(base_dir, v)
                 else:
                     v = str(v)
-                assert hasattr(sample, attr), f'{field} -> Sample.{attr} mapping failed, no such attribute'
+                assert hasattr(sample, attr), f'{field} -> Sample.{attr} mapping failed'
                 setattr(sample, attr, v)
 
         if sample.duration != G_FLOAT_INF:
