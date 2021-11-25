@@ -111,11 +111,10 @@ class SampleLoader:
 
 class Dataset:
     def __init__(self,
+        data_zoo:dict,
         dataset_config:dict,
         sample_loader:callable = SampleLoader(),
-        data_zoo_path:str = G_DEFAULT_DATA_ZOO,
     ) :
-        data_zoo = OmegaConf.load(data_zoo_path)
         self.samples = []
 
         for subset in dataset_config.subsets:
@@ -297,7 +296,8 @@ class FbankFeatureExtractor:
             https://pytorch.org/audio/stable/compliance.kaldi.html
         '''
         # By default, torchaudio uses normalized 32bits float waveform [-1.0, 1.0]
-        # To use Kaldi compliance function, waveform needs to be convert to 16bits signed-interger PCM [-32768, 32767]
+        # To use Kaldi compliance function, 
+        # waveform needs to be convert to 16bits signed-interger PCM [-32768, 32767]
         # TODO:
         # torchaudio's feature extraction is not consistent with Kaldi https://github.com/pytorch/audio/issues/400
         # torchaudio official plan to bind kaldi feat lib: https://github.com/pytorch/audio/issues/1269
@@ -338,8 +338,9 @@ class MeanVarStats:
         if self.n == 0:
             self.o1_sum = torch.zeros(feature_dim)
             self.o2_sum = torch.zeros(feature_dim)
+        assert self.o1_sum.shape[0] == feature_dim
+        assert self.o2_sum.shape[0] == feature_dim
 
-        assert self.o1_sum.shape[0] == feature_dim, f'mean_var_dim({self.o1_sum.shape[0]}) != feature_dim({feature_dim})'
         self.o1_sum += feature.sum(dim=0)
         self.o2_sum += feature.square().sum(dim=0)
         self.n += num_frames
@@ -711,12 +712,14 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     if distributed:
         from torch.nn.parallel import DistributedDataParallel as DDP
         model = DDP(model, find_unused_parameters=True)
+    
+    data_zoo = OmegaConf.load(G_DEFAULT_DATA_ZOO)
 
     sample_loader = SampleLoader(**config.get('sample_loader', {}))
     debug('Loading train_set ...')
-    train_dataset = Dataset(config.train_set, sample_loader)
+    train_dataset = Dataset(data_zoo, config.train_set, sample_loader)
     debug('Loading valid_set ...')
-    valid_dataset = Dataset(config.valid_set, sample_loader)
+    valid_dataset = Dataset(data_zoo, config.valid_set, sample_loader)
     if distributed: dist.barrier()
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
@@ -845,6 +848,9 @@ def recognize(config_path, dir):
     config = OmegaConf.load(config_path)
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
+    data_zoo = OmegaConf.load(G_DEFAULT_DATA_ZOO)
+    dataset = Dataset(data_zoo, config.test_set)
+
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if os.path.isfile(mean_var_stats_file):
         mean_var_stats = MeanVarStats().load(mean_var_stats_file)
@@ -863,8 +869,6 @@ def recognize(config_path, dir):
         tokenizer = tokenizer,
     )
 
-    sample_loader = SampleLoader(**config.get('sample_loader', {}))
-    dataset = Dataset(config.test_set, sample_loader)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         shuffle = False,
