@@ -31,7 +31,7 @@ import sentencepiece as spm
 G_FLOAT_INF = float('inf')
 G_SEED = 37927
 G_FEATURE_PADDING_VALUE = 0.0
-G_PAD_ID = -1
+G_LABEL_PADDING_VALUE = -1
 G_DEFAULT_DATA_ZOO = 'config/data_zoo.yaml'
 
 
@@ -169,6 +169,50 @@ class Dataset:
 
     def __len__(self):
         return len(self.samples)
+
+
+class DatasetView:
+    def __init__(self, dataset:Dataset):
+        self.dataset = dataset
+        self.itable = list(range(len(dataset)))
+
+    def __getitem__(self, i):
+        return self.dataset[self.itable[i]]
+    
+    def __len__(self):
+        return len(self.itable)
+
+    def shuffle(self):
+        random.shuffle(self.itable)
+        return self
+
+    def draw(self, n:int, mode:str = 'random'):
+        if mode == 'random':
+            self.itable = random.sample(self.itable, n)
+        elif mode == 'head':
+            self.itable = self.itable[:n]
+        elif mode == 'tail':
+            self.itable = self.itable[-n:]
+        return self
+    
+    def repeat(self, num_copies:int):
+        self.itable *= num_copies
+        return self
+
+    def shard(self, shard_index:int, num_shards:int):
+        self.itable = self.itable[shard_index::num_shards]
+        return self
+
+    def sort_by(self, what:str, reverse = True):
+        if what == 'duration':
+            self.itable = sorted(
+                self.itable, 
+                key = lambda x: self.dataset[x].duration, 
+                reverse = reverse,
+            )
+        else:
+            raise NotImplementedError
+        return self
 
 
 # https://github.com/lhotse-speech/lhotse/blob/master/lhotse/utils.py#L367 : compute_num_samples()
@@ -573,7 +617,7 @@ class DataPipe:
         targets = nn.utils.rnn.pad_sequence(
             labels,
             batch_first = True,
-            padding_value = G_PAD_ID,
+            padding_value = G_LABEL_PADDING_VALUE,
         )  # [batch_size, max(num_label_tokens)]
         target_lengths = torch.tensor([ len(y) for y in labels ])  # [batch_size]
 
@@ -681,6 +725,9 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         level=logging.DEBUG if rank == 0 else logging.INFO,
         format = f'\x1B[1;32m%(asctime)s [Rank={rank}/{world_size}:%(levelname)s] %(message)s\x1B[0m',
     )
+    debug(f'\n{OmegaConf.to_yaml(config)}\n')
+
+    seed_all(G_SEED)
 
     if world_size > 1:
         import torch.distributed as dist
@@ -693,10 +740,6 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     device = torch.device('cuda', device_id) if torch.cuda.is_available() else torch.device('cpu')
     info(f'Rank:{rank} -> device:{device}')
-
-
-    debug(f'\n{OmegaConf.to_yaml(config)}\n')
-    seed_all(G_SEED)
 
     tokenizer = Tokenizer(**config.tokenizer)
 
@@ -747,6 +790,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     debug(train_datapipe.mean_var_normalizer)
     debug(train_datapipe)
 
+    #train_dataset_view = DatasetView(train_dataset).repeat(10).sort_by('duration')
     if distributed:
         from torch.utils.data.distributed import DistributedSampler
         sampler = DistributedSampler(train_dataset, shuffle=True) 
@@ -840,7 +884,9 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         info(
             f'Epoch {e} summary: '
             f'train_loss_per_utt={train_loss_per_utt:<7.2f} '
+            f'over {train_utts} utts '
             f'valid_loss_per_utt={valid_loss_per_utt:<7.2f} '
+            f'over {valid_utts} utts '
             f'diff={train_loss_per_utt - valid_loss_per_utt:<7.2f} '
         )
 
