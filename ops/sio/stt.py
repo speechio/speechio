@@ -136,7 +136,7 @@ class Dataset:
                     if sample_loader.field_map['begin'] not in utts_reader.fieldnames:
                         warning(
                             'Metadata provides nothing for Sample.begin to load, '
-                            'fallback to default value 0.0'
+                            'using default value 0.0'
                         )
                     if sample_loader.field_map['duration'] not in utts_reader.fieldnames:
                         warning(
@@ -681,13 +681,13 @@ def create_model(model_name:str, model_hparam:str, input_dim, tokenizer):
         raise NotImplementedError(f'Unsupported model: {model_name}')
 
 
-def load_checkpoint(model:nn.Module, path:str):
-    if torch.cuda.is_available():
-        state_dict = torch.load(path)
-    else:
-        state_dict = torch.load(path, map_location = 'cpu')
+def load_checkpoint(model:nn.Module, device, path:str):
+    state_dict = torch.load(path, map_location = device)
     #model.load_state_dict({ k.removeprefix('module.') : v for k,v in state_dict.items() })
-    model.load_state_dict(state_dict)
+    if isinstance(model, nn.parallel.DistributedDataParallel):
+        model.module.load_state_dict(state_dict)
+    else:
+        model.load_state_dict(state_dict)
 
 
 def dump_checkpoint(model:nn.Module, path:str):
@@ -754,13 +754,15 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         config.fbank_feature_extractor.num_mel_bins, 
         tokenizer,
     )
+    model.to(device)
+    if os.path.isfile(init_checkpoint := os.path.join(dir, 'initial.model')):
+        load_checkpoint(model, device, init_checkpoint)
     debug(
         'Total params: '
         f'{sum([ p.numel() for p in model.parameters() ])/1e6:.2f}M '
         'Trainable params: '
         f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/1e6:.2f}M '
     )
-    model.to(device)
 
     if distributed:
         from torch.nn.parallel import DistributedDataParallel as DDP
@@ -829,9 +831,20 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
-        ddp_barrier()
-        info(f'Epoch {e} training ...')
+        checkpoint_model_path = os.path.join(dir, 'checkpoints', f'{e}.model')
+        checkpoint_state_path = os.path.join(dir, 'checkpoints', f'{e}.state')
 
+        ddp_barrier()
+        # Load checkpoint skip this epoch
+        if os.path.isfile(checkpoint_model_path) and os.path.isfile(checkpoint_state_path):
+            info(f'Skipping epoch {e} training')
+            load_checkpoint(model, device, checkpoint_model_path)
+            state = torch.load(checkpoint_state_path, map_location=device)
+            optimizer.load_state_dict(state['optimizer_state'])
+            scheduler.load_state_dict(state['scheduler_state'])
+            continue
+
+        info(f'Epoch {e} training ...')
         model.train()
         train_loss, train_utts = 0.0, 0
         if distributed: train_dataloader.sampler.set_epoch(e)
@@ -863,9 +876,14 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                         f'{train_loss_per_utt:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
                     )
         
+        # dump checkpoint
         if rank == 0:
-            dump_checkpoint(model, path := os.path.join(dir, 'checkpoints', f'{e}.ckpt'))
-            debug(f'Checkpoint dumped to {path}')
+            dump_checkpoint(model, checkpoint_model_path)
+            state = { 
+                'optimizer_state': optimizer.state_dict(),
+                'scheduler_state': scheduler.state_dict(),
+            }
+            torch.save(state, checkpoint_state_path)
         ddp_barrier()
 
         info(f'Epoch {e} validation ...')
@@ -935,9 +953,9 @@ def recognize(config_path, dir):
         config.fbank_feature_extractor.num_mel_bins, 
         tokenizer
     )
-    load_checkpoint(model, os.path.join(dir, 'final.ckpt'))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
+    load_checkpoint(model, device, os.path.join(dir, 'final.model'))
 
     info('Decoding ...')
     with torch.no_grad():
