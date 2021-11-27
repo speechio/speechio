@@ -866,33 +866,33 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         if rank == 0:
             dump_checkpoint(model, path := os.path.join(dir, 'checkpoints', f'{e}.ckpt'))
             debug(f'Checkpoint dumped to {path}')
+        ddp_barrier()
 
-        if rank == 0: # set this to True to check if validation across all ranks are consistent
-            info(f'Epoch {e} validation ...')
+        info(f'Epoch {e} validation ...')
 
-            model.eval()
-            valid_loss, valid_utts = 0.0, 0
+        model.eval()
+        valid_loss, valid_utts = 0.0, 0
 
-            with torch.no_grad():
-                for b, batch in enumerate(valid_dataloader, 1):
-                    samples, num_utts, num_frames, X, T, Y, U = batch
+        with torch.no_grad():
+            for b, batch in enumerate(valid_dataloader, 1):
+                samples, num_utts, num_frames, X, T, Y, U = batch
 
-                    X, T = X.to(device), T.to(device)
-                    Y, U = Y.to(device), U.to(device)
-                    loss = model(X, T, Y, U)
+                X, T = X.to(device), T.to(device)
+                Y, U = Y.to(device), U.to(device)
+                loss = model(X, T, Y, U)
 
-                    valid_utts += num_utts
-                    valid_loss += loss.item()
-                    valid_loss_per_utt = valid_loss/valid_utts
+                valid_utts += num_utts
+                valid_loss += loss.item()
+                valid_loss_per_utt = valid_loss/valid_utts
 
-            info(
-                f'Epoch {e} summary: '
-                f'train_loss_per_utt={train_loss_per_utt:<7.2f} '
-                f'over {train_utts} utts '
-                f'valid_loss_per_utt={valid_loss_per_utt:<7.2f} '
-                f'over {valid_utts} utts '
-                f'diff={train_loss_per_utt - valid_loss_per_utt:<7.2f} '
-            )
+        info(
+            f'Epoch {e} summary: '
+            f'train_loss_per_utt={train_loss_per_utt:<7.2f} '
+            f'over {train_utts} utts '
+            f'valid_loss_per_utt={valid_loss_per_utt:<7.2f} '
+            f'over {valid_utts} utts '
+            f'diff={train_loss_per_utt - valid_loss_per_utt:<7.2f} '
+        )
 
 
 def recognize(config_path, dir):
