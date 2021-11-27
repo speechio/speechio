@@ -135,17 +135,17 @@ class Dataset:
 
                     if sample_loader.field_map['begin'] not in utts_reader.fieldnames:
                         warning(
-                            'Metadata provides nothing for Sample::begin to load, '
-                            'fallback begin attr to default value 0.0'
+                            'Metadata provides nothing for Sample.begin to load, '
+                            'fallback begin value to default 0.0'
                         )
                     if sample_loader.field_map['duration'] not in utts_reader.fieldnames:
                         warning(
-                            'Metadata provides nothing for Sample::duration to load, '
+                            'Metadata provides nothing for Sample.duration to load, '
                             'min/max_duration filtering will be turned OFF.'
                         )
                     if sample_loader.field_map['text'] not in utts_reader.fieldnames:
                         warning(
-                            'Metadata provides nothing for Sample::text to load, '
+                            'Metadata provides nothing for Sample.text to load, '
                             'min/max_text_length filtering will be turned OFF.'
                         )
                 else:
@@ -862,38 +862,39 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                         f'Epoch={e}/{config.num_epochs} Batch={b}/{len(train_dataloader)} '
                         f'{train_loss_per_utt:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
                     )
-
+        
         if rank == 0:
             dump_checkpoint(model, path := os.path.join(dir, 'checkpoints', f'{e}.ckpt'))
             debug(f'Checkpoint dumped to {path}')
         ddp_barrier()
 
-        info(f'Epoch {e} validation ...')
+        if rank == 0: # set this to True to check if validation across all ranks are consistent
+            info(f'Epoch {e} validation ...')
 
-        model.eval()
-        valid_loss, valid_utts = 0.0, 0
+            model.eval()
+            valid_loss, valid_utts = 0.0, 0
 
-        with torch.no_grad():
-            for b, batch in enumerate(valid_dataloader, 1):
-                samples, num_utts, num_frames, X, T, Y, U = batch
+            with torch.no_grad():
+                for b, batch in enumerate(valid_dataloader, 1):
+                    samples, num_utts, num_frames, X, T, Y, U = batch
 
-                X, T = X.to(device), T.to(device)
-                Y, U = Y.to(device), U.to(device)
-                loss = model(X, T, Y, U)
+                    X, T = X.to(device), T.to(device)
+                    Y, U = Y.to(device), U.to(device)
+                    loss = model(X, T, Y, U)
 
-                valid_utts += num_utts
-                valid_loss += loss.item()
-                valid_loss_per_utt = valid_loss/valid_utts
+                    valid_utts += num_utts
+                    valid_loss += loss.item()
+                    valid_loss_per_utt = valid_loss/valid_utts
 
+            info(
+                f'Epoch {e} summary: '
+                f'train_loss_per_utt={train_loss_per_utt:<7.2f} '
+                f'over {train_utts} utts '
+                f'valid_loss_per_utt={valid_loss_per_utt:<7.2f} '
+                f'over {valid_utts} utts '
+                f'diff={train_loss_per_utt - valid_loss_per_utt:<7.2f} '
+            )
         ddp_barrier()
-        info(
-            f'Epoch {e} summary: '
-            f'train_loss_per_utt={train_loss_per_utt:<7.2f} '
-            f'over {train_utts} utts '
-            f'valid_loss_per_utt={valid_loss_per_utt:<7.2f} '
-            f'over {valid_utts} utts '
-            f'diff={train_loss_per_utt - valid_loss_per_utt:<7.2f} '
-        )
 
 
 def recognize(config_path, dir):
