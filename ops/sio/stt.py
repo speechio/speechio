@@ -866,7 +866,6 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         if rank == 0:
             dump_checkpoint(model, path := os.path.join(dir, 'checkpoints', f'{e}.ckpt'))
             debug(f'Checkpoint dumped to {path}')
-        ddp_barrier()
 
         if rank == 0: # set this to True to check if validation across all ranks are consistent
             info(f'Epoch {e} validation ...')
@@ -894,7 +893,6 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 f'over {valid_utts} utts '
                 f'diff={train_loss_per_utt - valid_loss_per_utt:<7.2f} '
             )
-        ddp_barrier()
 
 
 def recognize(config_path, dir):
