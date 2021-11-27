@@ -136,7 +136,7 @@ class Dataset:
                     if sample_loader.field_map['begin'] not in utts_reader.fieldnames:
                         warning(
                             'Metadata provides nothing for Sample.begin to load, '
-                            'fallback begin value to default 0.0'
+                            'fallback to default value 0.0'
                         )
                     if sample_loader.field_map['duration'] not in utts_reader.fieldnames:
                         warning(
