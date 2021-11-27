@@ -719,6 +719,11 @@ def seed_all(seed:int):
     torch.manual_seed(seed)
 
 
+def ddp_barrier():
+    if torch.distributed.is_initialized(): 
+        torch.distributed.barrier()
+
+
 def train(config, dir:str, device_id:int, world_size:int, rank:int):
     logging.basicConfig(
         stream=sys.stderr, 
@@ -768,14 +773,14 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     train_dataset = Dataset(data_zoo, config.train_set, sample_loader)
     debug('Loading valid_set ...')
     valid_dataset = Dataset(data_zoo, config.valid_set, sample_loader)
-    if distributed: dist.barrier()
+    ddp_barrier()
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if not os.path.isfile(mean_var_stats_file):
         if rank == 0:
             mean_var_stats = compute_mean_var_stats(train_dataset, config)
             mean_var_stats.dump(mean_var_stats_file)
-        if distributed: dist.barrier()
+        ddp_barrier()
     mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
     train_datapipe = DataPipe(
@@ -824,7 +829,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
-        if distributed: dist.barrier()
+        ddp_barrier()
         info(f'Epoch {e} training ...')
 
         model.train()
@@ -861,7 +866,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         if rank == 0:
             dump_checkpoint(model, path := os.path.join(dir, 'checkpoints', f'{e}.ckpt'))
             debug(f'Checkpoint dumped to {path}')
-        if distributed: dist.barrier()
+        ddp_barrier()
 
         info(f'Epoch {e} validation ...')
 
@@ -880,7 +885,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 valid_loss += loss.item()
                 valid_loss_per_utt = valid_loss/valid_utts
 
-        if distributed: dist.barrier()
+        ddp_barrier()
         info(
             f'Epoch {e} summary: '
             f'train_loss_per_utt={train_loss_per_utt:<7.2f} '
