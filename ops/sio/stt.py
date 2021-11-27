@@ -776,11 +776,11 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     ddp_barrier()
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
-    if not os.path.isfile(mean_var_stats_file):
-        if rank == 0:
+    if rank == 0:
+        if not os.path.isfile(mean_var_stats_file):
             mean_var_stats = compute_mean_var_stats(train_dataset, config)
             mean_var_stats.dump(mean_var_stats_file)
-        ddp_barrier()
+    ddp_barrier()
     mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
     train_datapipe = DataPipe(
