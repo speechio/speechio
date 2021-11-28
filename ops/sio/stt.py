@@ -681,16 +681,15 @@ def create_model(model_name:str, model_hparam:str, input_dim, tokenizer):
         raise NotImplementedError(f'Unsupported model: {model_name}')
 
 
-def load_checkpoint(model:nn.Module, device, path:str):
+def load_model_checkpoint(model:nn.Module, device, path:str):
     state_dict = torch.load(path, map_location = device)
-    #model.load_state_dict({ k.removeprefix('module.') : v for k,v in state_dict.items() })
     if isinstance(model, nn.parallel.DistributedDataParallel):
         model.module.load_state_dict(state_dict)
     else:
         model.load_state_dict(state_dict)
 
 
-def dump_checkpoint(model:nn.Module, path:str):
+def dump_model_checkpoint(model:nn.Module, path:str):
     if isinstance(model, nn.parallel.DistributedDataParallel):
         state_dict = model.module.state_dict()
     else:
@@ -698,7 +697,7 @@ def dump_checkpoint(model:nn.Module, path:str):
     torch.save(state_dict, path)
 
 
-def average_checkpoints(checkpoint_paths:list[str]):
+def average_model_checkpoints(checkpoint_paths:list[str]):
     from functools import reduce
 
     N = len(checkpoint_paths)
@@ -755,8 +754,8 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         tokenizer,
     )
     model.to(device)
-    if os.path.isfile(init_checkpoint := os.path.join(dir, 'initial.model')):
-        load_checkpoint(model, device, init_checkpoint)
+    if os.path.isfile(init_model_checkpoint := os.path.join(dir, 'checkpoints', '0.model')):
+        load_model_checkpoint(model, device, init_model_checkpoint)
     debug(
         'Total params: '
         f'{sum([ p.numel() for p in model.parameters() ])/1e6:.2f}M '
@@ -831,17 +830,22 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
     for e in range(1, config.num_epochs + 1): # 1-based indexing
-        checkpoint_model_path = os.path.join(dir, 'checkpoints', f'{e}.model')
-        checkpoint_state_path = os.path.join(dir, 'checkpoints', f'{e}.state')
+        model_checkpoint_path     = os.path.join(dir, 'checkpoints', f'{e}.model')
+        optimizer_checkpoint_path = os.path.join(dir, 'checkpoints', f'{e}.optimizer')
+        scheduler_checkpoint_path = os.path.join(dir, 'checkpoints', f'{e}.scheduler')
 
         ddp_barrier()
-        # Load checkpoint skip this epoch
-        if os.path.isfile(checkpoint_model_path) and os.path.isfile(checkpoint_state_path):
-            info(f'Skipping epoch {e} training')
-            load_checkpoint(model, device, checkpoint_model_path)
-            state = torch.load(checkpoint_state_path, map_location=device)
-            optimizer.load_state_dict(state['optimizer_state'])
-            scheduler.load_state_dict(state['scheduler_state'])
+        if os.path.isfile(model_checkpoint_path):
+            info(f'Found model checkpoint {model_checkpoint_path}, skipping epoch {e}')
+            load_model_checkpoint(model, device, model_checkpoint_path)
+            if os.path.isfile(optimizer_checkpoint_path):
+                optimizer.load_state_dict(
+                    torch.load(optimizer_checkpoint_path, map_location=device)
+                )
+            if os.path.isfile(scheduler_checkpoint_path):
+                scheduler.load_state_dict(
+                    torch.load(scheduler_checkpoint_path, map_location=device)
+                )
             continue
 
         info(f'Epoch {e} training ...')
@@ -876,14 +880,12 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                         f'{train_loss_per_utt:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
                     )
         
-        # dump checkpoint
+        # dump checkpoints
         if rank == 0:
-            dump_checkpoint(model, checkpoint_model_path)
-            state = { 
-                'optimizer_state': optimizer.state_dict(),
-                'scheduler_state': scheduler.state_dict(),
-            }
-            torch.save(state, checkpoint_state_path)
+            info(f'Dumping epoch {e} checkpoints to {os.path.join(dir, "checkpoints", f"{e}.*")}')
+            dump_model_checkpoint(model, model_checkpoint_path)
+            torch.save(optimizer.state_dict(), optimizer_checkpoint_path)
+            torch.save(scheduler.state_dict(), scheduler_checkpoint_path)
         ddp_barrier()
 
         info(f'Epoch {e} validation ...')
@@ -955,7 +957,7 @@ def recognize(config_path, dir):
     )
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
-    load_checkpoint(model, device, os.path.join(dir, 'final.model'))
+    load_model_checkpoint(model, device, os.path.join(dir, 'final.model'))
 
     info('Decoding ...')
     with torch.no_grad():
