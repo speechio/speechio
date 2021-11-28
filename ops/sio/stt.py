@@ -29,11 +29,11 @@ import sentencepiece as spm
 #import k2
 
 # Global Constants
-G_FLOAT_INF = float('inf')
-G_SEED = 37927
-G_FEATURE_PADDING_VALUE = 0.0
-G_LABEL_PADDING_VALUE = -1
-G_DEFAULT_DATA_ZOO = 'config/data_zoo.yaml'
+FLOAT_INF = float('inf')
+DEFAULT_SEED = 37927
+FEATURE_PADDING_VALUE = 0.0
+LABEL_PADDING_VALUE = -1
+DEFAULT_DB = 'config/db.yaml'
 
 
 @dataclass
@@ -41,7 +41,7 @@ class Sample:
     id:str = ''
     audio:str = ''
     begin:float = 0.0
-    duration:float = G_FLOAT_INF
+    duration:float = FLOAT_INF
     text:str = ''
     speaker:str = ''
 
@@ -72,7 +72,7 @@ class SampleLoader:
             'speaker': 'SPEAKER',
         },
         min_duration:float = 0.0, 
-        max_duration:float = G_FLOAT_INF,
+        max_duration:float = FLOAT_INF,
         min_text_length:int = 0, 
         max_text_length:int = sys.maxsize,
     ) :
@@ -97,7 +97,7 @@ class SampleLoader:
                 assert hasattr(sample, attr), f'{field} -> Sample.{attr} mapping failed'
                 setattr(sample, attr, v)
 
-        if sample.duration != G_FLOAT_INF:
+        if sample.duration != FLOAT_INF:
             if sample.duration < self.min_duration:
                 return None
             if sample.duration > self.max_duration:
@@ -114,7 +114,7 @@ class SampleLoader:
 
 class Dataset:
     def __init__(self,
-        data_zoo:dict,
+        database:dict,
         dataset_config:dict,
         sample_loader:callable = SampleLoader(),
     ) :
@@ -126,8 +126,8 @@ class Dataset:
             elif subset.max_num_samples < 0:
                 subset.max_num_samples = sys.maxsize
 
-            base_dir = data_zoo[subset.id].dir
-            metadata = data_zoo[subset.id].metadata
+            base_dir = database[subset.id].dir
+            metadata = database[subset.id].metadata
             debug(f'  Loading {subset.id} from ({base_dir} : {metadata}) ...')
 
             with open(metadata, 'r', encoding='utf8') as f:
@@ -230,7 +230,7 @@ def seconds_to_samples(sample_rate:int, seconds:float):
     )
 
 
-def load_audio(path:str, begin:float = 0.0, duration:float = G_FLOAT_INF) :
+def load_audio(path:str, begin:float = 0.0, duration:float = FLOAT_INF) :
     '''
     https://pytorch.org/tutorials/beginner/audio_preprocessing_tutorial.html#audio-i-o
 
@@ -610,7 +610,7 @@ class DataPipe:
         inputs = nn.utils.rnn.pad_sequence(
             features,
             batch_first = True,
-            padding_value = G_FEATURE_PADDING_VALUE,
+            padding_value = FEATURE_PADDING_VALUE,
         )  # [batch_size, max(num_time_frames), fbank_dim]
         input_lengths = torch.tensor([ len(x) for x in features ])  # [batch_size]
 
@@ -618,7 +618,7 @@ class DataPipe:
         targets = nn.utils.rnn.pad_sequence(
             labels,
             batch_first = True,
-            padding_value = G_LABEL_PADDING_VALUE,
+            padding_value = LABEL_PADDING_VALUE,
         )  # [batch_size, max(num_label_tokens)]
         target_lengths = torch.tensor([ len(y) for y in labels ])  # [batch_size]
 
@@ -728,7 +728,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     debug(f'\n{OmegaConf.to_yaml(config)}\n')
 
     # env
-    seed_all(G_SEED)
+    seed_all(DEFAULT_SEED)
 
     if world_size > 1:
         import torch.distributed as dist
@@ -771,13 +771,13 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         model = DDP(model, find_unused_parameters=True)
     
     # Train/Valid sets
-    data_zoo = OmegaConf.load(G_DEFAULT_DATA_ZOO)
+    db = OmegaConf.load(DEFAULT_DB)
 
     sample_loader = SampleLoader(**config.get('sample_loader', {}))
     debug('Loading train_set ...')
-    train_dataset = Dataset(data_zoo, config.train_set, sample_loader)
+    train_dataset = Dataset(db, config.train_set, sample_loader)
     debug('Loading valid_set ...')
-    valid_dataset = Dataset(data_zoo, config.valid_set, sample_loader)
+    valid_dataset = Dataset(db, config.valid_set, sample_loader)
     ddp_barrier()
 
     # Data preprocessing pipeline
@@ -947,8 +947,8 @@ def recognize(config_path, dir):
     config = OmegaConf.load(config_path)
     print(OmegaConf.to_yaml(config), file = sys.stderr, flush = True)
 
-    data_zoo = OmegaConf.load(G_DEFAULT_DATA_ZOO)
-    dataset = Dataset(data_zoo, config.test_set) # with default sample loader
+    db = OmegaConf.load(DEFAULT_DB)
+    dataset = Dataset(db, config.test_set) # with default sample loader
 
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if os.path.isfile(mean_var_stats_file):
