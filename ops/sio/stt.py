@@ -732,6 +732,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     )
     debug(f'\n{OmegaConf.to_yaml(config)}\n')
 
+    # env
     seed_all(G_SEED)
 
     if world_size > 1:
@@ -746,26 +747,35 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     device = torch.device('cuda', device_id) if torch.cuda.is_available() else torch.device('cpu')
     info(f'Rank:{rank} -> device:{device}')
 
+    checkpoint_dir = os.path.join(dir, 'checkpoints')
+    if rank == 0: os.makedirs(checkpoint_dir, exist_ok = True)
+
+    # Vocabulary
     tokenizer = Tokenizer(**config.tokenizer)
 
+    # Model
     model = create_model(
         config.model_name, 
         config.model_hparam, 
         config.fbank_feature_extractor.num_mel_bins, 
         tokenizer,
     )
-    model.to(device)
     debug(
         'Total params: '
         f'{sum([ p.numel() for p in model.parameters() ])/1e6:.2f}M '
         'Trainable params: '
         f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/1e6:.2f}M '
     )
+    model.to(device)
+    pretrained_or_initial_model = os.path.join(checkpoint_dir, '0.model')
+    if os.path.isfile(pretrained_or_initial_model):
+        load_model_checkpoint(model, device, pretrained_or_initial_model)
 
     if distributed:
         from torch.nn.parallel import DistributedDataParallel as DDP
         model = DDP(model, find_unused_parameters=True)
     
+    # Train/Valid sets
     data_zoo = OmegaConf.load(G_DEFAULT_DATA_ZOO)
 
     sample_loader = SampleLoader(**config.get('sample_loader', {}))
@@ -775,6 +785,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     valid_dataset = Dataset(data_zoo, config.valid_set, sample_loader)
     ddp_barrier()
 
+    # Data preprocessing pipeline
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if rank == 0:
         if not os.path.isfile(mean_var_stats_file):
@@ -795,6 +806,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     debug(train_datapipe.mean_var_normalizer)
     debug(train_datapipe)
 
+    # Data loader & sampler
     #train_dataset_view = DatasetView(train_dataset).repeat(10).sort_by('duration')
     if distributed:
         from torch.utils.data.distributed import DistributedSampler
@@ -817,8 +829,8 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         shuffle = False,
     )
 
+    # trainer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
-
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
         lr_lambda = lambda k: min(
@@ -827,10 +839,6 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         )
     ) # warmup scheduler
 
-    checkpoint_dir = os.path.join(dir, 'checkpoints')
-    if rank == 0:
-        os.makedirs(checkpoint_dir, exist_ok = True)
-    ddp_barrier()
     need_resume = False
     for e in range(1, config.num_epochs + 1): # epoch index is 1-based, 0 reserved for init/pretrain
         debug(f'On epoch {e} ...')
@@ -839,28 +847,28 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
             debug(f'Found checkpoint for epoch {e}, skipping this epoch')
             need_resume = True
             continue
-        else:
-            if need_resume:
-                last_model_checkpoint     = os.path.join(checkpoint_dir, f'{e-1}.model')
-                last_optimizer_checkpoint = os.path.join(checkpoint_dir, f'{e-1}.optimizer')
-                last_scheduler_checkpoint = os.path.join(checkpoint_dir, f'{e-1}.scheduler')
 
-                if os.path.isfile(last_model_checkpoint):
-                    debug(f'Resuming model from: {last_model_checkpoint}')
-                    load_model_checkpoint(model, device, last_model_checkpoint)
-                if os.path.isfile(last_optimizer_checkpoint):
-                    debug(f'Resuming optimizer from: {last_optimizer_checkpoint}')
-                    optimizer.load_state_dict(
-                        torch.load(last_optimizer_checkpoint, map_location=device)
-                    )
-                if os.path.isfile(last_scheduler_checkpoint):
-                    debug(f'Resuming scheduler from: {last_scheduler_checkpoint}')
-                    scheduler.load_state_dict(
-                        torch.load(last_scheduler_checkpoint, map_location=device)
-                    )
-                need_resume = False
+        if need_resume and not os.path.isfile(checkpoint):
+            last_model_checkpoint     = os.path.join(checkpoint_dir, f'{e-1}.model')
+            last_optimizer_checkpoint = os.path.join(checkpoint_dir, f'{e-1}.optimizer')
+            last_scheduler_checkpoint = os.path.join(checkpoint_dir, f'{e-1}.scheduler')
+
+            if os.path.isfile(last_model_checkpoint):
+                debug(f'Resuming model from: {last_model_checkpoint}')
+                load_model_checkpoint(model, device, last_model_checkpoint)
+            if os.path.isfile(last_optimizer_checkpoint):
+                debug(f'Resuming optimizer from: {last_optimizer_checkpoint}')
+                optimizer.load_state_dict(
+                    torch.load(last_optimizer_checkpoint, map_location=device)
+                )
+            if os.path.isfile(last_scheduler_checkpoint):
+                debug(f'Resuming scheduler from: {last_scheduler_checkpoint}')
+                scheduler.load_state_dict(
+                    torch.load(last_scheduler_checkpoint, map_location=device)
+                )
+            need_resume = False
         # Invariant: 
-        # At this code point, model&optimizer&scheduler are in well-established states:
+        # At this code point, model & optimizer & scheduler are in well-established states:
         # 1.For training from scratch: 
         #     all newly initialzed
         # 2.For resumed training from failure: 
