@@ -7,7 +7,7 @@ import os
 import argparse
 
 import torch
-from core.stt import average_checkpoints
+from sio.stt import average_model_checkpoints
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -21,4 +21,4 @@ if __name__ == '__main__':
         os.path.join(args.checkpoints_dir, f'{e}.ckpt') for e in range(args.begin, args.end) 
     ]
 
-    torch.save(average_checkpoints(checkpoints), args.output_checkpoint)
+    torch.save(average_model_checkpoints(checkpoints), args.output_checkpoint)
