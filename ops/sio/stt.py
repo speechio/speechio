@@ -641,8 +641,8 @@ def move_tensor_to_device(*tensors):
 
 def compute_mean_var_stats(dataset, config):
     feature_datapipe = DataPipe(
-        resampler = Resampler(**config.resampler),
-        perturbation = Perturbation(**config.perturbation),
+        resampler = Resampler(**c) if (c := config.get('resampler')) else None,
+        perturbation = Perturbation(**c) if (c := config.get('perturbation')) else None,
         feature_extractor = FbankFeatureExtractor(**config.fbank_feature_extractor),
     )
 
@@ -846,15 +846,15 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 last_scheduler_checkpoint = os.path.join(checkpoint_dir, f'{e-1}.scheduler')
 
                 if os.path.isfile(last_model_checkpoint):
-                    debug(f'Resuming model from last checkpoint: {last_model_checkpoint}')
+                    debug(f'Resuming model from: {last_model_checkpoint}')
                     load_model_checkpoint(model, device, last_model_checkpoint)
                 if os.path.isfile(last_optimizer_checkpoint):
-                    debug(f'Resuming optimizer from last checkpoint: {last_optimizer_checkpoint}')
+                    debug(f'Resuming optimizer from: {last_optimizer_checkpoint}')
                     optimizer.load_state_dict(
                         torch.load(last_optimizer_checkpoint, map_location=device)
                     )
                 if os.path.isfile(last_scheduler_checkpoint):
-                    debug(f'Resuming scheduler from last checkpoint: {last_scheduler_checkpoint}')
+                    debug(f'Resuming scheduler from: {last_scheduler_checkpoint}')
                     scheduler.load_state_dict(
                         torch.load(last_scheduler_checkpoint, map_location=device)
                     )
@@ -867,7 +867,6 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         #     all loaded from last checkpoint
         # 3.For finetuning: 
         #     model loaded from checkpoint_dir/0.model, optimizer/scheduler newly initialized
-
         debug(f'Epoch {e} training ...')
         model.train()
         train_loss, train_utts = 0.0, 0
