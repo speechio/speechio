@@ -837,7 +837,8 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     need_resume = False
     for e in range(1, config.num_epochs + 1): # 1-based indexing, 0 reserved for init/pretrain
         debug(f'On epoch {e} ...')
-        checkpoint = os.path.join(checkpoint_dir, f'{e}.checkpoint.json')
+
+        checkpoint = os.path.join(checkpoint_dir, f'{e}.done.json')
         if os.path.isfile(checkpoint):
             debug(f'Skipping epoch {e}, found checkpoint: {checkpoint}')
             need_resume = True
@@ -845,14 +846,17 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
         if need_resume and not os.path.isfile(checkpoint):
             if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.model')):
-                debug(f'Resuming model from prev checkpoint: {prev}')
+                debug(f'Resuming model from: {prev}')
                 load_model_checkpoint(model, device, prev)
+
             if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.optimizer')):
-                debug(f'Resuming optimizer from prev checkpoint: {prev}')
+                debug(f'Resuming optimizer from: {prev}')
                 optimizer.load_state_dict(torch.load(prev, map_location=device))
+
             if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.scheduler')):
-                debug(f'Resuming scheduler from prev checkpoint: {prev}')
+                debug(f'Resuming scheduler from: {prev}')
                 scheduler.load_state_dict(torch.load(prev, map_location=device))
+
             need_resume = False
 
         # Invariant: 
