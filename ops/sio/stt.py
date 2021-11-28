@@ -7,6 +7,7 @@
 import os, sys
 import decimal
 import random
+import time
 from dataclasses import dataclass
 from typing import Optional
 from contextlib import nullcontext
@@ -754,8 +755,6 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         tokenizer,
     )
     model.to(device)
-    if os.path.isfile(init_model_checkpoint := os.path.join(dir, 'checkpoints', '0.model')):
-        load_model_checkpoint(model, device, init_model_checkpoint)
     debug(
         'Total params: '
         f'{sum([ p.numel() for p in model.parameters() ])/1e6:.2f}M '
@@ -828,27 +827,48 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         )
     ) # warmup scheduler
 
-    os.makedirs(os.path.join(dir, 'checkpoints'), exist_ok = True)
-    for e in range(1, config.num_epochs + 1): # 1-based indexing
-        model_checkpoint_path     = os.path.join(dir, 'checkpoints', f'{e}.model')
-        optimizer_checkpoint_path = os.path.join(dir, 'checkpoints', f'{e}.optimizer')
-        scheduler_checkpoint_path = os.path.join(dir, 'checkpoints', f'{e}.scheduler')
-
-        ddp_barrier()
-        if os.path.isfile(model_checkpoint_path):
-            info(f'Found model checkpoint {model_checkpoint_path}, skipping epoch {e}')
-            load_model_checkpoint(model, device, model_checkpoint_path)
-            if os.path.isfile(optimizer_checkpoint_path):
-                optimizer.load_state_dict(
-                    torch.load(optimizer_checkpoint_path, map_location=device)
-                )
-            if os.path.isfile(scheduler_checkpoint_path):
-                scheduler.load_state_dict(
-                    torch.load(scheduler_checkpoint_path, map_location=device)
-                )
+    checkpoint_dir = os.path.join(dir, 'checkpoints')
+    if rank == 0:
+        os.makedirs(checkpoint_dir, exist_ok = True)
+    ddp_barrier()
+    need_resume = False
+    for e in range(1, config.num_epochs + 1): # epoch index is 1-based, 0 reserved for init/pretrain
+        debug(f'On epoch {e} ...')
+        checkpoint = os.path.join(checkpoint_dir, f'{e}.checkpoint.json')
+        if os.path.isfile(checkpoint):
+            debug(f'Found checkpoint for epoch {e}, skipping this epoch')
+            need_resume = True
             continue
+        else:
+            if need_resume:
+                last_model_checkpoint     = os.path.join(checkpoint_dir, f'{e-1}.model')
+                last_optimizer_checkpoint = os.path.join(checkpoint_dir, f'{e-1}.optimizer')
+                last_scheduler_checkpoint = os.path.join(checkpoint_dir, f'{e-1}.scheduler')
 
-        info(f'Epoch {e} training ...')
+                if os.path.isfile(last_model_checkpoint):
+                    debug(f'Resuming model from last checkpoint: {last_model_checkpoint}')
+                    load_model_checkpoint(model, device, last_model_checkpoint)
+                if os.path.isfile(last_optimizer_checkpoint):
+                    debug(f'Resuming optimizer from last checkpoint: {last_optimizer_checkpoint}')
+                    optimizer.load_state_dict(
+                        torch.load(last_optimizer_checkpoint, map_location=device)
+                    )
+                if os.path.isfile(last_scheduler_checkpoint):
+                    debug(f'Resuming scheduler from last checkpoint: {last_scheduler_checkpoint}')
+                    scheduler.load_state_dict(
+                        torch.load(last_scheduler_checkpoint, map_location=device)
+                    )
+                need_resume = False
+        # Invariant: 
+        # At this code point, model&optimizer&scheduler are in well-established states:
+        # 1.For training from scratch: 
+        #     all newly initialzed
+        # 2.For resumed training from failure: 
+        #     all loaded from last checkpoint
+        # 3.For finetuning: 
+        #     model loaded from checkpoint_dir/0.model, optimizer/scheduler newly initialized
+
+        debug(f'Epoch {e} training ...')
         model.train()
         train_loss, train_utts = 0.0, 0
         if distributed: train_dataloader.sampler.set_epoch(e)
@@ -880,15 +900,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                         f'{train_loss_per_utt:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
                     )
         
-        # dump checkpoints
-        if rank == 0:
-            info(f'Dumping epoch {e} checkpoints to {os.path.join(dir, "checkpoints", f"{e}.*")}')
-            dump_model_checkpoint(model, model_checkpoint_path)
-            torch.save(optimizer.state_dict(), optimizer_checkpoint_path)
-            torch.save(scheduler.state_dict(), scheduler_checkpoint_path)
-        ddp_barrier()
-
-        info(f'Epoch {e} validation ...')
+        debug(f'Epoch {e} validation ...')
 
         model.eval()
         valid_loss, valid_utts = 0.0, 0
@@ -905,14 +917,30 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 valid_loss += loss.item()
                 valid_loss_per_utt = valid_loss/valid_utts
 
-        info(
-            f'Epoch {e} summary: '
-            f'train_loss_per_utt={train_loss_per_utt:<7.2f} '
-            f'over {train_utts} utts '
-            f'valid_loss_per_utt={valid_loss_per_utt:<7.2f} '
-            f'over {valid_utts} utts '
-            f'diff={train_loss_per_utt - valid_loss_per_utt:<7.2f} '
-        )
+        # dump checkpoint
+        if rank == 0:
+            info(f'Dumping epoch {e} checkpoints to {os.path.join(checkpoint_dir, f"{e}.*")}')
+            model_checkpoint     = os.path.join(checkpoint_dir, f'{e}.model')
+            optimizer_checkpoint = os.path.join(checkpoint_dir, f'{e}.optimizer')
+            scheduler_checkpoint = os.path.join(checkpoint_dir, f'{e}.scheduler')
+
+            dump_model_checkpoint(model, model_checkpoint)
+            torch.save(optimizer.state_dict(), optimizer_checkpoint)
+            torch.save(scheduler.state_dict(), scheduler_checkpoint)
+            summary = {
+                'time': time.asctime(),
+                'epoch': e,
+                'train_loss_per_utt': train_loss_per_utt,
+                'train_utts': train_utts,
+                'valid_loss_per_utt': valid_loss_per_utt,
+                'valid_utts': valid_utts,
+                'diff:': train_loss_per_utt - valid_loss_per_utt,
+            }
+            with open(checkpoint, 'w+') as f:
+                json.dump(summary, f)
+            info(f'Epoch {e} summary: {summary}')
+        ddp_barrier()
+        time.sleep(0.5)
 
 
 def recognize(config_path, dir):
