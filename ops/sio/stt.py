@@ -187,12 +187,12 @@ class DatasetView:
         random.shuffle(self.itable)
         return self
 
-    def draw(self, n:int, mode:str = 'random'):
-        if mode == 'random':
+    def draw(self, n:int, how:str = 'random'):
+        if how == 'random':
             self.itable = random.sample(self.itable, n)
-        elif mode == 'head':
+        elif how == 'head':
             self.itable = self.itable[:n]
-        elif mode == 'tail':
+        elif how == 'tail':
             self.itable = self.itable[-n:]
         return self
     
@@ -204,12 +204,12 @@ class DatasetView:
         self.itable = self.itable[shard_index::num_shards]
         return self
 
-    def sort_by(self, what:str, reverse = True):
-        if what == 'duration':
+    def sort(self, by_what:str = 'duration', decreasing = True):
+        if by_what == 'duration':
             self.itable = sorted(
                 self.itable, 
                 key = lambda x: self.dataset[x].duration, 
-                reverse = reverse,
+                reverse = decreasing,
             )
         else:
             raise NotImplementedError
@@ -632,11 +632,6 @@ def dump_tensor_to_csv(x:torch.Tensor, path:str):
     import pandas as pd
     df = pd.DataFrame(x.numpy())
     df.to_csv(path)
-
-
-def move_tensor_to_device(*tensors):
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    return tuple([t.to(device) for t in tensors])
 
 
 def compute_mean_var_stats(dataset, config):
