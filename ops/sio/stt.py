@@ -835,41 +835,35 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     ) # warmup scheduler
 
     need_resume = False
-    for e in range(1, config.num_epochs + 1): # epoch index is 1-based, 0 reserved for init/pretrain
+    for e in range(1, config.num_epochs + 1): # 1-based indexing, 0 reserved for init/pretrain
         debug(f'On epoch {e} ...')
         checkpoint = os.path.join(checkpoint_dir, f'{e}.checkpoint.json')
         if os.path.isfile(checkpoint):
-            debug(f'Found checkpoint for epoch {e}, skipping this epoch')
+            debug(f'Skipping epoch {e}, found checkpoint: {checkpoint}')
             need_resume = True
             continue
 
         if need_resume and not os.path.isfile(checkpoint):
-            last_model_checkpoint     = os.path.join(checkpoint_dir, f'{e-1}.model')
-            last_optimizer_checkpoint = os.path.join(checkpoint_dir, f'{e-1}.optimizer')
-            last_scheduler_checkpoint = os.path.join(checkpoint_dir, f'{e-1}.scheduler')
-
-            if os.path.isfile(last_model_checkpoint):
-                debug(f'Resuming model from: {last_model_checkpoint}')
-                load_model_checkpoint(model, device, last_model_checkpoint)
-            if os.path.isfile(last_optimizer_checkpoint):
-                debug(f'Resuming optimizer from: {last_optimizer_checkpoint}')
-                optimizer.load_state_dict(
-                    torch.load(last_optimizer_checkpoint, map_location=device)
-                )
-            if os.path.isfile(last_scheduler_checkpoint):
-                debug(f'Resuming scheduler from: {last_scheduler_checkpoint}')
-                scheduler.load_state_dict(
-                    torch.load(last_scheduler_checkpoint, map_location=device)
-                )
+            if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.model')):
+                debug(f'Resuming model from prev checkpoint: {prev}')
+                load_model_checkpoint(model, device, prev)
+            if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.optimizer')):
+                debug(f'Resuming optimizer from prev checkpoint: {prev}')
+                optimizer.load_state_dict(torch.load(prev, map_location=device))
+            if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.scheduler')):
+                debug(f'Resuming scheduler from prev checkpoint: {prev}')
+                scheduler.load_state_dict(torch.load(prev, map_location=device))
             need_resume = False
+
         # Invariant: 
-        # At this code point, model & optimizer & scheduler are in well-established states:
+        # Here, model & optimizer & scheduler are in well-established states:
         # 1.For training from scratch: 
         #     all newly initialzed
         # 2.For resumed training from failure: 
         #     all loaded from last checkpoint
         # 3.For finetuning: 
         #     model loaded from checkpoint_dir/0.model, optimizer/scheduler newly initialized
+
         debug(f'Epoch {e} training ...')
         model.train()
         train_loss, train_utts = 0.0, 0
