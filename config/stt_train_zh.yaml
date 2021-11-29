@@ -58,7 +58,6 @@ valid_set:
     -   id: AISHELL-1-DEV
         max_num_samples: 2000
 
-# under ops/core/
 model_name: wenet
 model_hparam: wenet.yaml
 
