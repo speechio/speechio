@@ -705,7 +705,6 @@ def average_model_checkpoints(checkpoint_paths:list[str]):
         [ torch.load(f, map_location=torch.device('cpu')) for f in checkpoint_paths ],
     )
     averaged = { k : torch.true_divide(v, N) for k,v in summed.items() }
-
     return averaged
 
 
@@ -728,8 +727,10 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     )
     debug(f'\n{OmegaConf.to_yaml(config)}\n')
 
-    # env
+    # Setup envrionment
     seed_all(DEFAULT_SEED)
+    checkpoint_dir = os.path.join(dir, 'checkpoints')
+    if rank == 0: os.makedirs(checkpoint_dir, exist_ok = True)
 
     if world_size > 1:
         import torch.distributed as dist
@@ -742,9 +743,6 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     device = torch.device('cuda', device_id) if torch.cuda.is_available() else torch.device('cpu')
     info(f'Rank:{rank} -> device:{device}')
-
-    checkpoint_dir = os.path.join(dir, 'checkpoints')
-    if rank == 0: os.makedirs(checkpoint_dir, exist_ok = True)
 
     # Vocabulary
     tokenizer = Tokenizer(**config.tokenizer)
@@ -771,7 +769,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         from torch.nn.parallel import DistributedDataParallel as DDP
         model = DDP(model, find_unused_parameters=True)
     
-    # Train/Valid sets
+    # Load train/valid sets
     db = OmegaConf.load(DEFAULT_DB)
 
     sample_loader = SampleLoader(**config.get('sample_loader', {}))
@@ -781,7 +779,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     valid_dataset = Dataset(db, config.valid_set, sample_loader)
     ddp_barrier()
 
-    # Data preprocessing pipeline
+    # Create pre-processing data pipeline
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
     if rank == 0:
         if not os.path.isfile(mean_var_stats_file):
@@ -790,7 +788,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     ddp_barrier()
     mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
-    train_datapipe = DataPipe(
+    datapipe = DataPipe(
         resampler = Resampler(**c) if (c := config.get('resampler')) else None,
         perturbation = Perturbation(**c) if (c := config.get('perturbation')) else None,
         feature_extractor = FbankFeatureExtractor(**config.fbank_feature_extractor),
@@ -799,10 +797,10 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         text_normalizer = TextNormalizer(**c) if (c := config.get('text_normalizer')) else None,
         tokenizer = tokenizer,
     )
-    debug(train_datapipe.mean_var_normalizer)
-    debug(train_datapipe)
+    debug(datapipe.mean_var_normalizer)
+    debug(datapipe)
 
-    # Data loader & sampler
+    # Dataloaders
     #train_dataset_view = DatasetView(train_dataset).repeat(10).sort_by('duration')
     if distributed:
         from torch.utils.data.distributed import DistributedSampler
@@ -813,7 +811,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         **config.data_loader,
-        collate_fn = train_datapipe,
+        collate_fn = datapipe,
         shuffle = False if distributed else True,
         sampler = sampler,
     )
@@ -821,11 +819,11 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     valid_dataloader = torch.utils.data.DataLoader(
         valid_dataset,
         **config.data_loader,
-        collate_fn = train_datapipe,
+        collate_fn = datapipe,
         shuffle = False,
     )
 
-    # trainer
+    # Trainer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
@@ -860,8 +858,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
             need_resume = False
 
-        # Invariant: 
-        # Here, model & optimizer & scheduler are in well-established states:
+        # Here model & optimizer & scheduler should be in well-established states:
         # 1.For training from scratch: 
         #     all newly initialzed
         # 2.For resumed training from failure: 
@@ -918,7 +915,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 valid_loss += loss.item()
                 valid_loss_per_utt = valid_loss/valid_utts
 
-        # dump checkpoint
+        # Dump checkpoint
         if rank == 0:
             info(f'Dumping epoch {e} checkpoints to {os.path.join(checkpoint_dir, f"{e}.*")}')
             model_checkpoint     = os.path.join(checkpoint_dir, f'{e}.model')
