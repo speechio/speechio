@@ -137,17 +137,18 @@ class Dataset:
                     if sample_loader.field_map['begin'] not in utts_reader.fieldnames:
                         warning(
                             'Metadata provides nothing for Sample.begin to load, '
-                            'using default value 0.0'
+                            'using default value: 0.0'
                         )
                     if sample_loader.field_map['duration'] not in utts_reader.fieldnames:
                         warning(
                             'Metadata provides nothing for Sample.duration to load, '
-                            'min/max_duration filtering will be turned OFF.'
+                            'using default value: inf, '
+                            'min/max_duration filtering will have NO EFFECT.'
                         )
                     if sample_loader.field_map['text'] not in utts_reader.fieldnames:
                         warning(
                             'Metadata provides nothing for Sample.text to load, '
-                            'min/max_text_length filtering will be turned OFF.'
+                            'min/max_text_length filtering will have NO EFFECT.'
                         )
                 else:
                     raise NotImplementedError
