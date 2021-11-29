@@ -490,29 +490,28 @@ class Tokenizer:
         self.sentence_piece.load(model_path)
 
         self.tokens = []
-        self.token_to_idx = {}
+        self.token_to_index = {}
         with open(vocab_path, 'r') as f:
             for l in f:
                 if len(cols := l.strip().split()) == 2:
                     word = cols[0]
-                    self.token_to_idx[word] = len(self.tokens)
+                    self.token_to_index[word] = len(self.tokens)
                     self.tokens.append(word)
 
-        self.unk, self.unk_index = unk, self.token_to_idx[unk]
-        self.bos, self.bos_index = bos, self.token_to_idx[bos]
-        self.eos, self.eos_index = eos, self.token_to_idx[eos]
-        self.sil, self.sil_index = sil, self.token_to_idx.get(sil, self.unk_index)
-        self.blk, self.blk_index = blk, self.token_to_idx.get(blk, self.unk_index)
+        self.unk, self.unk_index = unk, self.token_to_index[unk]
+        self.bos, self.bos_index = bos, self.token_to_index[bos]
+        self.eos, self.eos_index = eos, self.token_to_index[eos]
+        self.sil, self.sil_index = sil, self.token_to_index.get(sil, self.unk_index)
+        self.blk, self.blk_index = blk, self.token_to_index.get(blk, self.unk_index)
 
-    def encode(self, text:str, mode) -> list[int]:
-        tokens = []
-        if mode == 'id':
-            tokens = self.sentence_piece.encode_as_ids(text)
-        elif mode == 'piece':
-            tokens = self.sentence_piece.encode_as_pieces(text)
+    def encode(self, text:str, mode:str = 'token') -> list[int]:
+        if mode == 'index':
+            encoded = self.sentence_piece.encode_as_ids(text)
+        elif mode == 'token':
+            encoded = self.sentence_piece.encode_as_pieces(text)
         else:
-            raise RuntimeError
-        return tokens
+            raise NotImplementedError
+        return encoded
 
     def decode(self, tokens:list[int]) -> str:
         return self.sentence_piece.DecodeIds(tokens)
@@ -521,7 +520,7 @@ class Tokenizer:
         return len(self.tokens)
 
     def __call__(self, text) -> tuple[list[str], list[int]] :
-        return self.encode(text, 'piece'), self.encode(text, 'id')
+        return self.encode(text, 'token'), self.encode(text, 'index')
 
 
 class TextNormalizer:
