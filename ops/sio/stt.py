@@ -419,8 +419,9 @@ class MeanVarNormalizer:
     def __init__(self, mean_var_stats:MeanVarStats):
         mean = mean_var_stats.o1_sum / mean_var_stats.n
         var  = mean_var_stats.o2_sum / mean_var_stats.n - mean.square()
+        isd  = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
         self.mean_norm_shift = -mean
-        self.var_norm_scale = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
+        self.var_norm_scale = isd
 
     def __repr__(self):
         return (
@@ -488,19 +489,19 @@ class Tokenizer:
         self.sentence_piece.load(model_path)
 
         self.tokens = []
-        self.token_to_id = {}
+        self.token_to_idx = {}
         with open(vocab_path, 'r') as f:
             for l in f:
                 if len(cols := l.strip().split()) == 2:
                     word = cols[0]
-                    self.token_to_id[word] = len(self.tokens)
+                    self.token_to_idx[word] = len(self.tokens)
                     self.tokens.append(word)
 
-        self.unk, self.unk_index = unk, self.token_to_id[unk]
-        self.bos, self.bos_index = bos, self.token_to_id[bos]
-        self.eos, self.eos_index = eos, self.token_to_id[eos]
-        self.sil, self.sil_index = sil, self.token_to_id.get(sil, self.unk_index)
-        self.blk, self.blk_index = blk, self.token_to_id.get(blk, self.unk_index)
+        self.unk, self.unk_index = unk, self.token_to_idx[unk]
+        self.bos, self.bos_index = bos, self.token_to_idx[bos]
+        self.eos, self.eos_index = eos, self.token_to_idx[eos]
+        self.sil, self.sil_index = sil, self.token_to_idx.get(sil, self.unk_index)
+        self.blk, self.blk_index = blk, self.token_to_idx.get(blk, self.unk_index)
 
     def encode(self, text:str, mode) -> list[int]:
         tokens = []
