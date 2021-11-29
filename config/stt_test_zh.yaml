@@ -10,8 +10,8 @@ tokenizer:
     model_path: model/tokenizer/AISHELL-1.model
 
 # under ops/core/
-model_name: conformer
-model_hparam: conformer.yaml
+model_name: wenet
+model_hparam: wenet.yaml
 
 test_set:
     subsets:
