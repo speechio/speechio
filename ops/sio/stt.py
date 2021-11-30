@@ -870,7 +870,6 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         model.train()
         train_loss, train_utts = 0.0, 0
         if distributed: train_dataloader.sampler.set_epoch(e)
-
         with model.join() if distributed else nullcontext():
             for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
                 samples, num_utts, num_frames, X, T, Y, U = batch
@@ -899,10 +898,8 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                     )
         
         debug(f'Epoch {e} validation ...')
-
         model.eval()
         valid_loss, valid_utts = 0.0, 0
-
         with torch.no_grad():
             for b, batch in enumerate(valid_dataloader, 1):
                 samples, num_utts, num_frames, X, T, Y, U = batch
@@ -939,6 +936,9 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
             info(f'Epoch {e} summary: {summary}')
         ddp_barrier()
         time.sleep(0.5)
+
+    if distributed:
+        dist.destroy_process_group()
 
 
 def recognize(config_path, dir):
