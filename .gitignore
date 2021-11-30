@@ -16,6 +16,7 @@ build
 # oss
 .ossutil_checkpoint
 ossutil_output
+oss
 
 model/tokenizer
 data/audio/*
