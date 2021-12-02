@@ -755,12 +755,10 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         config.fbank_feature_extractor.num_mel_bins, 
         tokenizer,
     )
-    debug(
-        'Total params: '
-        f'{sum([ p.numel() for p in model.parameters() ])/1e6:.2f}M '
-        'Trainable params: '
-        f'{sum([ p.numel() for p in model.parameters() if p.requires_grad ])/1e6:.2f}M '
-    )
+    debug({
+        'total_params': sum([ p.numel() for p in model.parameters() ])/1e6,
+        'trainable_params': sum([ p.numel() for p in model.parameters() if p.requires_grad ])/1e6,
+    })
     model.to(device)
     pretrained_or_initial_model = os.path.join(checkpoint_dir, '0.model')
     if os.path.isfile(pretrained_or_initial_model):
@@ -898,8 +896,10 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
                 if b % config.logging_period == 0:
                     info(
-                        f'Epoch={e}/{config.num_epochs} Batch={b}/{len(train_dataloader)} '
-                        f'{train_loss_per_utt:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
+                        f'Epoch:{e}/{config.num_epochs} '
+                        f'Batch:{b}/{len(train_dataloader)} '
+                        f'Loss:{train_loss_per_utt:<7.2f} '
+                        f'LR:{scheduler.get_last_lr()[0]:<7.6f} '
                     )
         
         debug(f'Epoch {e} validation ...')
