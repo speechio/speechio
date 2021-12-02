@@ -823,7 +823,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         shuffle = False,
     )
 
-    # Trainer
+    # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr = config.optimizer.Adam.lr)
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer,
@@ -891,7 +891,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 train_loss += loss.item()
                 train_loss_per_utt = train_loss/train_utts
 
-                if b % config.log_interval == 0:
+                if b % config.logging_period == 0:
                     info(
                         f'Epoch={e}/{config.num_epochs} Batch={b}/{len(train_dataloader)} '
                         f'{train_loss_per_utt:>7.2f} LR={scheduler.get_last_lr()[0]:7.6f}'
