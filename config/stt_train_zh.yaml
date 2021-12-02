@@ -52,7 +52,7 @@ data_loader:
 train_set:
     subsets:
     -   id: AISHELL-1-TRAIN
-        max_num_samples: 1024
+        max_num_samples: 10240
 valid_set:
     subsets:
     -   id: AISHELL-1-DEV
@@ -62,8 +62,8 @@ model_name: wenet
 model_hparam: wenet.yaml
 
 num_epochs: 180
-gradient_accumulation: 2
-gradient_clipping: 5.0
+grad_accumulation: 2
+grad_clipping: 5.0
 logging_period: 100
 optimizer:
     Adam:

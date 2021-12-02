@@ -876,16 +876,17 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 X, T = X.to(device), T.to(device)
                 Y, U = Y.to(device), U.to(device)
 
-                if ddp and b % config.gradient_accumulation != 0: 
+                if ddp and b % config.grad_accumulation != 0: 
                     ctx = model.no_sync()
                 else:
                     ctx = nullcontext()
-                with ctx: # avoid ddp syncing during gradient accumulation
+                with ctx: # avoid ddp syncing during grad accumulation
                     loss = stt_loss(model, X, T, Y, U)
-                    (loss / num_utts / config.gradient_accumulation).backward()
+                    (loss / num_utts / config.grad_accumulation).backward()
 
-                if b % config.gradient_accumulation == 0:
-                    if torch.isfinite(nn.utils.clip_grad_norm_(model.parameters(), config.gradient_clipping)):
+                if b % config.grad_accumulation == 0:
+                    grad_norm = nn.utils.clip_grad_norm_(model.parameters(), config.grad_clipping)
+                    if torch.isfinite(grad_norm):
                         optimizer.step()
                     optimizer.zero_grad()
                     scheduler.step()
