@@ -378,24 +378,16 @@ class MeanVarStats:
         self.o2_sum = None
         self.n = 0
 
-    def __repr__(self):
-        return (
-            '\nGlobal MEAN/VAR stats:\n'
-            f'    1st_order:  {self.o1_sum}\n'
-            f'    2nd_order:  {self.o2_sum}\n'
-            f'    frames:   {self.n}\n'
-        )
-
-    def accumulate_mean_var_stats(self, feature:torch.Tensor):
-        num_frames, feature_dim = feature.shape
+    def accumulate_mean_var_stats(self, feature_matrix:torch.Tensor):
+        num_frames, feature_dim = feature_matrix.shape
         if self.n == 0:
             self.o1_sum = torch.zeros(feature_dim)
             self.o2_sum = torch.zeros(feature_dim)
         assert self.o1_sum.shape[0] == feature_dim
         assert self.o2_sum.shape[0] == feature_dim
 
-        self.o1_sum += feature.sum(dim=0)
-        self.o2_sum += feature.square().sum(dim=0)
+        self.o1_sum += feature_matrix.sum(dim=0)
+        self.o2_sum += feature_matrix.square().sum(dim=0)
         self.n += num_frames
 
     def load(self, path:str):
@@ -417,6 +409,14 @@ class MeanVarStats:
         with open(path, 'w+') as f:
             json.dump(stats, f, indent=4)
 
+    def __repr__(self):
+        return (
+            '\nGlobal MEAN/VAR stats:\n'
+            f'    1st_order:  {self.o1_sum}\n'
+            f'    2nd_order:  {self.o2_sum}\n'
+            f'    frames:   {self.n}\n'
+        )
+
 
 class MeanVarNormalizer:
     def __init__(self, mean_var_stats:MeanVarStats):
@@ -426,17 +426,17 @@ class MeanVarNormalizer:
         self.mean_norm_shift = -mean
         self.var_norm_scale = istd
 
+    def __call__(self, feature:torch.Tensor):
+        feature += self.mean_norm_shift
+        feature *= self.var_norm_scale
+        return feature
+
     def __repr__(self):
         return (
             '\nGlobal MEAN/VAR normalizer:\n'
             f'    mean_norm_shift:  {self.mean_norm_shift}\n'
             f'    var_norm_scale:  {self.var_norm_scale}\n'
         )
-
-    def __call__(self, feature:torch.Tensor):
-        feature += self.mean_norm_shift
-        feature *= self.var_norm_scale
-        return feature
 
 
 class SpecAugment:
@@ -774,9 +774,9 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     db = OmegaConf.load(DEFAULT_DB)
 
     sample_loader = SampleLoader(**config.get('sample_loader', {}))
-    debug('Loading train_set ...')
+    if rank == 0: info('Loading train_set ...')
     train_dataset = Dataset(db, config.train_set, sample_loader)
-    debug('Loading valid_set ...')
+    if rank == 0: info('Loading valid_set ...')
     valid_dataset = Dataset(db, config.valid_set, sample_loader)
     ddp_barrier()
 
