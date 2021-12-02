@@ -738,9 +738,9 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         os.environ['MASTER_ADDR'] = str(config.ddp_master_addr)
         os.environ['MASTER_PORT'] = str(config.ddp_master_port)
         dist.init_process_group(config.ddp_backend, rank = rank, world_size = world_size)
-        distributed = True
+        ddp = True
     else:
-        distributed = False
+        ddp = False
 
     device = torch.device('cuda', device_id) if torch.cuda.is_available() else torch.device('cpu')
     info(f'Rank:{rank} -> device:{device}')
@@ -766,7 +766,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
     if os.path.isfile(pretrained_or_initial_model):
         load_model_checkpoint(model, device, pretrained_or_initial_model)
 
-    if distributed:
+    if ddp:
         from torch.nn.parallel import DistributedDataParallel as DDP
         model = DDP(model, find_unused_parameters=True)
     
@@ -803,7 +803,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     # Dataloaders
     #train_dataset_view = DatasetView(train_dataset).repeat(10).sort_by('duration')
-    if distributed:
+    if ddp:
         from torch.utils.data.distributed import DistributedSampler
         sampler = DistributedSampler(train_dataset, shuffle=True) 
     else:
@@ -813,7 +813,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         train_dataset,
         **config.data_loader,
         collate_fn = datapipe,
-        shuffle = False if distributed else True,
+        shuffle = False if ddp else True,
         sampler = sampler,
     )
 
@@ -846,15 +846,15 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
         if need_resume and not os.path.isfile(checkpoint):
             if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.model')):
-                debug(f'Restore model state from: {prev}')
+                debug(f'Restoring model state from: {prev}')
                 load_model_checkpoint(model, device, prev)
 
             if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.optimizer')):
-                debug(f'Restore optimizer state from: {prev}')
+                debug(f'Restoring optimizer state from: {prev}')
                 optimizer.load_state_dict(torch.load(prev, map_location=device))
 
             if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.scheduler')):
-                debug(f'Restore scheduler state from: {prev}')
+                debug(f'Restoring scheduler state from: {prev}')
                 scheduler.load_state_dict(torch.load(prev, map_location=device))
 
             need_resume = False
@@ -870,15 +870,19 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         debug(f'Epoch {e} training ...')
         model.train()
         train_loss, train_utts = 0.0, 0
-        if distributed: train_dataloader.sampler.set_epoch(e)
-        with model.join() if distributed else nullcontext():
+        if ddp: train_dataloader.sampler.set_epoch(e)
+        with model.join() if ddp else nullcontext():
             for b, batch in enumerate(train_dataloader, 1): # 1-based indexing
                 samples, num_utts, num_frames, X, T, Y, U = batch
 
                 X, T = X.to(device), T.to(device)
                 Y, U = Y.to(device), U.to(device)
 
-                with model.no_sync() if distributed and b % config.gradient_accumulation != 0 else nullcontext():
+                if ddp and b % config.gradient_accumulation != 0: 
+                    gradient_sync_context = model.no_sync()
+                else:
+                    gradient_sync_context = nullcontext()
+                with gradient_sync_context:
                     loss = stt_loss(model, X, T, Y, U)
                     (loss / num_utts / config.gradient_accumulation).backward()
 
@@ -938,7 +942,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         ddp_barrier()
         time.sleep(0.5)
 
-    if distributed:
+    if ddp:
         dist.destroy_process_group()
 
 
