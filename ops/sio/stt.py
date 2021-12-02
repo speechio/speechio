@@ -28,6 +28,8 @@ import torchaudio.sox_effects
 import sentencepiece as spm
 #import k2
 
+from .wenet import stt_create, stt_loss, stt_decode
+
 # Global Constants
 FLOAT_INF = float('inf')
 DEFAULT_SEED = 37927
@@ -662,8 +664,7 @@ def compute_mean_var_stats(dataset, config):
 
 def create_model(model_name:str, model_hparam:str, input_dim, tokenizer):
     if  model_name == 'wenet':
-        from .wenet import Model
-        model = Model(
+        model = stt_create(
             os.path.join(os.path.dirname(__file__), model_hparam),
             input_dim,
             tokenizer.size(),
@@ -845,15 +846,15 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
         if need_resume and not os.path.isfile(checkpoint):
             if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.model')):
-                debug(f'Resuming model from: {prev}')
+                debug(f'Restore model state from: {prev}')
                 load_model_checkpoint(model, device, prev)
 
             if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.optimizer')):
-                debug(f'Resuming optimizer from: {prev}')
+                debug(f'Restore optimizer state from: {prev}')
                 optimizer.load_state_dict(torch.load(prev, map_location=device))
 
             if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.scheduler')):
-                debug(f'Resuming scheduler from: {prev}')
+                debug(f'Restore scheduler state from: {prev}')
                 scheduler.load_state_dict(torch.load(prev, map_location=device))
 
             need_resume = False
@@ -878,7 +879,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 Y, U = Y.to(device), U.to(device)
 
                 with model.no_sync() if distributed and b % config.gradient_accumulation != 0 else nullcontext():
-                    loss = model(X, T, Y, U)
+                    loss = stt_loss(model, X, T, Y, U)
                     (loss / num_utts / config.gradient_accumulation).backward()
 
                 if b % config.gradient_accumulation == 0:
@@ -906,7 +907,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
                 X, T = X.to(device), T.to(device)
                 Y, U = Y.to(device), U.to(device)
-                loss = model(X, T, Y, U)
+                loss = stt_loss(model, X, T, Y, U)
 
                 valid_utts += num_utts
                 valid_loss += loss.item()
@@ -993,6 +994,6 @@ def recognize(config_path, dir):
             assert num_utts == 1
 
             X, T = X.to(device), T.to(device)
-            hyps = model.decode(X, T)
+            hyps = stt_decode(model, X, T)
 
             print(f'{b}\t{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}', file=sys.stdout, flush=True)
