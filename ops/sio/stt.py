@@ -877,10 +877,10 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 Y, U = Y.to(device), U.to(device)
 
                 if ddp and b % config.gradient_accumulation != 0: 
-                    gradient_sync_context = model.no_sync()
+                    ctx = model.no_sync()
                 else:
-                    gradient_sync_context = nullcontext()
-                with gradient_sync_context:
+                    ctx = nullcontext()
+                with ctx: # avoid ddp syncing during gradient accumulation
                     loss = stt_loss(model, X, T, Y, U)
                     (loss / num_utts / config.gradient_accumulation).backward()
 
