@@ -832,17 +832,17 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         )
     ) # warmup scheduler
 
-    need_resume = False
+    waiting_to_resume = False
     for e in range(1, config.num_epochs + 1): # 1-based indexing, 0 reserved for init/pretrain
         debug(f'On epoch {e} ...')
 
         checkpoint = os.path.join(checkpoint_dir, f'{e}.done.json')
         if os.path.isfile(checkpoint):
             debug(f'Skipping epoch {e}, found checkpoint: {checkpoint}')
-            need_resume = True
+            waiting_to_resume = True
             continue
 
-        if need_resume and not os.path.isfile(checkpoint):
+        if waiting_to_resume and not os.path.isfile(checkpoint):
             if os.path.isfile(prev := os.path.join(checkpoint_dir, f'{e-1}.model')):
                 debug(f'Restoring model state from: {prev}')
                 load_model_checkpoint(model, device, prev)
@@ -855,7 +855,7 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
                 debug(f'Restoring scheduler state from: {prev}')
                 scheduler.load_state_dict(torch.load(prev, map_location=device))
 
-            need_resume = False
+            waiting_to_resume = False
 
         # Here model & optimizer & scheduler should be in well-established states:
         # 1.For training from scratch: 
