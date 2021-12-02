@@ -420,9 +420,9 @@ class MeanVarNormalizer:
     def __init__(self, mean_var_stats:MeanVarStats):
         mean = mean_var_stats.o1_sum / mean_var_stats.n
         var  = mean_var_stats.o2_sum / mean_var_stats.n - mean.square()
-        isd  = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
+        istd  = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
         self.mean_norm_shift = -mean
-        self.var_norm_scale = isd
+        self.var_norm_scale = istd
 
     def __repr__(self):
         return (
