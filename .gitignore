@@ -4,7 +4,6 @@ config/credential/*.cfg
 __pycache__
 
 *.json
-log.*
 log
 *.log
 tmp*
