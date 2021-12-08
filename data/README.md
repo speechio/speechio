@@ -2,7 +2,7 @@
 
 ## .tsv Metadata spec
 ### Fields
-- ID: unique string idendifier of an audio segment
+- ID: unique string identifier of an audio segment
 - AUDIO: file path of the containing audio
 - BEGIN (optional): in seconds, default: 0.0
 - DURATION (optional): in seconds, default: float infinity
