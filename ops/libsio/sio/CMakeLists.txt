@@ -1,6 +1,9 @@
 # libsio
 add_library(sio STATIC
   link.cc
+  data_pipe.cc
+  recognizer.cc
+  speech_to_text.cc
 )
 
 # libsio unittest
@@ -10,6 +13,7 @@ add_executable(unittest
   link_test.cc
   list_test.cc
   heap_test.cc
+  data_pipe_test.cc
 )
 
 target_link_libraries(unittest
