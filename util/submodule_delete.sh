@@ -1,4 +1,4 @@
-path_to_submodule=libsio/deps/abseil-cpp
+path_to_submodule=ops/libsio/deps/abseil-cpp
 
 # Remove the submodule entry from .git/config
 git submodule deinit -f $path_to_submodule
