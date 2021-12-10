@@ -8,29 +8,23 @@
 
 namespace sio {
 
-class DataPipe {
+struct DataPipe {
  public:
   explicit DataPipe(
     const FeatureExtractorInfo& feature_extractor_info
   ) :
-    feature_extractor_(feature_extractor_info)
+    feature_extractor(feature_extractor_info)
   { }
 
   void Forward(float sample_rate, const float* samples, size_t num_samples) {
     /* placeholder: resampler */
 
-    /* placeholder: signal processing */
+    /* placeholder: signal processing, e.g. agc */
 
-    feature_extractor_.Forward(sample_rate, samples, num_samples);
+    feature_extractor.Forward(sample_rate, samples, num_samples);
   }
 
-  i32 NumFramesReady() const {
-    return feature_extractor_.NumFramesReady();
-  }
-
- private:
-  FeatureExtractor feature_extractor_;
-
+  FeatureExtractor feature_extractor;
 }; // class DataPipe
 }  // namespace sio
 #endif
