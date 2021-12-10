@@ -68,6 +68,6 @@ struct SpeechToText {
 //  // context
 //  ContextManager *context_manager_;
 }; // end of class SpeechToText
-} // namespace sio
+}  // namespace sio
 
 #endif

@@ -19,5 +19,5 @@ class Recognizer {
   DataPipe data_pipe_;
 
 }; // class Recognizer
-} // namespace sio
+}  // namespace sio
 #endif
