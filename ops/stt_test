@@ -5,7 +5,7 @@
 # All rights reserved.
 
 import argparse
-from sio import stt
+from pysio import stt
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -8,7 +8,7 @@ import os
 import argparse
 import torch.multiprocessing
 from omegaconf import OmegaConf
-from sio import stt
+from pysio import stt
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
