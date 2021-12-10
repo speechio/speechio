@@ -2,7 +2,6 @@
 #include <iostream>
 
 #include "feat/wave-reader.h"
-
 #include "sio/str.h"
 #include "sio/type.h"
 #include "sio/vec.h"
@@ -16,11 +15,13 @@ TEST(DataPipe, Feature) {
   };
   Vec<i32> num_frames = {126, 522};
 
-  FeatureConfig c;
+  FeatureExtractorConfig c;
+  FeatureExtractorInfo feature_info(c);
   float sample_rate = 16000;
 
   for (index_t i = 0; i < files.size(); i++) {
-    DataPipe datapipe(c); // TODO: can't move this obj outside loop, need investigation
+    // TODO: can't move datapipe obj outside loop, need investigation
+    DataPipe datapipe(feature_info);
     std::ifstream is(files[i], std::ifstream::binary);
     kaldi::WaveData wave;
     wave.Read(is);

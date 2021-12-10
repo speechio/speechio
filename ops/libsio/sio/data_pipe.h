@@ -1,25 +1,35 @@
 #ifndef SIO_DATA_PIPE_H
 #define SIO_DATA_PIPE_H
 
-#include "online2/online-nnet2-feature-pipeline.h"
 #include "sio/type.h"
+#include "sio/str.h"
+#include "sio/log.h"
+#include "sio/feature_extractor.h"
 
 namespace sio {
 
-using FeatureConfig = kaldi::OnlineNnet2FeaturePipelineConfig;
-
 class DataPipe {
  public:
-  explicit DataPipe(const FeatureConfig& feature_config) :
-    feature_info_(feature_config), feature_extractor_(feature_info_)
+  explicit DataPipe(
+    const FeatureExtractorInfo& feature_extractor_info
+  ) :
+    feature_extractor_(feature_extractor_info)
   { }
 
-  void Forward(float sample_rate, const float* samples, size_t num_samples);
-  i32 NumFramesReady() const;
+  void Forward(float sample_rate, const float* samples, size_t num_samples) {
+    /* placeholder: resampler */
+
+    /* placeholder: signal processing */
+
+    feature_extractor_.Forward(sample_rate, samples, num_samples);
+  }
+
+  i32 NumFramesReady() const {
+    return feature_extractor_.NumFramesReady();
+  }
 
  private:
-  kaldi::OnlineNnet2FeaturePipelineInfo feature_info_;
-  kaldi::OnlineNnet2FeaturePipeline feature_extractor_;
+  FeatureExtractor feature_extractor_;
 
 }; // class DataPipe
 }  // namespace sio

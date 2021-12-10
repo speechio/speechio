@@ -2,23 +2,24 @@
 #define SIO_SPEECH_TO_TEXT_H
 
 #include "sio/ptr.h" // for "Optional"
+#include "sio/str.h"
 #include "recognizer.h"
 
 namespace sio {
 
 struct SpeechToTextConfig {
-  FeatureConfig feature_config;
+  FeatureExtractorConfig feature_extractor_config;
 
-  std::string tokenizer;
-  std::string model;
-  std::string graph;
-  std::string context;
+  Str tokenizer;
+  Str model;
+  Str graph;
+  Str context;
 
   bool do_endpointing = false;
   bool online = true;
 
   void Register(kaldi::OptionsItf *opts) {
-    feature_config.Register(opts);
+    feature_extractor_config.Register(opts);
 
     opts->Register("tokenizer", &tokenizer, "sentencepiece tokenizer");
     opts->Register("model", &model, "nn model filename");
@@ -41,13 +42,16 @@ struct SpeechToTextConfig {
 
 template <typename BeamSearchGraphT>
 struct SpeechToText {
-  SpeechToText(const SpeechToTextConfig &c) :
-    config(c)
+  SpeechToText(const SpeechToTextConfig& c) :
+    config(c),
+    feature_extractor_info(c.feature_extractor_config)
   { }
   //~SpeechToText();
 
   Optional<Recognizer*> CreateRecognizer() {
-    return new Recognizer(config.feature_config);
+    return new Recognizer(
+      feature_extractor_info
+    );
   }
   int DestroyRecognizer(Recognizer* r)  { 
     delete r;
@@ -55,6 +59,7 @@ struct SpeechToText {
   }
 
   const SpeechToTextConfig &config;
+  FeatureExtractorInfo feature_extractor_info;
 
 //  // acoustic model
 //  TransitionModel trans_model_;

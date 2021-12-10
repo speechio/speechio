@@ -7,8 +7,10 @@
 namespace sio {
 class Recognizer {
  public:
-  Recognizer(const FeatureConfig& feature_config) :
-    data_pipe_(feature_config)
+  Recognizer(
+    const FeatureExtractorInfo& feature_extractor_info
+  ):
+    data_pipe_(feature_extractor_info)
   { }
 
   int StartSession(const char* key = nullptr);
