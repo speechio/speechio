@@ -29,10 +29,15 @@ struct DataPipe {
     // Resampler
     kaldi::Vector<float> resampled;
     if (resampler != nullptr) {
-      resampler->Forward(samples, num_samples, sample_rate, &resampled, false);
+      resampler->Forward(
+        audio_seg.samples,
+        audio_seg.len,
+        audio_seg.sample_rate,
+        &resampled, false
+      );
 
       audio_seg.samples = resampled.Data();
-      audio_seg.len = resampled.Dim();
+      audio_seg.len     = resampled.Dim();
       audio_seg.sample_rate = resampler->TargetSampleRate();
     }
 
