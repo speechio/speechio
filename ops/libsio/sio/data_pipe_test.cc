@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 #include <iostream>
 
-#include "feat/wave-reader.h"
 #include "sio/str.h"
 #include "sio/type.h"
 #include "sio/map.h"
@@ -23,7 +22,7 @@ TEST(DataPipe, AudioReaderAndResampler) {
   EXPECT_EQ(audio.Dim(), 20480);
 
   kaldi::Vector<float> output;
-  resampler.Forward(wave_data.SampFreq(), audio.Data(), audio.Dim(), &output, true);
+  resampler.Forward(audio.Data(), audio.Dim(), wave_data.SampFreq(), &output, true);
 
   EXPECT_EQ(resampler.TargetSampleRate(), 8000.0);
   EXPECT_EQ(output.Dim(), 10240);
@@ -50,7 +49,7 @@ TEST(DataPipe, FeatureExtractor) {
     kaldi::WaveData wave;
     wave.Read(is);
     kaldi::SubVector<float> audio(wave.Data(), 0);
-    feature_extractor.Forward(sample_rate, (float*)audio.Data(), audio.Dim());
+    feature_extractor.Forward(audio.Data(), audio.Dim(), sample_rate);
     EXPECT_EQ(num_frames, feature_extractor.NumFramesReady());
   }
 }

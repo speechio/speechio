@@ -11,14 +11,25 @@
 
 namespace sio {
 
+/*
 enum class AudioFormat: int {
   kUnknown,
-  kFloatMono8k,
-  kFloatMono16k,
-  kShortMono8k,
-  kShortMono16k,
+  kMono8k,
+  kMono16k,
 };
+*/
 
+/* AudioSegment has no ownership */
+template <typename T>
+struct AudioSegment {
+  T* samples = nullptr;
+  size_t len = 0;
+  float sample_rate = 0;
+
+  AudioSegment(T* samples, size_t len, float sample_rate) :
+    samples(samples), len(len), sample_rate(sample_rate)
+  { }
+};
 
 class Resampler {
  public:
@@ -32,7 +43,7 @@ class Resampler {
   { }
 
   void Forward(
-    float sample_rate, const float* samples, size_t num_samples, 
+    const float* samples, size_t num_samples, float sample_rate, 
     kaldi::Vector<float> *output,
     bool flush
   ) {

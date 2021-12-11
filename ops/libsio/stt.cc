@@ -38,15 +38,18 @@ int main() {
 
         int samples_done = 0;
         while (samples_done < audio.Dim()) {
-            int remaining = audio.Dim() - samples_done;
-            int n = std::min(chunk_size, remaining);
-    
-            rec->AcceptAudio(
-                wave_data.SampFreq(),
+            AudioSegment<const float> audio_seg(
                 audio.Data() + samples_done,
-                n
+                std::min(chunk_size, audio.Dim() - samples_done),
+                wave_data.SampFreq()
             );
-            samples_done += n;
+
+            rec->AcceptAudio(
+                audio_seg.samples,
+                audio_seg.len,
+                audio_seg.sample_rate
+            );
+            samples_done += audio_seg.len;
     
             //if (opts.do_endpointing && rec->EndOfSentenceDetected()) {
             //    break;

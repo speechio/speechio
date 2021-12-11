@@ -16,7 +16,7 @@ class FeatureExtractor {
     extractor_(info)
   { }
 
-  void Forward(float sample_rate, const float* samples, size_t num_samples) {
+  void Forward(const float* samples, size_t num_samples, float sample_rate) {
     extractor_.AcceptWaveform(
       sample_rate, 
       kaldi::SubVector<float>(samples, num_samples)

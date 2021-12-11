@@ -1,19 +1,11 @@
 # libsio
-add_library(sio STATIC
-  link.cc
-  audio.cc
-  feature_extractor.cc
-  data_pipe.cc
-  recognizer.cc
-  speech_to_text.cc
-)
+add_library(sio STATIC speech_to_text.cc)
 
 # libsio unittest
 add_executable(unittest 
   log_test.cc
   check_test.cc
-  link_test.cc
-  list_test.cc
+  linked_list_test.cc
   heap_test.cc
   data_pipe_test.cc
 )

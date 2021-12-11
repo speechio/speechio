@@ -57,7 +57,7 @@ struct SpeechToText {
       feature_extractor_info
     );
   }
-  int DestroyRecognizer(Recognizer* r)  { 
+  int DestroyRecognizer(Recognizer* r) { 
     delete r;
     return 0;
   }

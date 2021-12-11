@@ -2,15 +2,52 @@
 #define SIO_LIST_H
 
 #include "sio/ptr.h"
-#include "sio/link.h"
 
 namespace sio {
 
+class Link {
+ public:
+  ~Link() { Unlink(); }
+
+  bool  IsLinked() { return (prev_ != this || next_ != this); }
+  Link* Prev() { return prev_; }
+  Link* Next() { return next_; }
+
+  void  InsertBefore(Link* ref) {
+    prev_ = ref->prev_;
+    next_ = ref;
+
+    prev_->next_ = this;
+    ref->prev_  = this;
+  }
+
+  void  InsertAfter(Link* ref) {
+    prev_ = ref;
+    next_ = ref->next_;
+
+    ref->next_  = this;
+    next_->prev_ = this;
+  }
+
+  void  Unlink() {
+    prev_->next_ = next_;
+    next_->prev_ = prev_;
+
+    prev_ = this;
+    next_ = this;
+  }
+
+ private:
+  Link* prev_ = this;
+  Link* next_ = this;
+};
+
+
 template <typename T>
-class List {
+class LinkedList {
 public:
-  List(size_t offset) { offset_ = offset; }
-  ~List() { UnlinkAll(); }
+  LinkedList(size_t offset) { offset_ = offset; }
+  ~LinkedList() { UnlinkAll(); }
 
   bool IsEmpty(){ return (Head() == nullptr); }
 
