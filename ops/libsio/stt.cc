@@ -9,10 +9,10 @@ int main() {
       argument/config-file parsing -> config
     */
 
-    float sample_rate = config.model_sample_rate;
-    float chunk_secs = 0.2;
-    int chunk_size = (chunk_secs > 0) ? int(sample_rate * chunk_secs) : std::numeric_limits<int>::max();
-    assert(chunk_size > 0);
+    int samples_per_chunk = std::numeric_limits<int>::max();
+    if (config.online == true) {
+        samples_per_chunk = 1000;
+    }
 
     SpeechToText<float> speech_to_text(config);
 
@@ -29,7 +29,6 @@ int main() {
         kaldi::WaveData wave_data;
         std::ifstream is(audio_path, std::ifstream::binary);
         wave_data.Read(is);
-        assert(wave_data.SampFreq() == config.input_sample_rate);
         kaldi::SubVector<float> audio(wave_data.Data(), 0);
 
         Recognizer* rec = speech_to_text.CreateRecognizer();
@@ -40,7 +39,7 @@ int main() {
         while (samples_done < audio.Dim()) {
             AudioSegment<const float> audio_seg(
                 audio.Data() + samples_done,
-                std::min(chunk_size, audio.Dim() - samples_done),
+                std::min(samples_per_chunk, audio.Dim() - samples_done),
                 wave_data.SampFreq()
             );
 

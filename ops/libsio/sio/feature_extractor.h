@@ -7,12 +7,12 @@
 
 namespace sio {
 
-using FeatureExtractorConfig = kaldi::OnlineNnet2FeaturePipelineConfig;
-using FeatureExtractorInfo   = kaldi::OnlineNnet2FeaturePipelineInfo;
+using FeatureConfig = kaldi::OnlineNnet2FeaturePipelineConfig;
+using FeatureInfo   = kaldi::OnlineNnet2FeaturePipelineInfo;
 
 class FeatureExtractor {
  public:
-  FeatureExtractor(const FeatureExtractorInfo& info) :
+  FeatureExtractor(const FeatureInfo& info) :
     extractor_(info)
   { }
 

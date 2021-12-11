@@ -2,6 +2,7 @@
 #define SIO_DATA_PIPE_H
 
 #include "sio/ptr.h"
+#include "sio/check.h"
 #include "sio/audio.h"
 #include "sio/feature_extractor.h"
 
@@ -9,15 +10,11 @@ namespace sio {
 struct DataPipe {
  public:
   explicit DataPipe(
-    float input_sample_rate,
-    float model_sample_rate,
-    const FeatureExtractorInfo& feature_extractor_info
+    FeatureInfo& info
   ):
-    feature_extractor(feature_extractor_info)
-  {
-    if (input_sample_rate != model_sample_rate) 
-      resampler = new Resampler(input_sample_rate, model_sample_rate);
-  }
+    feature_info(info),
+    feature_extractor(feature_info)
+  { }
 
   ~DataPipe() {
     if (resampler != nullptr) delete resampler;
@@ -28,7 +25,13 @@ struct DataPipe {
 
     // Resampler
     kaldi::Vector<float> resampled;
-    if (resampler != nullptr) {
+    if SIO_UNLIKELY(sample_rate != feature_info.GetSamplingFrequency()) {
+      if (resampler == nullptr) {
+        resampler = new Resampler(sample_rate, feature_info.GetSamplingFrequency());
+      } else if (sample_rate != resampler->SourceSampleRate()) {
+        delete resampler;
+        resampler = new Resampler(sample_rate, feature_info.GetSamplingFrequency());
+      }
       resampler->Forward(
         audio_seg.samples,
         audio_seg.len,
@@ -55,8 +58,9 @@ struct DataPipe {
 
   void StopSession() { }
 
-  Optional<Resampler*> resampler = nullptr;
+  FeatureInfo& feature_info;
   FeatureExtractor feature_extractor;
+  Optional<Resampler*> resampler = nullptr;
 }; // class DataPipe
 }  // namespace sio
 #endif

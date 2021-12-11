@@ -37,8 +37,8 @@ TEST(DataPipe, FeatureExtractor) {
   };
 
   float sample_rate = 16000;
-  FeatureExtractorConfig c;
-  FeatureExtractorInfo feature_info(c);
+  FeatureConfig c;
+  FeatureInfo feature_info(c);
   for (const auto& kv : audio_to_frames) {
     Str audio_file = kv.first;
     i32 num_frames = kv.second;

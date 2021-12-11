@@ -1,18 +1,18 @@
 #ifndef SIO_RECOGNIZER_H
 #define SIO_RECOGNIZER_H
 
-#include "sio/audio.h"
+#include <cstddef>
+
+#include "sio/feature_extractor.h"
 #include "sio/data_pipe.h"
 
 namespace sio {
 class Recognizer {
  public:
   Recognizer(
-    float input_sample_rate,
-    float model_sample_rate,
-    const FeatureExtractorInfo& feature_extractor_info
+    FeatureInfo& feature_info
   ) :
-    data_pipe_(input_sample_rate, model_sample_rate, feature_extractor_info)
+    data_pipe_(feature_info)
   { }
 
   int StartSession(const char* key = nullptr) { return 0; }

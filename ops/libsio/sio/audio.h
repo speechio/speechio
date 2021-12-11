@@ -53,6 +53,7 @@ class Resampler {
     resampler_.Resample(input, flush, output);
   }
 
+  float SourceSampleRate() { return resampler_.GetInputSamplingRate(); }
   float TargetSampleRate() { return resampler_.GetOutputSamplingRate(); }
 
  private:

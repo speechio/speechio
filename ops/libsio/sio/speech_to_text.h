@@ -1,27 +1,25 @@
 #ifndef SIO_SPEECH_TO_TEXT_H
 #define SIO_SPEECH_TO_TEXT_H
 
-#include "sio/ptr.h" // for "Optional"
+#include "sio/ptr.h"
 #include "sio/str.h"
 #include "recognizer.h"
 
 namespace sio {
 
 struct SpeechToTextConfig {
-  f32 input_sample_rate = 16000.0;
-  f32 model_sample_rate = 16000.0;
-  FeatureExtractorConfig feature_extractor_config;
+  FeatureConfig feature_config;
 
-  Str tokenizer;
-  Str model;
-  Str graph;
-  Str context;
+  std::string tokenizer;
+  std::string model;
+  std::string graph;
+  std::string context;
 
   bool do_endpointing = false;
   bool online = true;
 
   void Register(kaldi::OptionsItf *opts) {
-    feature_extractor_config.Register(opts);
+    feature_config.Register(opts);
 
     opts->Register("tokenizer", &tokenizer, "sentencepiece tokenizer");
     opts->Register("model", &model, "nn model filename");
@@ -45,19 +43,17 @@ struct SpeechToTextConfig {
 template <typename BeamSearchGraphT>
 struct SpeechToText {
   const SpeechToTextConfig &config;
-  FeatureExtractorInfo feature_extractor_info;
+  FeatureInfo feature_info;
 
   SpeechToText(const SpeechToTextConfig& c) :
     config(c),
-    feature_extractor_info(c.feature_extractor_config)
+    feature_info(c.feature_config)
   { }
   //~SpeechToText();
 
   Optional<Recognizer*> CreateRecognizer() {
     return new Recognizer(
-      config.input_sample_rate,
-      config.model_sample_rate,
-      feature_extractor_info
+      feature_info
     );
   }
 
