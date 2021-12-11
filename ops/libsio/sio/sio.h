@@ -11,6 +11,8 @@
 #include "sio/link.h"
 #include "sio/list.h"
 #include "sio/heap.h"
+#include "sio/audio.h"
+#include "sio/feature_extractor.h"
 #include "sio/data_pipe.h"
 #include "sio/recognizer.h"
 #include "sio/speech_to_text.h"

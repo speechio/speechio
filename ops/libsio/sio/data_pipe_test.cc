@@ -5,7 +5,30 @@
 #include "sio/str.h"
 #include "sio/type.h"
 #include "sio/map.h"
+#include "sio/audio.h"
 #include "sio/data_pipe.h"
+
+
+TEST(DataPipe, AudioReaderAndResampler) {
+  using namespace sio;
+
+  std::string audio_path = "testdata/MINI/audio/audio1.wav";
+  std::ifstream is(audio_path, std::ifstream::binary);
+  kaldi::WaveData wave_data;
+  wave_data.Read(is);
+  kaldi::SubVector<float> audio(wave_data.Data(), 0);
+
+  Resampler resampler(16000, 8000);
+  EXPECT_EQ(wave_data.SampFreq(), 16000.0);
+  EXPECT_EQ(audio.Dim(), 20480);
+
+  kaldi::Vector<float> output;
+  resampler.Forward(wave_data.SampFreq(), audio.Data(), audio.Dim(), &output, true);
+
+  EXPECT_EQ(resampler.TargetSampleRate(), 8000.0);
+  EXPECT_EQ(output.Dim(), 10240);
+}
+
 
 TEST(DataPipe, FeatureExtractor) {
   using namespace sio;
@@ -31,3 +54,4 @@ TEST(DataPipe, FeatureExtractor) {
     EXPECT_EQ(num_frames, feature_extractor.NumFramesReady());
   }
 }
+

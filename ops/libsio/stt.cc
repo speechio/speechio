@@ -1,6 +1,5 @@
 #include <iostream>
 
-#include "feat/wave-reader.h"
 #include "sio/sio.h"
 
 int main() {
@@ -10,14 +9,13 @@ int main() {
       argument/config-file parsing -> config
     */
 
-    float sample_rate = 16000;
+    float sample_rate = config.model_sample_rate;
     float chunk_secs = 0.2;
-    int chunk_samples = (chunk_secs > 0) ? int(sample_rate * chunk_secs) : std::numeric_limits<int>::max();
-    assert(chunk_samples > 0);
+    int chunk_size = (chunk_secs > 0) ? int(sample_rate * chunk_secs) : std::numeric_limits<int>::max();
+    assert(chunk_size > 0);
 
     SpeechToText<float> speech_to_text(config);
 
-    AudioFormat audio_format = AudioFormat::kFloatMono16k;
     std::ifstream wav_scp("testdata/MINI/wav.scp");
     std::string line;
     while (std::getline(wav_scp, line)) {
@@ -28,23 +26,26 @@ int main() {
         std::string& audio_path = fields[1];
         SIO_DEBUG << audio_key << " " << audio_path;
 
-        kaldi::WaveData wave;
-        std::ifstream stream(audio_path, std::ifstream::binary);
-        wave.Read(stream);
-        kaldi::SubVector<float> audio(wave.Data(), 0); // channel 0
-        assert(wave.SampFreq() == sample_rate);
+        kaldi::WaveData wave_data;
+        std::ifstream is(audio_path, std::ifstream::binary);
+        wave_data.Read(is);
+        assert(wave_data.SampFreq() == config.input_sample_rate);
+        kaldi::SubVector<float> audio(wave_data.Data(), 0);
 
         Recognizer* rec = speech_to_text.CreateRecognizer();
         assert(rec != nullptr);
         rec->StartSession(audio_key.c_str());
+
         int samples_done = 0;
         while (samples_done < audio.Dim()) {
-            int samples_remaining = audio.Dim() - samples_done;
-            int n = chunk_samples < samples_remaining ? chunk_samples : samples_remaining;
+            int remaining = audio.Dim() - samples_done;
+            int n = std::min(chunk_size, remaining);
     
-            kaldi::SubVector<float> audio_chunk(audio, samples_done, n);
-            rec->AcceptAudioData(audio_format, audio_chunk.Data(), audio_chunk.SizeInBytes());
-    
+            rec->AcceptAudio(
+                wave_data.SampFreq(),
+                audio.Data() + samples_done,
+                n
+            );
             samples_done += n;
     
             //if (opts.do_endpointing && rec->EndOfSentenceDetected()) {

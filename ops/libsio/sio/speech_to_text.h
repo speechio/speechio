@@ -8,6 +8,8 @@
 namespace sio {
 
 struct SpeechToTextConfig {
+  f32 input_sample_rate = 16000.0;
+  f32 model_sample_rate = 16000.0;
   FeatureExtractorConfig feature_extractor_config;
 
   Str tokenizer;
@@ -50,6 +52,8 @@ struct SpeechToText {
 
   Optional<Recognizer*> CreateRecognizer() {
     return new Recognizer(
+      config.input_sample_rate,
+      config.model_sample_rate,
       feature_extractor_info
     );
   }

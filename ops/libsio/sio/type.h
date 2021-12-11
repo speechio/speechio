@@ -21,13 +21,5 @@ using f64 = double;
 
 using index_t = ptrdiff_t;
 
-enum class AudioFormat: int {
-  kUnknown,
-  kFloatMono8k,
-  kFloatMono16k,
-  kShortMono8k,
-  kShortMono16k,
-};
-
 }; // namespace sio
 #endif

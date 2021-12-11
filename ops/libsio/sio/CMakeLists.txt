@@ -1,6 +1,7 @@
 # libsio
 add_library(sio STATIC
   link.cc
+  audio.cc
   feature_extractor.cc
   data_pipe.cc
   recognizer.cc
