@@ -44,6 +44,9 @@ struct SpeechToTextConfig {
 
 template <typename BeamSearchGraphT>
 struct SpeechToText {
+  const SpeechToTextConfig &config;
+  FeatureExtractorInfo feature_extractor_info;
+
   SpeechToText(const SpeechToTextConfig& c) :
     config(c),
     feature_extractor_info(c.feature_extractor_config)
@@ -57,13 +60,11 @@ struct SpeechToText {
       feature_extractor_info
     );
   }
+
   int DestroyRecognizer(Recognizer* r) { 
     delete r;
     return 0;
   }
-
-  const SpeechToTextConfig &config;
-  FeatureExtractorInfo feature_extractor_info;
 
 //  // acoustic model
 //  TransitionModel trans_model_;
