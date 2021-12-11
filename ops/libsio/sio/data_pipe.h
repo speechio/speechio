@@ -13,7 +13,7 @@ struct DataPipe {
     FeatureInfo& info
   ):
     feature_info(info),
-    feature_extractor(feature_info)
+    feature_extractor(info)
   { }
 
   ~DataPipe() {
