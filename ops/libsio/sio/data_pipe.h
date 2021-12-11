@@ -49,7 +49,7 @@ struct DataPipe {
       possible other signal processing
     */
 
-    // Feture extractor
+    // Feature extractor
     feature_extractor.Forward(
       audio_seg.samples,
       audio_seg.len,
