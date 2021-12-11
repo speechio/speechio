@@ -32,6 +32,7 @@ struct DataPipe {
         delete resampler;
         resampler = new Resampler(sample_rate, feature_info.GetSamplingFrequency());
       }
+
       resampler->Forward(
         audio_seg.samples,
         audio_seg.len,
