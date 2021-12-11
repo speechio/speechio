@@ -36,6 +36,8 @@ struct DataPipe {
         &resampled, false
       );
 
+      /* possible other signal processing */
+
       audio_seg.samples = resampled.Data();
       audio_seg.len     = resampled.Dim();
       audio_seg.sample_rate = resampler->TargetSampleRate();
