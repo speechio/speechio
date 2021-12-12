@@ -5,12 +5,10 @@
 #include "sio/type.h"
 #include "sio/map.h"
 #include "sio/audio.h"
-#include "sio/feature_extractor.h"
+#include "sio/feature.h"
 #include "sio/mean_var_norm.h"
-#include "sio/data_pipe.h"
 
-
-TEST(DataPipe, AudioReaderAndResampler) {
+TEST(Recognizer, AudioReaderAndResampler) {
   using namespace sio;
 
   std::string audio_path = "testdata/MINI/audio/audio1.wav";
@@ -31,7 +29,7 @@ TEST(DataPipe, AudioReaderAndResampler) {
 }
 
 
-TEST(DataPipe, FeatureExtractor) {
+TEST(Recognizer, FeatureExtractor) {
   using namespace sio;
   Map<Str, i32> audio_to_frames = {
       {"testdata/MINI/audio/audio1.wav", 126},
@@ -70,6 +68,6 @@ TEST(DataPipe, FeatureExtractor) {
 
 }
 
-TEST(DataPipe, MeanVarNormalizer) {
+TEST(Recognizer, MeanVarNormalizer) {
   using namespace sio;
 }

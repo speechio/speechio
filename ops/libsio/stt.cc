@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "sio/sio.h"
+#include "sio/include/sio.h"
 
 int main() {
     using namespace sio;
@@ -39,25 +39,16 @@ int main() {
 
         int samples_done = 0;
         while (samples_done < audio.Dim()) {
-            AudioSegment<const float> audio_seg(
+            int this_chunk = std::min(samples_per_chunk, audio.Dim() - samples_done);
+            rec->Speech(
                 audio.Data() + samples_done,
-                std::min(samples_per_chunk, audio.Dim() - samples_done),
+                this_chunk,
                 wave_data.SampFreq()
             );
-
-            rec->AcceptAudio(
-                audio_seg.samples,
-                audio_seg.len,
-                audio_seg.sample_rate
-            );
-            samples_done += audio_seg.len;
-    
-            //if (opts.do_endpointing && rec->EndOfSentenceDetected()) {
-            //    break;
-            //}
-            SIO_DEBUG << samples_done << " samples decoded.";
+            samples_done += this_chunk;
         }
-        rec->StopSession();
+        rec->To();
+        rec->Text();
         speech_to_text.DestroyRecognizer(rec);
         SIO_INFO << "Decoded " << samples_done << " samples for " << audio_key;
     }

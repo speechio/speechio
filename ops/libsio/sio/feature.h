@@ -1,5 +1,5 @@
-#ifndef SIO_FEATURE_EXTRACTOR_H
-#define SIO_FEATURE_EXTRACTOR_H
+#ifndef SIO_FEATURE_H
+#define SIO_FEATURE_H
 
 #include "online2/online-nnet2-feature-pipeline.h"
 #include "sio/type.h"
@@ -42,5 +42,6 @@ class FeatureExtractor {
  private:
   kaldi::OnlineNnet2FeaturePipeline extractor_;
 }; // class FeatureExtractor
+
 }  // namespace sio
 #endif

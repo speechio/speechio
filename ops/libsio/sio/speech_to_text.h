@@ -3,7 +3,7 @@
 
 #include "sio/ptr.h"
 #include "sio/str.h"
-#include "recognizer.h"
+#include "sio/recognizer.h"
 
 namespace sio {
 

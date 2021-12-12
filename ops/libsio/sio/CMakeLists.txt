@@ -7,7 +7,7 @@ add_executable(unittest
   check_test.cc
   linked_list_test.cc
   heap_test.cc
-  data_pipe_test.cc
+  recognizer_test.cc
 )
 
 target_link_libraries(unittest

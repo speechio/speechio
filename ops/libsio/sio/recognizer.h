@@ -3,8 +3,10 @@
 
 #include <cstddef>
 
-#include "sio/feature_extractor.h"
-#include "sio/data_pipe.h"
+#include "sio/ptr.h"
+#include "sio/check.h"
+#include "sio/audio.h"
+#include "sio/feature.h"
 
 namespace sio {
 class Recognizer {
@@ -12,18 +14,63 @@ class Recognizer {
   Recognizer(
     FeatureInfo& feature_info
   ) :
-    data_pipe_(feature_info)
+    feature_info_(feature_info),
+    feature_extractor_(feature_info)
   { }
 
+  ~Recognizer() {
+    if (resampler_ != nullptr) delete resampler_;
+  }
+
   int StartSession(const char* key = nullptr) { return 0; }
-  int AcceptAudio(const float* samples, size_t num_samples, float sample_rate) {
-    data_pipe_.Forward(samples, num_samples, sample_rate);
+
+  int Speech(const float* samples, size_t num_samples, float sample_rate) {
+    AudioSegment<const float> audio_seg(samples, num_samples, sample_rate);
+
+    // Resampler
+    kaldi::Vector<float> resampled;
+    if SIO_UNLIKELY(sample_rate != feature_info_.GetSamplingFrequency()) {
+      if (resampler_ == nullptr) {
+        resampler_ = new Resampler(sample_rate, feature_info_.GetSamplingFrequency());
+      } else if (sample_rate != resampler_->SourceSampleRate()) {
+        delete resampler_;
+        resampler_ = new Resampler(sample_rate, feature_info_.GetSamplingFrequency());
+      }
+
+      resampler_->Forward(
+        audio_seg.samples,
+        audio_seg.len,
+        audio_seg.sample_rate,
+        &resampled, false
+      );
+
+      audio_seg.samples = resampled.Data();
+      audio_seg.len     = resampled.Dim();
+      audio_seg.sample_rate = resampler_->TargetSampleRate();
+    }
+
+    /* 
+      possible other signal processing
+    */
+
+    // Feature extractor
+    feature_extractor_.Forward(
+      audio_seg.samples,
+      audio_seg.len,
+      audio_seg.sample_rate
+    );
+
     return 0;
   }
-  int StopSession() { return 0; }
+
+  int Text() { return 0; }
+
+  int To() { return 0; }
 
  private:
-  DataPipe data_pipe_;
+  FeatureInfo& feature_info_;
+  FeatureExtractor feature_extractor_;
+  Optional<Resampler*> resampler_ = nullptr;
 
 }; // class Recognizer
 }  // namespace sio
