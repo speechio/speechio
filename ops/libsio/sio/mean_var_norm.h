@@ -11,6 +11,18 @@
 
 namespace sio {
 struct MeanVarNorm {
+  /*
+  Format of mean_var_norm file, three lines:
+  line1: norm_vector_dimension
+  line2: m_norm_shift vector, no brackets, elements seperated by comma or whitespaces
+  line3: v_nrom_scale vector, same as above
+
+  Example mean_var_norm.txt:
+  3
+  -8.505237579345703 -8.91793441772461 -10.091235160827637
+  0.6330024600028992 0.49299687147140503 0.37579503655433655
+
+  */
   void Load(std::string mvn_path) {
     m_norm_shift.clear();
     v_norm_scale.clear();
@@ -27,7 +39,7 @@ struct MeanVarNorm {
     std::vector<std::string> cols;
 
     std::getline(is, line);
-    cols = absl::StrSplit(line, absl::ByAnyChar(" ,"), absl::SkipWhitespace());
+    cols = absl::StrSplit(line, absl::ByAnyChar(" \t,"), absl::SkipWhitespace());
     SIO_CHECK(cols.size() == dim, "mean norm dim is different from header");
 
     for (int i = 0; i != cols.size(); i++) {
@@ -35,7 +47,7 @@ struct MeanVarNorm {
     }
 
     std::getline(is, line);
-    cols = absl::StrSplit(line, absl::ByAnyChar(" ,"), absl::SkipWhitespace());
+    cols = absl::StrSplit(line, absl::ByAnyChar(" \t,"), absl::SkipWhitespace());
     SIO_CHECK(cols.size() == dim, "var norm dim is different from header");
 
     for (int i = 0; i != cols.size(); i++) {
