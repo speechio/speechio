@@ -20,14 +20,14 @@ enum class AudioFormat: int {
 */
 
 /* AudioSegment has no ownership */
-template <typename T>
+template <typename SampleType>
 struct AudioSegment {
-  T* samples = nullptr;
+  SampleType* data = nullptr;
   size_t len = 0;
   float sample_rate = 0;
 
-  AudioSegment(T* samples, size_t len, float sample_rate) :
-    samples(samples), len(len), sample_rate(sample_rate)
+  AudioSegment(SampleType* data, size_t len, float sample_rate) :
+    data(data), len(len), sample_rate(sample_rate)
   { }
 };
 
@@ -43,13 +43,13 @@ class Resampler {
   { }
 
   void Forward(
-    const float* samples, size_t num_samples, float sample_rate, 
+    const float* data, size_t len, float sample_rate, 
     kaldi::Vector<float> *output,
     bool flush
   ) {
     SIO_P_COND(sample_rate == resampler_.GetInputSamplingRate());
 
-    kaldi::SubVector<float> input(samples, num_samples);
+    kaldi::SubVector<float> input(data, len);
     resampler_.Resample(input, flush, output);
   }
 

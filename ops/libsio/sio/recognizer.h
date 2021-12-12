@@ -24,8 +24,8 @@ class Recognizer {
 
   int StartSession(const char* key = nullptr) { return 0; }
 
-  int Speech(const float* samples, size_t num_samples, float sample_rate) {
-    AudioSegment<const float> audio_seg(samples, num_samples, sample_rate);
+  int Speech(const float* data, size_t len, float sample_rate) {
+    AudioSegment<const float> audio_seg(data, len, sample_rate);
 
     // Resampler
     kaldi::Vector<float> resampled;
@@ -38,14 +38,14 @@ class Recognizer {
       }
 
       resampler_->Forward(
-        audio_seg.samples,
+        audio_seg.data,
         audio_seg.len,
         audio_seg.sample_rate,
         &resampled, false
       );
 
-      audio_seg.samples = resampled.Data();
-      audio_seg.len     = resampled.Dim();
+      audio_seg.data = resampled.Data();
+      audio_seg.len  = resampled.Dim();
       audio_seg.sample_rate = resampler_->TargetSampleRate();
     }
 
@@ -55,7 +55,7 @@ class Recognizer {
 
     // Feature extractor
     feature_extractor_.Forward(
-      audio_seg.samples,
+      audio_seg.data,
       audio_seg.len,
       audio_seg.sample_rate
     );
