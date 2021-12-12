@@ -30,9 +30,7 @@ class Recognizer {
     // Resampler
     kaldi::Vector<float> resampled;
     if SIO_UNLIKELY(sample_rate != feature_info_.GetSamplingFrequency()) {
-      if (resampler_ == nullptr) {
-        resampler_ = new Resampler(sample_rate, feature_info_.GetSamplingFrequency());
-      } else if (sample_rate != resampler_->SourceSampleRate()) {
+      if (resampler_ == nullptr || sample_rate != resampler_->SourceSampleRate()) {
         delete resampler_;
         resampler_ = new Resampler(sample_rate, feature_info_.GetSamplingFrequency());
       }
