@@ -1,5 +1,5 @@
-#ifndef SIO_MEAN_VAR_NORMALIZER_H
-#define SIO_MEAN_VAR_NORMALIZER_H
+#ifndef SIO_MEAN_VAR_NORM_H
+#define SIO_MEAN_VAR_NORM_H
 
 #include <string>
 #include <iostream>
@@ -10,7 +10,7 @@
 #include "sio/check.h"
 
 namespace sio {
-struct MeanVarNormalizer {
+struct MeanVarNorm {
   void Load(std::string mvn_path) {
     m_norm_shift.clear();
     v_norm_scale.clear();
@@ -28,7 +28,7 @@ struct MeanVarNormalizer {
 
     std::getline(is, line);
     cols = absl::StrSplit(line, absl::ByAnyChar(" ,"), absl::SkipWhitespace());
-    SIO_Q_COND(cols.size() == dim);
+    SIO_CHECK(cols.size() == dim, "mean norm dim is different from header");
 
     for (int i = 0; i != cols.size(); i++) {
       m_norm_shift.push_back(std::stod(cols[i]));
@@ -36,7 +36,7 @@ struct MeanVarNormalizer {
 
     std::getline(is, line);
     cols = absl::StrSplit(line, absl::ByAnyChar(" ,"), absl::SkipWhitespace());
-    SIO_Q_COND(cols.size() == dim);
+    SIO_CHECK(cols.size() == dim, "var norm dim is different from header");
 
     for (int i = 0; i != cols.size(); i++) {
       v_norm_scale.push_back(std::stod(cols[i]));

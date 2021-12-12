@@ -6,7 +6,7 @@
 #include "sio/map.h"
 #include "sio/audio.h"
 #include "sio/feature_extractor.h"
-#include "sio/mean_var_normalizer.h"
+#include "sio/mean_var_norm.h"
 #include "sio/data_pipe.h"
 
 
@@ -43,7 +43,7 @@ TEST(DataPipe, FeatureExtractor) {
   c.feature_type = "fbank";
   FeatureInfo feature_info(c);
 
-  MeanVarNormalizer mvn;
+  MeanVarNorm mvn;
   mvn.Load("testdata/mean_var_norm_23dim.txt");
 
   for (const auto& kv : audio_to_frames) {
@@ -63,9 +63,7 @@ TEST(DataPipe, FeatureExtractor) {
     kaldi::Vector<float> frame_feat(feature_extractor.Dim());
     for (index_t f = 0; f < feature_extractor.NumFramesReady(); f++) {
       feature_extractor.GetFrame(f, &frame_feat);
-      SIO_DEBUG << "Raw " << f << frame_feat;
       mvn.Forward(&frame_feat);
-      SIO_DEBUG << "Normed " << f << frame_feat;
     }
     EXPECT_EQ(num_frames, feature_extractor.NumFramesReady());
   }
