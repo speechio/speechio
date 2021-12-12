@@ -64,5 +64,5 @@ add_subdirectory(sio)
 
 # bin
 add_executable(stt stt.cc)
-target_link_libraries(stt sio ${KALDI_LIBS} absl::strings absl::str_format absl::type_traits absl::flat_hash_map)
+target_link_libraries(stt sio ${KALDI_LIBS} absl::base absl::strings absl::str_format absl::type_traits absl::flat_hash_map)
 

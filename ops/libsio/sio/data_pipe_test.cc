@@ -45,8 +45,6 @@ TEST(DataPipe, FeatureExtractor) {
 
   MeanVarNormalizer mvn;
   mvn.Load("testdata/mean_var_norm_23dim.txt");
-  SIO_INFO << mvn.mean_norm_shift ;
-  SIO_INFO << mvn.var_norm_scale;
 
   for (const auto& kv : audio_to_frames) {
     Str audio_file = kv.first;
@@ -65,9 +63,9 @@ TEST(DataPipe, FeatureExtractor) {
     kaldi::Vector<float> frame_feat(feature_extractor.Dim());
     for (index_t f = 0; f < feature_extractor.NumFramesReady(); f++) {
       feature_extractor.GetFrame(f, &frame_feat);
-      SIO_DEBUG << "Raw feat " << f << frame_feat;
+      SIO_DEBUG << "Raw " << f << frame_feat;
       mvn.Forward(&frame_feat);
-      SIO_DEBUG << "MV normed feat " << f << frame_feat;
+      SIO_DEBUG << "Normed " << f << frame_feat;
     }
     EXPECT_EQ(num_frames, feature_extractor.NumFramesReady());
   }

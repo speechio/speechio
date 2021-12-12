@@ -14,6 +14,7 @@ target_link_libraries(unittest
   gtest_main
   sio
   absl::base
+  absl::strings
   ${KALDI_LIBS}
 )
 

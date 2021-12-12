@@ -437,6 +437,17 @@ class MeanVarNormalizer:
             f'    mean_norm_shift:  {self.mean_norm_shift}\n'
             f'    var_norm_scale:  {self.var_norm_scale}\n'
         )
+    
+    def dump(self, path:str):
+        dim1 = self.mean_norm_shift.shape[0]
+        dim2 = self.var_norm_scale.shape[0]
+        assert(dim1 == dim2)
+
+        with open(path, 'w+') as f:
+            #json.dump(norm, f)
+            print(f'{dim1}', file=f)
+            print(' '.join([ str(e) for e in self.mean_norm_shift.tolist() ]), file = f)
+            print(' '.join([ str(e) for e in self.var_norm_scale.tolist() ]), file = f)
 
 
 class SpecAugment:
