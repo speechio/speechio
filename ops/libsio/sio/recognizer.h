@@ -63,9 +63,8 @@ class Recognizer {
     return 0;
   }
 
-  int Text() { return 0; }
-
   int To() { return 0; }
+  int Text() { return 0; }
 
  private:
   FeatureInfo& feature_info_;
