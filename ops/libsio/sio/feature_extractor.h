@@ -16,16 +16,27 @@ class FeatureExtractor {
     extractor_(info)
   { }
 
+  i32 Dim() {
+    return extractor_.Dim();
+  }
+
   void Forward(const float* samples, size_t num_samples, float sample_rate) {
     extractor_.AcceptWaveform(
       sample_rate, 
       kaldi::SubVector<float>(samples, num_samples)
     );
-    SIO_DEBUG << extractor_.NumFramesReady() << " frames ready.";
   }
 
   i32 NumFramesReady() const {
     return extractor_.NumFramesReady();
+  }
+
+  void InputFinished() {
+    extractor_.InputFinished();
+  }
+
+  void GetFrame(i32 frame_idx, kaldi::VectorBase<f32>* feat) {
+    extractor_.GetFrame(frame_idx, feat);
   }
 
  private:

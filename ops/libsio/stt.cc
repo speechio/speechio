@@ -5,6 +5,8 @@
 int main() {
     using namespace sio;
     SpeechToTextConfig config;
+
+    config.feature_config.feature_type = "fbank";
     /* 
       argument/config-file parsing -> config
     */

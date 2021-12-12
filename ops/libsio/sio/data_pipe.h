@@ -55,10 +55,12 @@ struct DataPipe {
       audio_seg.len,
       audio_seg.sample_rate
     );
+
   }
 
   void StopSession() { }
 
+  index_t num_frames_done = 0;
   FeatureInfo& feature_info;
   FeatureExtractor feature_extractor;
   Optional<Resampler*> resampler = nullptr;
