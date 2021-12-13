@@ -7,8 +7,6 @@
 #include <cstdio>
 #include <mutex>
 
-#include "absl/base/optimization.h"
-
 namespace sio {
 
 /* SIO_FUNC_REPR */

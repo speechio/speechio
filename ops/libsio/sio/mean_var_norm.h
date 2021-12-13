@@ -24,33 +24,29 @@ struct MeanVarNorm {
 
   */
   void Load(std::string mvn_path) {
-    m_norm_shift.clear();
-    v_norm_scale.clear();
-
     std::ifstream is(mvn_path);
 
     std::string line;
     std::getline(is, line);
-
     dim = std::stoi(line);
-    m_norm_shift.reserve(dim);
-    v_norm_scale.reserve(dim);
 
     std::vector<std::string> cols;
 
     std::getline(is, line);
     cols = absl::StrSplit(line, absl::ByAnyChar(" \t,"), absl::SkipWhitespace());
-    SIO_CHECK(cols.size() == dim, "mean norm dim is different from header");
-
-    for (int i = 0; i != cols.size(); i++) {
+    SIO_P_COND(cols.size() == dim);
+    m_norm_shift.clear();
+    m_norm_shift.reserve(dim);
+    for (int i = 0; i != dim; i++) {
       m_norm_shift.push_back(std::stod(cols[i]));
     }
 
     std::getline(is, line);
     cols = absl::StrSplit(line, absl::ByAnyChar(" \t,"), absl::SkipWhitespace());
-    SIO_CHECK(cols.size() == dim, "var norm dim is different from header");
-
-    for (int i = 0; i != cols.size(); i++) {
+    SIO_P_COND(cols.size() == dim);
+    v_norm_scale.clear();
+    v_norm_scale.reserve(dim);
+    for (int i = 0; i != dim; i++) {
       v_norm_scale.push_back(std::stod(cols[i]));
     }
   }

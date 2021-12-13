@@ -1,6 +1,7 @@
 #ifndef SIO_CHECK_H
 #define SIO_CHECK_H
 
+#include "absl/base/optimization.h"
 #include "sio/log.h"
 
 #define SIO_LIKELY   ABSL_PREDICT_TRUE
