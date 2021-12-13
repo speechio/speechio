@@ -1,6 +1,6 @@
 # libsio
 add_library(sio SHARED
-  speech_to_text_manager.cc
+  speech_to_text.cc
 )
 
 # libsio unittest

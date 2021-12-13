@@ -13,7 +13,7 @@ int main() {
         chunk_size = 1000;
     }
 
-    sio::SpeechToTextManager<float> stt_manager(config);
+    sio::SpeechToText<float> speech_to_text(config);
 
     //std::ifstream wav_scp("testdata/MINI/wav.scp");
     std::string scp_file = json_config["wav"].ToString();
@@ -32,23 +32,23 @@ int main() {
         wave_data.Read(is);
         kaldi::SubVector<float> audio(wave_data.Data(), 0);
 
-        sio::SpeechToText* stt = stt_manager.Create();
-        assert(stt != nullptr);
-        stt->StartSession(audio_id.c_str());
+        sio::Recognizer* rec = speech_to_text.Create();
+        assert(rec != nullptr);
+        rec->StartSession(audio_id.c_str());
 
         int samples_done = 0;
         while (samples_done < audio.Dim()) {
             int actual_chunk_size = std::min(chunk_size, audio.Dim() - samples_done);
-            stt->Speech(
+            rec->Speech(
                 audio.Data() + samples_done,
                 actual_chunk_size,
                 wave_data.SampFreq()
             );
             samples_done += actual_chunk_size;
         }
-        stt->To();
-        stt->Text();
-        stt_manager.Destroy(stt);
+        rec->To();
+        rec->Text();
+        speech_to_text.Destroy(rec);
         SIO_INFO << audio_id << " -> " << samples_done << " samples decoded.";
     }
 

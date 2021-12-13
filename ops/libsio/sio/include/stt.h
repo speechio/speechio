@@ -15,8 +15,8 @@
 #include "sio/feature.h"
 #include "sio/mean_var_normalizer.h"
 #include "sio/speech_to_text_config.h"
+#include "sio/recognizer.h"
 #include "sio/speech_to_text.h"
-#include "sio/speech_to_text_manager.h"
 
 #endif
 
