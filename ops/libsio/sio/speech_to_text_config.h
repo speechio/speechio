@@ -1,5 +1,5 @@
-#ifndef SIO_STT_CONFIG_H
-#define SIO_STT_CONFIG_H
+#ifndef SIO_SPEECH_TO_TEXT_CONFIG_H
+#define SIO_SPEECH_TO_TEXT_CONFIG_H
 
 #include "sio/feature.h"
 
