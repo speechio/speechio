@@ -1,6 +1,6 @@
 # libsio
 add_library(sio STATIC 
-  speech_to_text_manager.cc
+  stt_manager.cc
 )
 
 # libsio unittest
@@ -9,7 +9,8 @@ add_executable(unittest
   check_test.cc
   linked_list_test.cc
   heap_test.cc
-  speech_to_text_test.cc
+  audio_test.cc
+  feature_test.cc
 )
 
 target_link_libraries(unittest

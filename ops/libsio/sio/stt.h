@@ -1,5 +1,5 @@
-#ifndef SIO_SPEECH_TO_TEXT_H
-#define SIO_SPEECH_TO_TEXT_H
+#ifndef SIO_STT_H
+#define SIO_STT_H
 
 #include <cstddef>
 

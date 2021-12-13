@@ -1,10 +1,13 @@
 #include <iostream>
 
-#include "sio/include/sio.h"
+#include "sio/include/speech_to_text.h"
+#include "sio/json.h"
 
 int main() {
     using namespace sio;
+    using Json = nlohmann::json;
     SpeechToTextConfig config;
+
 
     config.feature_config.feature_type = "fbank";
     /* 
@@ -16,9 +19,15 @@ int main() {
         chunk_size = 1000;
     }
 
+    Json j;
+    std::ifstream cfg("testdata/config.json");
+    cfg >> j;
+
     SpeechToTextManager<float> stt_manager(config);
 
-    std::ifstream wav_scp("testdata/MINI/wav.scp");
+    //std::ifstream wav_scp("testdata/MINI/wav.scp");
+    std::string scp_file = j["wav"];
+    std::ifstream wav_scp(scp_file);
     std::string line;
     while (std::getline(wav_scp, line)) {
         std::vector<std::string> fields = absl::StrSplit(line, absl::ByAnyChar(" \t,:;"));
