@@ -1,5 +1,5 @@
-#ifndef SIO_MEAN_VAR_NORM_H
-#define SIO_MEAN_VAR_NORM_H
+#ifndef SIO_MEAN_VAR_NORMALIZER_H
+#define SIO_MEAN_VAR_NORMALIZER_H
 
 #include <string>
 #include <iostream>
@@ -10,7 +10,7 @@
 #include "sio/check.h"
 
 namespace sio {
-struct MeanVarNorm {
+struct MeanVarNormalizer {
   /*
   Format of mean_var_norm file, three lines:
   line1: norm_vector_dimension

@@ -1,29 +1,22 @@
 #include <iostream>
 
 #include "sio/include/stt.h"
-#include "sio/json.h"
 
 int main() {
     sio::SpeechToTextConfig config;
-
     config.feature_config.feature_type = "fbank";
-    /* 
-      argument/config-file parsing -> config
-    */
+
+    json::JSON json_config = json::LoadFromFile("testdata/config.json");
 
     int chunk_size = std::numeric_limits<int>::max();
     if (config.online == true) {
         chunk_size = 1000;
     }
 
-    nlohmann::json j;
-    std::ifstream cfg("testdata/config.json");
-    cfg >> j;
-
     sio::SpeechToTextManager<float> stt_manager(config);
 
     //std::ifstream wav_scp("testdata/MINI/wav.scp");
-    std::string scp_file = j["wav"];
+    std::string scp_file = json_config["wav"].ToString();
     std::ifstream wav_scp(scp_file);
     std::string line;
     while (std::getline(wav_scp, line)) {
