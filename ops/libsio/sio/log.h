@@ -91,7 +91,7 @@ class Logger {
 
   ~Logger() {
     if (severity_ >= CurrentLogVerbosity()) {
-      if (severity_ >= LogSeverity::kWarning) {
+      if (severity_ == LogSeverity::kDebug || severity_ >= LogSeverity::kWarning) {
         buf_ << " [" << file_ << ":" << line_ << ":" << func_ << "]";
       }
       os_ << buf_.str() << "\n";
@@ -110,7 +110,7 @@ class Logger {
 };
 
 #define SIO_DEBUG \
-    sio::Logger(SIO_FILE_REPR, SIO_FUNC_REPR, __LINE__, sio::LogSeverity::kDebug,   std::cerr)
+    sio::Logger(SIO_FILE_REPR, __func__,      __LINE__, sio::LogSeverity::kDebug,   std::cerr)
 #define SIO_INFO \
     sio::Logger(SIO_FILE_REPR, SIO_FUNC_REPR, __LINE__, sio::LogSeverity::kInfo,    std::cerr)
 #define SIO_WARNING \

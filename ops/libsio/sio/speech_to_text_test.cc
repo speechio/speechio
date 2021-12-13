@@ -8,7 +8,7 @@
 #include "sio/feature.h"
 #include "sio/mean_var_norm.h"
 
-TEST(Recognizer, AudioReaderAndResampler) {
+TEST(SpeechToText, AudioReaderAndResampler) {
   using namespace sio;
 
   std::string audio_path = "testdata/MINI/audio/audio1.wav";
@@ -29,7 +29,7 @@ TEST(Recognizer, AudioReaderAndResampler) {
 }
 
 
-TEST(Recognizer, FeatureExtractor) {
+TEST(SpeechToText, FeatureExtractor) {
   using namespace sio;
   Map<Str, i32> audio_to_frames = {
       {"testdata/MINI/audio/audio1.wav", 126},
@@ -68,6 +68,6 @@ TEST(Recognizer, FeatureExtractor) {
 
 }
 
-TEST(Recognizer, MeanVarNormalizer) {
+TEST(SpeechToText, MeanVarNormalizer) {
   using namespace sio;
 }
