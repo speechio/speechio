@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "sio/include/speech_to_text.h"
+#include "sio/include/stt.h"
 #include "sio/json.h"
 
 int main() {

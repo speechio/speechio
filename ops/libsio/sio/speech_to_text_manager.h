@@ -1,9 +1,9 @@
-#ifndef SIO_STT_MANAGER_H
-#define SIO_STT_MANAGER_H
+#ifndef SIO_SPEECH_TO_TEXT_MANAGER_H
+#define SIO_SPEECH_TO_TEXT_MANAGER_H
 
 #include "sio/ptr.h"
-#include "sio/stt_config.h"
-#include "sio/stt.h"
+#include "sio/speech_to_text_config.h"
+#include "sio/speech_to_text.h"
 
 namespace sio {
 
