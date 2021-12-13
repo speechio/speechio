@@ -1,9 +1,9 @@
-#ifndef SIO_SPEECH_TO_TEXT_MANAGER_H
-#define SIO_SPEECH_TO_TEXT_MANAGER_H
+#ifndef SIO_STT_MANAGER_H
+#define SIO_STT_MANAGER_H
 
 #include "sio/ptr.h"
-#include "sio/speech_to_text_config.h"
-#include "sio/speech_to_text.h"
+#include "sio/stt_config.h"
+#include "sio/stt.h"
 
 namespace sio {
 
@@ -37,7 +37,7 @@ struct SpeechToTextManager {
 //
 //  // context
 //  ContextManager *context_manager_;
-}; // end of class SpeechToTextManager
+}; // class SpeechToTextManager
 }  // namespace sio
 
 #endif

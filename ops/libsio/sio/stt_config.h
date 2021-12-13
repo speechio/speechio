@@ -1,5 +1,5 @@
-#ifndef SIO_SPEECH_TO_TEXT_CONFIG_H
-#define SIO_SPEECH_TO_TEXT_CONFIG_H
+#ifndef SIO_STT_CONFIG_H
+#define SIO_STT_CONFIG_H
 
 #include "sio/feature.h"
 
@@ -34,6 +34,6 @@ struct SpeechToTextConfig {
                    "in the file given to --ivector-extraction-config, and "
                    "--chunk-length=-1.");
   }
-}; // End of SpeechToTextManager
+}; // class SpeechToTextConfig
 }  // namespace sio
 #endif

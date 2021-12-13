@@ -1,5 +1,5 @@
-#ifndef SIO_STT_H
-#define SIO_STT_H
+#ifndef SIO_INCLUDE_SPEECH_TO_TEXT_H
+#define SIO_INCLUDE_SPEECH_TO_TEXT_H
 
 #include "sio/type.h"
 #include "sio/log.h"
@@ -13,8 +13,8 @@
 #include "sio/audio.h"
 #include "sio/feature.h"
 #include "sio/mean_var_norm.h"
-#include "sio/speech_to_text_config.h"
-#include "sio/speech_to_text.h"
-#include "sio/speech_to_text_manager.h"
+#include "sio/stt_config.h"
+#include "sio/stt.h"
+#include "sio/stt_manager.h"
 
 #endif

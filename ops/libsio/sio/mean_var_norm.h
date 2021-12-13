@@ -66,5 +66,5 @@ struct MeanVarNorm {
   std::vector<double> m_norm_shift;
   std::vector<double> v_norm_scale;
 }; // class MeanVarNormalizer
-} // namespace sio
+}  // namespace sio
 #endif
