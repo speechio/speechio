@@ -1,5 +1,5 @@
 /* 
- * Copied from SimpleJSON project https://github.com/nbsdx/SimpleJSO
+ * Modified from SimpleJSON project https://github.com/nbsdx/SimpleJSO
  * License: "Do what the fuck you want public license"
  */
 
