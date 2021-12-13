@@ -57,12 +57,7 @@ TEST(JSON, LoadFromFile) {
 }
 
 TEST(JSON, DumpToString) {
-  JSON obj = json::LoadFromString(
-    "{ \"Key\" : \"StringValue\","
-    "   \"Key2\" : true, "
-    "   \"Key3\" : 1234, "
-    "   \"Key4\" : null }"
-  );
+  JSON obj = json::LoadFromFile("testdata/config.json");
 
   std::string dump_str = obj.dump();
   cout << "dump_str: " << dump_str << endl;
