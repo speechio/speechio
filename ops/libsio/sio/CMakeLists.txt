@@ -1,5 +1,5 @@
 # libsio
-add_library(sio STATIC 
+add_library(sio SHARED
   stt_manager.cc
 )
 
