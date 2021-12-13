@@ -6,7 +6,7 @@ int main() {
     sio::SpeechToTextConfig config;
     config.feature_config.feature_type = "fbank";
 
-    json::JSON json_config = json::LoadFromFile("testdata/config.json");
+    json::JSON json_config = json::Load("testdata/config.json");
 
     int chunk_size = std::numeric_limits<int>::max();
     if (config.online == true) {

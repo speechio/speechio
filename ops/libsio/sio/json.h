@@ -205,9 +205,7 @@ class JSON
             return ret;
         }
 
-        // 2021.12 Jiayu: commented "Load" function out,
-        // moving it outside JSON class scope, to json:: namespace
-        //static JSON Load( const string & );
+        static JSON Load( const string & );
 
         template <typename T>
         void append( T arg ) {
@@ -648,19 +646,19 @@ namespace {
     }
 }
 
-JSON LoadFromString( const string &str ) {
+JSON JSON::Load( const string &str ) {
     size_t offset = 0;
     return std::move( parse_next( str, offset ) );
 }
 
 // Jiayu: 2021.12
-JSON LoadFromFile(const string &filename) {
+JSON Load(const string &filename) {
     std::ifstream is(filename);
     std::string line, content;
     while (std::getline(is, line)) {
         content += line;
     }
-    return std::move(LoadFromString(content));
+    return std::move(JSON::Load(content));
 }
 
 } // End Namespace json

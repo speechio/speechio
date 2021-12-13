@@ -28,15 +28,15 @@ TEST(JSON, Prim) {
 }
 
 TEST(JSON, LoadFromString) {
-  JSON Int    = json::LoadFromString( " 123 " );
-  JSON Float  = json::LoadFromString( " 123.234 " );
-  JSON Str    = json::LoadFromString( "\"String\"" );
-  JSON EscStr = json::LoadFromString( "\" \\\"Some\\/thing\\\" \"" );
-  JSON Arr    = json::LoadFromString( "[1,2, true, false,\"STRING\", 1.5]" );
-  JSON Obj    = json::LoadFromString( "{ \"Key\" : \"StringValue\","
-                                      "   \"Key2\" : true, "
-                                      "   \"Key3\" : 1234, "
-                                      "   \"Key4\" : null }" );
+  JSON Int    = JSON::Load( " 123 " );
+  JSON Float  = JSON::Load( " 123.234 " );
+  JSON Str    = JSON::Load( "\"String\"" );
+  JSON EscStr = JSON::Load( "\" \\\"Some\\/thing\\\" \"" );
+  JSON Arr    = JSON::Load( "[1,2, true, false,\"STRING\", 1.5]" );
+  JSON Obj    = JSON::Load( "{ \"Key\" : \"StringValue\","
+                            "   \"Key2\" : true, "
+                            "   \"Key3\" : 1234, "
+                            "   \"Key4\" : null }" );
   
   cout << Int << endl;
   cout << Float << endl;
@@ -48,7 +48,7 @@ TEST(JSON, LoadFromString) {
 }
 
 TEST(JSON, LoadFromFile) {
-  JSON json_obj = json::LoadFromFile("testdata/config.json");  // SIO extended function
+  JSON json_obj = json::Load("testdata/config.json");  // SIO extended function
   //cout << j << endl;
   EXPECT_EQ(json_obj["model"].ToString(), "model_dir/model.bin");
   EXPECT_EQ(json_obj["sample_rate"].ToFloat(), 16000.0);
@@ -57,7 +57,7 @@ TEST(JSON, LoadFromFile) {
 }
 
 TEST(JSON, DumpToString) {
-  JSON obj = json::LoadFromFile("testdata/config.json");
+  JSON obj = json::Load("testdata/config.json");
 
   std::string dump_str = obj.dump();
   cout << "dump_str: " << dump_str << endl;
