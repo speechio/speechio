@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
-#include <cstdio>
 #include <mutex>
 
 #include "sio/base.h"
@@ -21,16 +20,16 @@ enum class LogSeverity : int {
 
 constexpr const char* LogSeverityRepr(LogSeverity s) {
   return s == LogSeverity::kDebug
-         ? "[D]"
+         ? "(D)"
          : s == LogSeverity::kInfo
-           ? "[I]"
+           ? "(I)"
            : s == LogSeverity::kWarning
-             ? "[WARNING]"
+             ? "(WARNING)"
              : s == LogSeverity::kError
-               ? "[ERROR]"
+               ? "(ERROR)"
                : s == LogSeverity::kFatal 
-                 ? "[FATAL]" 
-                 : "[UNKNOWN]";
+                 ? "(FATAL)" 
+                 : "(UNKNOWN)";
 }
 
 inline LogSeverity CurrentLogVerbosity() {
@@ -60,6 +59,9 @@ class Logger {
   {
     if (severity_ >= CurrentLogVerbosity()) {
       buf_ << LogSeverityRepr(severity_) << " ";
+      if (severity_ == LogSeverity::kDebug || severity_ >= LogSeverity::kWarning) {
+        buf_ << "[" << file_ << ":" << line_ << ":" << func_ << "] ";
+      }
     }
   }
 
@@ -71,12 +73,8 @@ class Logger {
 
   ~Logger() {
     if (severity_ >= CurrentLogVerbosity()) {
-      if (severity_ == LogSeverity::kDebug || severity_ >= LogSeverity::kWarning) {
-        buf_ << " [" << file_ << ":" << line_ << ":" << func_ << "]";
-      }
       os_ << buf_.str() << "\n";
     }
-    if (severity_ >= LogSeverity::kFatal) abort();
   }
 
  private:
