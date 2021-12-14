@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <cstdio>
+
 #include "sio/error.h"
 #include "sio/check.h"
 #include "sio/type.h"
@@ -20,15 +22,19 @@ TEST(Check, HoareLogic) {
 
 namespace { // seal test func scope in anonymous namespace
 Error test_error_func() {
-  return Error::None;
-  //return Error::OOM;
+  return ErrorNone;
+  //return ErrorOOM;
 }
 }
 
 TEST(Check, Error) {
   Error err = test_error_func();
   SIO_Q_COND(!err);
-  SIO_CHECK(!err, error_cstr(err));
+
+  //FILE *fp = nullptr;
+  //SIO_CHECK(fp != nullptr, "cannot open file", ErrorInvalidFileHandle);
+
+  //SIO_CHECK(false, "", ErrorUnknown);
 }
 
 } // namespace sio
