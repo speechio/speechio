@@ -1,26 +1,34 @@
 #ifndef SIO_ERROR_H
 #define SIO_ERROR_H
 
+#include <cstddef>
+
 #include "sio/base.h"
 
 namespace sio {
 
+enum Error {
+  ErrorNone = 0,
+  ErrorOOM,
+  ErrorUnreachable,
+  ErrorPrecondition,
+  ErrorPostcondition,
+  ErrorInvariant,
+  ErrorCheck,
+  ErrorInvalidFileHandle,
+  ErrorUnknown,
+}; // enum Error
+
+const char *error_cstr(Error err);
+
+
 ABSL_ATTRIBUTE_NOINLINE
 ABSL_ATTRIBUTE_NORETURN
-ABSL_PRINTF_ATTRIBUTE(1, 2)
-void panic(const char *format, ...);
+void panic(const char* file, size_t line, const char* func, Error err = ErrorUnknown);
 
-#define SIO_UNREACHABLE \
-  ::sio::panic("Unreachable bug occurred @ %s:%d:%s.\n", SIO_FILE_REPR, __LINE__, SIO_FUNC_REPR)
+#define SIO_PANIC(err) ::sio::panic(SIO_FILE_REPR, __LINE__, SIO_FUNC_REPR, err)
 
-enum class Error : int {
-  None = 0,
-  Unknown,
-  OOM,
-}; // enum class Error
-
-bool operator!(Error err);
-const char *error_cstr(Error err);
+#define SIO_UNREACHABLE() SIO_PANIC(::sio::ErrorUnreachable)
 
 } // namespace sio
 

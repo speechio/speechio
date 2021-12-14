@@ -6,25 +6,25 @@
 
 namespace sio {
 
-void panic(const char *format, ...) {
-  va_list ap;
-  va_start(ap, format);
-  vfprintf(stderr, format, ap);
-  fflush(stderr);
-  va_end(ap);
-  abort();
-}
-
-bool operator!(Error err) {
-  return (err == Error::None);
-}
-
 const char *error_cstr(Error err) {
   switch (err) {
-    case Error::None: return "(no error)";
-    case Error::OOM: return "out of memory";
-    default: return "(unknown error)";
+    case ErrorNone: return "(no error)";
+    case ErrorOOM: return "out of memory";
+    case ErrorUnreachable: return "control flow into unreachable";
+    case ErrorPrecondition: return "pre-condition unsatisfied";
+    case ErrorPostcondition: return "post-condition unsatisfied";
+    case ErrorInvariant: return "invariant unsatisfied";
+    case ErrorCheck: return "check failure";
+    case ErrorInvalidFileHandle: return "invalid file handle";
+    case ErrorUnknown: return "unknown error";
   }
+  SIO_UNREACHABLE();
+}
+
+
+void panic(const char* file, size_t line, const char* func, Error err) {
+  fprintf(stderr, "panic: %s @ %s:%d:%s\n", error_cstr(err), file, line, func);
+  abort();
 }
 
 } // namespace sio
