@@ -6,7 +6,7 @@
 
 namespace sio {
 
-TEST(Check, HoareLogicCheck) {
+TEST(Check, HoareLogic) {
   Vec<int> v = {1,2};
   i32 i = 0;
   i32 sum = 0;
@@ -25,7 +25,7 @@ Error test_error_func() {
 }
 }
 
-TEST(Check, ErrorCheck) {
+TEST(Check, Error) {
   Error err = test_error_func();
   SIO_Q_COND(!err);
   SIO_CHECK(!err, error_cstr(err));
