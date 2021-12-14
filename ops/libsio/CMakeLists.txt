@@ -59,8 +59,8 @@ foreach(x ${KALDI_LIBS})
 endforeach()
 
 # libsio
-include_directories(${CMAKE_SOURCE_DIR})
-add_subdirectory(sio)
+include_directories(${CMAKE_SOURCE_DIR}/include)
+add_subdirectory(src)
 
 # bin
 add_executable(stt stt.cc)
