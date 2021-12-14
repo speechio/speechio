@@ -1,8 +1,9 @@
 #include "gtest/gtest.h"
 #include "sio/heap.h"
 
+namespace sio {
+
 TEST(Heap, ArenaAllocator) {
-  using namespace sio;
 
   struct S {
     char c;
@@ -37,3 +38,5 @@ TEST(Heap, ArenaAllocator) {
   p->Free(s4);
   delete p;
 }
+
+} // namespace sio

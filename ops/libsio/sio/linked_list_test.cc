@@ -1,9 +1,9 @@
 #include "gtest/gtest.h"
 #include "sio/linked_list.h"
 
+namespace sio {
 
 TEST(LinkedList, Link) {
-  using namespace sio;
 
   Link *l1 = new Link;
   Link *l2 = new Link;
@@ -41,7 +41,6 @@ TEST(LinkedList, Link) {
 
 
 TEST(LinkedList, Basic) {
-  using namespace sio;
   struct A {
     Link link;
     char* c;
@@ -78,3 +77,5 @@ TEST(LinkedList, Basic) {
   delete a2;
   delete l;
 }
+
+} // namespace sio

@@ -7,26 +7,8 @@
 #include <cstdio>
 #include <mutex>
 
+#include "sio/base.h"
 namespace sio {
-
-/* SIO_FUNC_REPR */
-#if defined(_MSC_VER)
-#define SIO_FUNC_REPR __FUNCSIG__
-#elif defined(__clang__) || defined(__GNUC__) || defined(__GNUG__) || defined(__PRETTY_FUNCTION__)
-#define SIO_FUNC_REPR __PRETTY_FUNCTION__
-#else
-#define SIO_FUNC_REPR __func__
-#endif
-
-
-/* SIO_FILE_REPR */
-constexpr const char* Basename(const char* fname, int offset) {
-  return offset == 0 || fname[offset - 1] == '/' || fname[offset - 1] == '\\'
-             ? fname + offset
-             : Basename(fname, offset - 1);
-}
-#define SIO_FILE_REPR  ::sio::Basename(__FILE__, sizeof(__FILE__) - 1)
-
 
 /* Log severity levels */
 enum class LogSeverity : int {
@@ -108,7 +90,7 @@ class Logger {
 };
 
 #define SIO_DEBUG \
-    sio::Logger(SIO_FILE_REPR, __func__,      __LINE__, sio::LogSeverity::kDebug,   std::cerr)
+    sio::Logger(SIO_FILE_REPR, SIO_FUNC_REPR, __LINE__, sio::LogSeverity::kDebug,   std::cerr)
 #define SIO_INFO \
     sio::Logger(SIO_FILE_REPR, SIO_FUNC_REPR, __LINE__, sio::LogSeverity::kInfo,    std::cerr)
 #define SIO_WARNING \

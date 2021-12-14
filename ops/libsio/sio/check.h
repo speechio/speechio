@@ -1,16 +1,16 @@
 #ifndef SIO_CHECK_H
 #define SIO_CHECK_H
 
-#include "absl/base/optimization.h"
-#include "sio/log.h"
+#include "sio/base.h"
+#include "sio/error.h"
 
-#define SIO_LIKELY   ABSL_PREDICT_TRUE
-#define SIO_UNLIKELY ABSL_PREDICT_FALSE
-
-#define SIO_CHECK(expr, message) do {                           \
-  if SIO_UNLIKELY(!(expr)) {                                    \
-    SIO_ERROR << "Check {" << #expr << "} failed: " << message; \
-  }                                                             \
+#define SIO_CHECK(expr, message) do {                    \
+  if SIO_UNLIKELY(!(expr)) {                             \
+    ::sio::panic("Check failure: {%s}, %s @ %s:%d:%s\n", \
+      (#expr), message,                                  \
+      SIO_FILE_REPR, __LINE__, SIO_FUNC_REPR             \
+    );                                                   \
+  }                                                      \
 } while(0)
 
 #define SIO_P_COND(cond) SIO_CHECK(cond, "Precondition")

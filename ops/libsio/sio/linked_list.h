@@ -101,11 +101,11 @@ public:
 
 private:
   Link* LinkOf(T* node) {
-      return (Link*) ((size_t)node + offset_);
+    return (Link*) ((size_t)node + offset_);
   }
 
   Optional<T*> NodeOf(Link* link) {
-      return (link == &origin_) ? nullptr : (T*) ((size_t)link - offset_);
+    return (link == &origin_) ? nullptr : (T*) ((size_t)link - offset_);
   }
 
   Link   origin_;

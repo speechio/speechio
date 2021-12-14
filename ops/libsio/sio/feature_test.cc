@@ -8,9 +8,9 @@
 #include "sio/feature.h"
 #include "sio/mean_var_normalizer.h"
 
+namespace sio {
 
 TEST(Feature, ExtractorAndMeanVarNorm) {
-  using namespace sio;
   Map<Str, i32> audio_to_frames = {
       {"testdata/MINI/audio/audio1.wav", 126},
       {"testdata/MINI/audio/audio2.wav", 522}
@@ -47,3 +47,5 @@ TEST(Feature, ExtractorAndMeanVarNorm) {
   }
 
 }
+
+} // namespace sio

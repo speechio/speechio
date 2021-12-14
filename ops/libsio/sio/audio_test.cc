@@ -4,8 +4,9 @@
 
 #include "sio/audio.h"
 
+namespace sio {
+
 TEST(Audio, LoaderAndResampler) {
-  using namespace sio;
 
   std::string audio_path = "testdata/MINI/audio/audio1.wav";
   std::ifstream is(audio_path, std::ifstream::binary);
@@ -23,3 +24,5 @@ TEST(Audio, LoaderAndResampler) {
   EXPECT_EQ(resampler.TargetSampleRate(), 8000.0);
   EXPECT_EQ(output.Dim(), 10240);
 }
+
+} // namespace sio

@@ -2,8 +2,9 @@
 #include "sio/log.h"
 #include "sio/str.h"
 
+namespace sio {
+
 TEST(Log, Basic) {
-  using namespace sio;
   Str msg = "This is a log message.";
 
   SIO_DEBUG << msg;
@@ -12,3 +13,5 @@ TEST(Log, Basic) {
   SIO_ERROR << msg;
   //SIO_FATAL << msg;
 }
+
+} // namespace sio

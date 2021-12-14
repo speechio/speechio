@@ -1,10 +1,11 @@
 # libsio
 add_library(sio SHARED
-  speech_to_text.cc
+  error.cc
 )
 
 # libsio unittest
 add_executable(unittest 
+  error_test.cc
   log_test.cc
   check_test.cc
   linked_list_test.cc
