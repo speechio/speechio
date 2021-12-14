@@ -24,6 +24,7 @@ const char *error_cstr(Error err) {
 
 void panic(const char* file, size_t line, const char* func, Error err) {
   fprintf(stderr, "panic: %s @ %s:%d:%s\n", error_cstr(err), file, line, func);
+  fflush(stderr);
   abort();
 }
 
