@@ -408,6 +408,21 @@ class MeanVarStats:
         }
         with open(path, 'w+') as f:
             json.dump(stats, f, indent=4)
+    
+    def dump_mean_var_normalizer(self, path:str):
+        info(f'Dumping mean/var normalizer -> {path}')
+        # compute shift and scale factor from stats
+        mean = self.o1_sum / self.n
+        var  = self.o2_sum / self.n - mean.square()
+        istd  = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
+        m_norm_shift = -mean
+        v_norm_scale = istd
+        # dump
+        with open(path, 'w+') as f:
+            #json.dump(norm, f)
+            print(f'{self.o1_sum.shape[0]}', file=f)
+            print(' '.join([ str(e) for e in m_norm_shift.tolist() ]), file = f)
+            print(' '.join([ str(e) for e in v_norm_scale.tolist() ]), file = f)
 
     def __repr__(self):
         return (
@@ -419,35 +434,38 @@ class MeanVarStats:
 
 
 class MeanVarNormalizer:
-    def __init__(self, mean_var_stats:MeanVarStats):
-        mean = mean_var_stats.o1_sum / mean_var_stats.n
-        var  = mean_var_stats.o2_sum / mean_var_stats.n - mean.square()
-        istd  = var.sqrt().clamp(min = torch.finfo(torch.float32).eps).reciprocal()
-        self.mean_norm_shift = -mean
-        self.var_norm_scale = istd
+    def __init__(self, path:str):
+        info(f'Loading mean/var normalizer <- {path}')
+        self.m_norm_shift = None
+        self.v_norm_scale = None
+        with open(path, 'r') as f:
+            lines = f.readlines()
+            assert(len(lines) == 3)
+
+            cols = lines[0].strip().split()
+            assert(len(cols) == 1)
+            feature_dim = int(cols[0])
+
+            cols = lines[1].strip().split()
+            assert(len(cols) == feature_dim)
+            self.m_norm_shift = torch.tensor([ float(e) for e in cols ])
+
+            cols = lines[2].strip().split()
+            assert(len(cols) == feature_dim)
+            self.v_norm_scale = torch.tensor([ float(e) for e in cols ])
+
 
     def __call__(self, feature:torch.Tensor):
-        feature += self.mean_norm_shift
-        feature *= self.var_norm_scale
+        feature += self.m_norm_shift
+        feature *= self.v_norm_scale
         return feature
 
     def __repr__(self):
         return (
             '\nGlobal MEAN/VAR normalizer:\n'
-            f'    mean_norm_shift:  {self.mean_norm_shift}\n'
-            f'    var_norm_scale:  {self.var_norm_scale}\n'
+            f'   m_norm_shift:  {self.m_norm_shift}\n'
+            f'   v_norm_scale:  {self.v_norm_scale}\n'
         )
-    
-    def dump(self, path:str):
-        dim1 = self.mean_norm_shift.shape[0]
-        dim2 = self.var_norm_scale.shape[0]
-        assert(dim1 == dim2)
-
-        with open(path, 'w+') as f:
-            #json.dump(norm, f)
-            print(f'{dim1}', file=f)
-            print(' '.join([ str(e) for e in self.mean_norm_shift.tolist() ]), file = f)
-            print(' '.join([ str(e) for e in self.var_norm_scale.tolist() ]), file = f)
 
 
 class SpecAugment:
@@ -791,18 +809,20 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     # Create pre-processing data pipeline
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
+    mean_var_normalizer_file = os.path.join(dir, 'mean_var_normalizer.txt')
     if rank == 0:
         if not os.path.isfile(mean_var_stats_file):
             mean_var_stats = compute_mean_var_stats(train_dataset, config)
             mean_var_stats.dump(mean_var_stats_file)
+            mean_var_stats.dump_mean_var_normalizer(mean_var_normalizer_file)
+        time.sleep(0.1)
     ddp_barrier()
-    mean_var_stats = MeanVarStats().load(mean_var_stats_file)
 
     datapipe = DataPipe(
         resampler = Resampler(**c) if (c := config.get('resampler')) else None,
         perturbation = Perturbation(**c) if (c := config.get('perturbation')) else None,
         feature_extractor = FbankFeatureExtractor(**config.fbank_feature_extractor),
-        mean_var_normalizer = MeanVarNormalizer(mean_var_stats),
+        mean_var_normalizer = MeanVarNormalizer(mean_var_normalizer_file),
         spec_augment = SpecAugment(**c) if (c := config.get('spec_augment')) else None,
         text_normalizer = TextNormalizer(**c) if (c := config.get('text_normalizer')) else None,
         tokenizer = tokenizer,
@@ -965,11 +985,9 @@ def recognize(config_path, dir):
     db = OmegaConf.load(DEFAULT_DB)
     dataset = Dataset(db, config.test_set) # with default sample loader
 
-    mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
-    if os.path.isfile(mean_var_stats_file):
-        mean_var_stats = MeanVarStats().load(mean_var_stats_file)
-    else:
-        raise FileNotFoundError(f'Cannot find mean var stats file: {mean_var_stats_file}')
+    mean_var_normalizer_file = os.path.join(dir, 'mean_var_normalizer.txt')
+    if not os.path.isfile(mean_var_normalizer_file):
+        raise FileNotFoundError(f'Cannot find mean var normalizer file: {mean_var_normalizer_file}')
 
     tokenizer = Tokenizer(**config.tokenizer)
 
@@ -977,7 +995,7 @@ def recognize(config_path, dir):
         resampler = Resampler(**c) if (c := config.get('resampler')) else None,
         perturbation = Perturbation(**c) if (c := config.get('perturbation')) else None,
         feature_extractor = FbankFeatureExtractor(**config.fbank_feature_extractor),
-        mean_var_normalizer = MeanVarNormalizer(mean_var_stats),
+        mean_var_normalizer = MeanVarNormalizer(mean_var_normalizer_file),
         spec_augment = SpecAugment(**c) if (c := config.get('spec_augment')) else None,
         text_normalizer = TextNormalizer(**c) if (c := config.get('text_normalizer')) else None,
         tokenizer = tokenizer,
