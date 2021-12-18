@@ -31,7 +31,7 @@ spec_augment:
     num_f_masks: 2
     f_mask_width_max: 10
 
-text_normalizer:
+text_norm:
     case: upper # either 'upper' or 'lower'
 
 tokenizer: 

@@ -409,7 +409,7 @@ class MeanVarStats:
         with open(path, 'w+') as f:
             json.dump(stats, f, indent=4)
     
-    def dump_mean_var_normalizer(self, path:str):
+    def dump_mean_var_norm(self, path:str):
         info(f'Dumping mean/var normalizer -> {path}')
         # compute shift and scale factor from stats
         mean = self.o1_sum / self.n
@@ -433,7 +433,7 @@ class MeanVarStats:
         )
 
 
-class MeanVarNormalizer:
+class MeanVarNorm:
     def __init__(self, path:str):
         info(f'Loading mean/var normalizer <- {path}')
         self.m_norm_shift = None
@@ -554,7 +554,7 @@ class Tokenizer:
         return self.encode(text, 'token'), self.encode(text, 'index')
 
 
-class TextNormalizer:
+class TextNorm:
     def __init__(self, case:str):
         self.case = case
 
@@ -571,17 +571,17 @@ class DataPipe:
         resampler:Optional[callable] = None,
         perturbation:Optional[callable] = None,
         feature_extractor:Optional[callable] = None,
-        mean_var_normalizer:Optional[callable] = None,
+        mean_var_norm:Optional[callable] = None,
         spec_augment:Optional[callable] = None,
-        text_normalizer:Optional[callable] = None,
+        text_norm:Optional[callable] = None,
         tokenizer:Optional[callable] = None,
     ) :
         self.resampler = resampler
         self.perturbation = perturbation
         self.feature_extractor = feature_extractor
-        self.mean_var_normalizer = mean_var_normalizer
+        self.mean_var_norm = mean_var_norm
         self.spec_augment = spec_augment
-        self.text_normalizer = text_normalizer
+        self.text_norm = text_norm
         self.tokenizer = tokenizer
     
     def __repr__(self):
@@ -610,8 +610,8 @@ class DataPipe:
             if self.feature_extractor:
                 feature = self.feature_extractor(waveform, sample_rate)
 
-            if self.mean_var_normalizer:
-                feature = self.mean_var_normalizer(feature)
+            if self.mean_var_norm:
+                feature = self.mean_var_norm(feature)
 
             if self.spec_augment:
                 key, feature = self.spec_augment(key, feature)
@@ -620,8 +620,8 @@ class DataPipe:
             feature = feature.detach()
 
             text = sample.text
-            if self.text_normalizer:
-                text = self.text_normalizer(text)
+            if self.text_norm:
+                text = self.text_norm(text)
 
             token_pieces, token_ids = [], []
             if self.tokenizer:
@@ -809,12 +809,12 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
 
     # Create pre-processing data pipeline
     mean_var_stats_file = os.path.join(dir, 'mean_var_stats.json')
-    mean_var_normalizer_file = os.path.join(dir, 'mean_var_normalizer.txt')
+    mean_var_norm_file = os.path.join(dir, 'mean_var_norm.txt')
     if rank == 0:
         if not os.path.isfile(mean_var_stats_file):
             mean_var_stats = compute_mean_var_stats(train_dataset, config)
             mean_var_stats.dump(mean_var_stats_file)
-            mean_var_stats.dump_mean_var_normalizer(mean_var_normalizer_file)
+            mean_var_stats.dump_mean_var_norm(mean_var_norm_file)
         time.sleep(0.1)
     ddp_barrier()
 
@@ -822,12 +822,12 @@ def train(config, dir:str, device_id:int, world_size:int, rank:int):
         resampler = Resampler(**c) if (c := config.get('resampler')) else None,
         perturbation = Perturbation(**c) if (c := config.get('perturbation')) else None,
         feature_extractor = FbankFeatureExtractor(**config.fbank_feature_extractor),
-        mean_var_normalizer = MeanVarNormalizer(mean_var_normalizer_file),
+        mean_var_norm = MeanVarNorm(mean_var_norm_file),
         spec_augment = SpecAugment(**c) if (c := config.get('spec_augment')) else None,
-        text_normalizer = TextNormalizer(**c) if (c := config.get('text_normalizer')) else None,
+        text_norm = TextNorm(**c) if (c := config.get('text_norm')) else None,
         tokenizer = tokenizer,
     )
-    debug(datapipe.mean_var_normalizer)
+    debug(datapipe.mean_var_norm)
     debug(datapipe)
 
     # Dataloaders
@@ -985,9 +985,9 @@ def recognize(config_path, dir):
     db = OmegaConf.load(DEFAULT_DB)
     dataset = Dataset(db, config.test_set) # with default sample loader
 
-    mean_var_normalizer_file = os.path.join(dir, 'mean_var_normalizer.txt')
-    if not os.path.isfile(mean_var_normalizer_file):
-        raise FileNotFoundError(f'Cannot find mean var normalizer file: {mean_var_normalizer_file}')
+    mean_var_norm_file = os.path.join(dir, 'mean_var_norm.txt')
+    if not os.path.isfile(mean_var_norm_file):
+        raise FileNotFoundError(f'Cannot find mean var normalizer file: {mean_var_norm_file}')
 
     tokenizer = Tokenizer(**config.tokenizer)
 
@@ -995,9 +995,9 @@ def recognize(config_path, dir):
         resampler = Resampler(**c) if (c := config.get('resampler')) else None,
         perturbation = Perturbation(**c) if (c := config.get('perturbation')) else None,
         feature_extractor = FbankFeatureExtractor(**config.fbank_feature_extractor),
-        mean_var_normalizer = MeanVarNormalizer(mean_var_normalizer_file),
+        mean_var_norm = MeanVarNorm(mean_var_norm_file),
         spec_augment = SpecAugment(**c) if (c := config.get('spec_augment')) else None,
-        text_normalizer = TextNormalizer(**c) if (c := config.get('text_normalizer')) else None,
+        text_norm = TextNorm(**c) if (c := config.get('text_norm')) else None,
         tokenizer = tokenizer,
     )
 
