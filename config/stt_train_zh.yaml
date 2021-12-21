@@ -52,7 +52,7 @@ data_loader:
 train_set:
     subsets:
     -   id: AISHELL-1-TRAIN
-        max_num_samples: 10240
+        max_num_samples: -1
 valid_set:
     subsets:
     -   id: AISHELL-1-DEV
