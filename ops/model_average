@@ -18,7 +18,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     checkpoints = [ 
-        os.path.join(args.checkpoints_dir, f'{e}.ckpt') for e in range(args.begin, args.end) 
+        os.path.join(args.checkpoints_dir, f'{e}.model') for e in range(args.begin, args.end) 
     ]
 
     torch.save(average_model_checkpoints(checkpoints), args.output_checkpoint)
