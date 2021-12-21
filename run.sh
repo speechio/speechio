@@ -1,7 +1,4 @@
-## MEMO
-#ops/tokenizer_train --config config/tokenizer_zh.yaml --input data/text/AISHELL-1_trn.txt --model model/tokenizer/AISHELL-1
-#ops/tokenizer_train --config config/tokenizer_en.yaml --input data/text/GigaSpeech_S.txt --model model/tokenizer/GigaSpeech_S
-
+## Tokenizer memo
 # ops/tokenizer_encode --input misc/text --model misc/tokenizer --output_format id --output misc/encoded1
 # cat misc/text | ops/tokenizer_encode --model misc/tokenizer > misc/encoded2
 
@@ -9,19 +6,48 @@
 # cat misc/encoded2 | ops/tokenizer_decode --model misc/tokenizer > misc/decoded2
 
 #-------------------- RECIPE --------------------#
+tokenizer_text=data/text/AISHELL-1_trn.txt
+tokenizer_model=model/tokenizer/AISHELL-1
+tokenizer_config=config/tokenizer_zh.yaml
 
-## Train tokenizer
-#ops/tokenizer_train --config config/tokenizer_zh.yaml --input data/text/AISHELL-1_trn.txt --model model/tokenizer/AISHELL-1
+trn_config=config/stt_train_zh.yaml
+tst_config=config/stt_test_zh.yaml
+
+dir=exp/aishell1_90epoch
+
+mkdir -p $dir
+stage=0
+
+# Train tokenizer from text
+if [ $stage -le 1 ]; then
+    ops/tokenizer_train --config $tokenizer_config \
+        --input $tokenizer_text \
+        --model $tokenizer_model \
+        2> $dir/log.tokenizer
+fi
 
 # Train stt model
-dir=exp/tmp && mkdir -p $dir
-ops/stt_train --node_rank 0 --config config/stt_train_zh.yaml $dir # 2> $dir/log.train
-#ops/model_average --begin 161 --end 181 $dir/checkpoints $dir/final.ckpt
-#
-## Inference on test set
-#ops/stt_test --config config/stt_test_zh.yaml $dir 1> $dir/res.test 2> $dir/log.test
-#
+if [ $stage -le 2 ]; then
+    ops/stt_train --node_rank 0 --config $trn_config $dir 2> $dir/log.train
+fi
+
+# Average model checkpoints & export
+if [ $tage -le 3 ]; then
+    ops/stt_average --begin 81 --end 91 $dir/checkpoints $dir/final.model
+    ops/stt_export --config $trn_config $dir/final.model $dir/final.pt
+fi
+
+# Decode on test set
+if [ $stage -le 4 ]; then
+    ops/stt_test --config $tst_config $dir 1> $dir/res.test 2> $dir/log.test
+fi
+
 ## Error rate evaluation
-#awk -F'\t' '{print $2, $3}' $dir/res.test > $dir/rec.txt
-#ops/compute_error_rate --tokenizer char --ref $dir/ref.txt --hyp $dir/rec.txt $dir/RESULT
+if [ $stage -le 5 ]; then
+    awk -F'\t' '{print $2, $3}' $dir/res.test > $dir/rec.txt
+    ops/stt_error_rate --tokenizer char \
+        --ref $dir/ref.txt \
+        --hyp $dir/rec.txt \
+        $dir/RESULT
+fi
 
