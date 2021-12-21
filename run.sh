@@ -18,32 +18,33 @@ dir=exp/AISHELL-1
 mkdir -p $dir
 stage=0
 
-# Train tokenizer from text
 if [ $stage -le 1 ]; then
+    echo "Training tokenizer from text ..."
     ops/tokenizer_train --config $tokenizer_config \
         --input $tokenizer_text \
         --model $tokenizer_model \
         2> $dir/log.tokenizer
 fi
 
-# Train stt model
 if [ $stage -le 2 ]; then
+    echo "Traning stt model ..."
     ops/stt_train --node_rank 0 --config $trn_config $dir 2> $dir/log.train
 fi
 
-# Average model checkpoints & export as runtime resource
-if [ $tage -le 3 ]; then
+if [ $stage -le 3 ]; then
+    echo "Averaging model checkpoints ..."
     ops/stt_average $dir/checkpoints $dir/final.model # default average last 20 checkpoints
+    echo "Exporting runtime model ..."
     ops/stt_export --config $trn_config $dir/final.model $dir/final.pt
 fi
 
-# Decode on test set
 if [ $stage -le 4 ]; then
+    echo "Decoding test set ..."
     ops/stt --config $tst_config $dir 1> $dir/res.test 2> $dir/log.test
 fi
 
-# Evaluate error rate
 if [ $stage -le 5 ]; then
+    echo "Evaluating error rate ..."
     awk -F'\t' '{print $2, $3}' $dir/res.test > $dir/rec.txt
     ops/stt_error_rate --tokenizer char \
         --ref $dir/ref.txt \
