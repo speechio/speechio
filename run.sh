@@ -13,7 +13,7 @@ tokenizer_config=config/tokenizer_zh.yaml
 trn_config=config/stt_train_zh.yaml
 tst_config=config/stt_test_zh.yaml
 
-dir=exp/aishell1_90epoch
+dir=exp/AISHELL-1
 
 mkdir -p $dir
 stage=0
@@ -31,18 +31,18 @@ if [ $stage -le 2 ]; then
     ops/stt_train --node_rank 0 --config $trn_config $dir 2> $dir/log.train
 fi
 
-# Average model checkpoints & export
+# Average model checkpoints & export as runtime resource
 if [ $tage -le 3 ]; then
-    ops/stt_average --begin 81 --end 91 $dir/checkpoints $dir/final.model
+    ops/stt_average $dir/checkpoints $dir/final.model # default average last 20 checkpoints
     ops/stt_export --config $trn_config $dir/final.model $dir/final.pt
 fi
 
 # Decode on test set
 if [ $stage -le 4 ]; then
-    ops/stt_test --config $tst_config $dir 1> $dir/res.test 2> $dir/log.test
+    ops/stt --config $tst_config $dir 1> $dir/res.test 2> $dir/log.test
 fi
 
-## Error rate evaluation
+# Evaluate error rate
 if [ $stage -le 5 ]; then
     awk -F'\t' '{print $2, $3}' $dir/res.test > $dir/rec.txt
     ops/stt_error_rate --tokenizer char \
@@ -50,4 +50,3 @@ if [ $stage -le 5 ]; then
         --hyp $dir/rec.txt \
         $dir/RESULT
 fi
-

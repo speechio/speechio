@@ -5,20 +5,27 @@
 
 import os
 import argparse
+import glob
 
 import torch
 from pysio.stt import average_model_checkpoints
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--begin', type = int, default = 0)
-    parser.add_argument('--end', type = int, default = 10000)
+    parser.add_argument('--n', type = int, default = 20)
     parser.add_argument('checkpoints_dir', type = str)
-    parser.add_argument('output_checkpoint', type = str)
+    parser.add_argument('output', type = str)
     args = parser.parse_args()
 
-    checkpoints = [ 
-        os.path.join(args.checkpoints_dir, f'{e}.model') for e in range(args.begin, args.end) 
-    ]
+    checkpoints = glob.glob(os.path.join(args.checkpoints_dir, '*.model'))
 
-    torch.save(average_model_checkpoints(checkpoints), args.output_checkpoint)
+    def get_epoch(checkpoint):
+        # e.g. checkpoint = 'exp/multi_cn/checkpoints/62.model'
+        fname, ext = os.path.splitext(os.path.basename(checkpoint))
+        assert ext == '.model'
+        return int(fname) # 62
+
+    checkpoints.sort(key = get_epoch)
+
+    last_n_checkpoints = checkpoints[-args.n:]
+    torch.save(average_model_checkpoints(last_n_checkpoints), args.output)
