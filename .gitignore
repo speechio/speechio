@@ -3,7 +3,7 @@ config/credential/*.cfg
 
 __pycache__
 
-*.json
+.vscode
 log
 *.log
 tmp*
