@@ -1,17 +1,11 @@
-## Tokenizer memo
-# ops/tokenizer_encode --input misc/text --model misc/tokenizer --output_format id --output misc/encoded1
-# cat misc/text | ops/tokenizer_encode --model misc/tokenizer > misc/encoded2
+#!/usr/bin/env bash
 
-# ops/tokenizer_decode --model misc/tokenizer --input misc/encoded1 --input_format id > misc/decoded1
-# cat misc/encoded2 | ops/tokenizer_decode --model misc/tokenizer > misc/decoded2
-
-#-------------------- RECIPE --------------------#
 tokenizer_text=data/text/AISHELL-1_trn.txt
 tokenizer_model=model/tokenizer/AISHELL-1
 
 tokenizer_config=config/stt_zh/tokenizer.yaml
-trn_config=config/stt_zh/train.yaml
-tst_config=config/stt_zh/test.yaml
+train_config=config/stt_zh/train.yaml
+test_config=config/stt_zh/test.yaml
 
 dir=exp/AISHELL-1
 
@@ -28,7 +22,7 @@ fi
 
 if [ $stage -le 2 ]; then
     echo "Traning stt model ..."
-    ops/stt_train --node_rank 0 --config $trn_config $dir 2> $dir/log.train
+    ops/stt_train --node_rank 0 --config $train_config $dir 2> $dir/log.train
 fi
 
 if [ $stage -le 3 ]; then
@@ -36,12 +30,12 @@ if [ $stage -le 3 ]; then
     ops/stt_average $dir/checkpoints $dir/final.model # default average last 20 checkpoints
 
     echo "Exporting runtime model ..."
-    ops/stt_export --config $trn_config $dir/final.model $dir/final.pt
+    ops/stt_export --config $train_config $dir/final.model $dir/final.pt
 fi
 
 if [ $stage -le 4 ]; then
     echo "Decoding test set ..."
-    ops/stt --config $tst_config $dir 1> $dir/res.test 2> $dir/log.test
+    ops/stt --config $test_config $dir 1> $dir/res.test 2> $dir/log.test
 fi
 
 if [ $stage -le 5 ]; then

@@ -2,6 +2,12 @@
 # Copyright (c) 2021 Jiayu DU
 # All rights reserved.
 
+# example:
+#   ops/tokenizer_encode --input input.txt --model tokenizer --output_format id --output encoded.txt
+#
+# example:
+#   cat input.txt | ops/tokenizer_encode --model tokenizer > encoded.txt
+
 import sys, os
 import argparse
 from contextlib import contextmanager
