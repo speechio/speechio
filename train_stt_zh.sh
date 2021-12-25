@@ -8,10 +8,10 @@
 #-------------------- RECIPE --------------------#
 tokenizer_text=data/text/AISHELL-1_trn.txt
 tokenizer_model=model/tokenizer/AISHELL-1
-tokenizer_config=config/tokenizer_zh.yaml
 
-trn_config=config/stt_train_zh.yaml
-tst_config=config/stt_test_zh.yaml
+tokenizer_config=config/stt_zh/tokenizer.yaml
+trn_config=config/stt_zh/train.yaml
+tst_config=config/stt_zh/test.yaml
 
 dir=exp/AISHELL-1
 
@@ -34,6 +34,7 @@ fi
 if [ $stage -le 3 ]; then
     echo "Averaging model checkpoints ..."
     ops/stt_average $dir/checkpoints $dir/final.model # default average last 20 checkpoints
+
     echo "Exporting runtime model ..."
     ops/stt_export --config $trn_config $dir/final.model $dir/final.pt
 fi
