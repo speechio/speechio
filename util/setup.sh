@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 
-KALDI_ROOT=/home/speechio/work/kaldi
-WENET_ROOT=/home/speechio/work/wenet
+export KALDI_ROOT=/home/speechio/work/kaldi
+export MKL_ROOT=/opt/intel/mkl
+export WENET_ROOT=/home/speechio/work/wenet
 
-CUDA_VERSION=10.2
-PYTHON_VERSION=3.9
-PYTORCH_VERSION=1.9
+export CUDA_VERSION=10.2
+export PYTHON_VERSION=3.9
+export PYTORCH_VERSION=1.9
 
 ## Create & Activate virtual env 
 conda create -n speechio python=$PYTHON_VERSION
@@ -17,13 +18,21 @@ conda create -n speechio python=$PYTHON_VERSION
 ##
 pip3 install -r requirements.txt
 
+## setup wenet python dependency
+util/setup_wenet.sh
+
 ## K2, problematic
 #conda install -c k2-fsa -c pytorch -c conda-forge k2 cudatoolkit=$CUDA_VERSION python=$PYTHON_VERSION pytorch=$PYTORCH_VERSION
+
+## setup submodules
+util/setup_submodule.sh
+
+## setup kaldi
+util/setup_kaldi.sh
 
 ## KenLM
 #pip3 install https://github.com/kpu/kenlm/archive/master.zip
 
-cd ops/
-ln -s $WENET_ROOT/wenet wenet
-ln -s $KALDI_ROOT kaldi
-cd -
+## setup libtorch
+util/setup_libtorch.sh
+
