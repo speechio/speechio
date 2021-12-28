@@ -13,7 +13,7 @@ if __name__ == '__main__':
     logging.info(args)
 
     if not os.path.isfile('util/oss'):
-        logging.error("Please install oss via util/install_aliyun_oss_client.sh")
+        logging.error("Please install oss via util/setup_aliyun_oss.sh")
         sys.exit(-1)
 
     if not os.path.isfile('config/credential/aliyun_oss.cfg'):
