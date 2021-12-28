@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-tokenizer_text=data/text/AISHELL-1_trn.txt
-tokenizer_model=model/tokenizer/AISHELL-1
+text=data/text/AISHELL-1_trn.txt
+tokenizer=model/tokenizer/AISHELL-1
 
 config_dir=config/stt_zh
 tokenizer_config=${config_dir}/tokenizer.yaml
@@ -16,8 +16,8 @@ stage=0
 if [ $stage -le 1 ]; then
     echo "Training tokenizer from text ..."
     ops/tokenizer_train --config $tokenizer_config \
-        --input $tokenizer_text \
-        --model $tokenizer_model \
+        --input $text \
+        --model $tokenizer \
         2> $dir/log.tokenizer
 fi
 
