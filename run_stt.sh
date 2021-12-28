@@ -3,9 +3,10 @@
 tokenizer_text=data/text/AISHELL-1_trn.txt
 tokenizer_model=model/tokenizer/AISHELL-1
 
-tokenizer_config=config/stt_zh/tokenizer.yaml
-train_config=config/stt_zh/train.yaml
-test_config=config/stt_zh/test.yaml
+config_dir=config/stt_zh
+tokenizer_config=${config_dir}/tokenizer.yaml
+train_config=${config_dir}/train.yaml
+test_config=${config_dir}/test.yaml
 
 dir=exp/AISHELL-1
 
