@@ -8,6 +8,7 @@ log
 *.log
 tmp*
 *.pt
+*.pts
 nohup.out
 
 build
