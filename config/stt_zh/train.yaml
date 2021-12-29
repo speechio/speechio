@@ -21,8 +21,8 @@ perturbation:
     volumes: #[0.9, 1.0, 1.1]
 
 fbank_feature_extractor:
-    dither: 0.0
     num_mel_bins: 80
+    dither: 0.0
 
 spec_augment:
     mark_key: True
