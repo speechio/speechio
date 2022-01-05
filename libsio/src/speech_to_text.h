@@ -6,45 +6,57 @@
 #include "sio/base.h"
 #include "sio/speech_to_text_config.h"
 #include "sio/recognizer.h"
+#include "sio/tokenizer.h"
 
 namespace sio {
 
 struct SpeechToText {
-  SpeechToTextConfig config;
-  torch::jit::script::Module model;
+	SpeechToTextConfig config;
+	torch::jit::script::Module nnet;
+	Tokenizer tokenizer;
+	Optional<Owner<MeanVarNorm*>> mean_var_norm = nullptr;
 
- public:
-  Error Load(std::string config_file) { 
-    config.Load(config_file);
+	Error Load(std::string config_file) { 
+		config.Load(config_file);
 
-    SIO_CHECK(config.model != "") << "Need to provide a stt model.";
-    SIO_INFO << "Loading torchscript model from: " << config.model;
-    model = torch::jit::load(config.model);
+		if (config.mean_var_norm_file != "") {
+			mean_var_norm = new MeanVarNorm;
+			mean_var_norm->Load(config.mean_var_norm_file);
+		} else {
+			mean_var_norm = nullptr;
+		}
 
-    SIO_INFO << "subsampling_rate: " << model.run_method("subsampling_rate").toInt();
-    SIO_INFO << "bidirectional decoder: " << model.run_method("is_bidirectional_decoder").toBool();
-    SIO_INFO << "right context: " << model.run_method("right_context").toInt();
+		tokenizer.Load(config.tokenizer_vocab);
 
-    return Error::OK;
-  }
+		SIO_CHECK(config.nnet != "") << "stt nnet is required";
+		SIO_INFO << "Loading torchscript nnet from: " << config.nnet; 
+		nnet = torch::jit::load(config.nnet);
 
-  ~SpeechToText() { }
+		return Error::OK;
+	}
 
-  Optional<Recognizer*> CreateRecognizer() {
-    try {
-      return new Recognizer(
-        config.feature_extractor,
-        model
-      ); 
-    } catch (...) {
-      return nullptr;
-    }
-  }
+	~SpeechToText() { 
+		if (mean_var_norm != nullptr) {
+			delete mean_var_norm;
+		}
+	}
 
-  void DestroyRecognizer(Recognizer* rec) {
-    SIO_CHECK(rec != nullptr);
-    delete rec;
-  }
+	Optional<Recognizer*> CreateRecognizer() {
+		try {
+			return new Recognizer(
+			/* feature */ config.feature_extractor, mean_var_norm,
+			/* scorer */ config.scorer, nnet,
+			/* tokenizer */ tokenizer
+			); 
+		} catch (...) {
+			return nullptr;
+		}
+	}
+
+	void DestroyRecognizer(Recognizer* rec) {
+		SIO_CHECK(rec != nullptr);
+		delete rec;
+	}
 }; // class SpeechToText
 }  // namespace sio
 
