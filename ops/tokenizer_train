@@ -10,7 +10,7 @@ def SentencePieceTrain(config, text, model):
     import sentencepiece as spm
     # https://colab.research.google.com/github/google/sentencepiece/blob/master/python/sentencepiece_python_module_example.ipynb
     dst = os.path.dirname(args.model)
-    if not os.path.isdir(dst):
+    if dst and not os.path.isdir(dst):
         os.makedirs(dst, exist_ok = True)
 
     config = OmegaConf.load(config)['sentencepiece']
