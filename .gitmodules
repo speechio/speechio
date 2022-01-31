@@ -1,3 +1,6 @@
 [submodule "abseil-cpp"]
 	path = libsio/deps/abseil-cpp
 	url = https://github.com/abseil/abseil-cpp
+[submodule "libsio/deps/kenlm"]
+	path = libsio/deps/kenlm
+	url = https://github.com/kpu/kenlm
