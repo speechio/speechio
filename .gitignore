@@ -1,6 +1,9 @@
 .DS_Store
 config/credential/*.cfg
 
+*.so
+*.a
+
 __pycache__
 
 .vscode
