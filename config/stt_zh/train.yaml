@@ -60,7 +60,7 @@ valid_set:
 model_name: wenet
 model_hparam: wenet.yaml
 
-num_epochs: 90 # wenet setup: 180
+num_epochs: 120 # wenet setup: 180
 grad_accumulation: 2
 grad_clipping: 5.0
 logging_period: 100
