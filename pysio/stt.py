@@ -28,7 +28,7 @@ import torchaudio.sox_effects
 import sentencepiece as spm
 #import k2
 
-from .wenet import stt_create, stt_loss, stt_decode
+from .backend.wenet_wrapper import stt_create, stt_loss, stt_decode
 
 # Global Constants
 FLOAT_INF = float('inf')
