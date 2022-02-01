@@ -1,12 +1,10 @@
 #!/bin/bash
 
 repo=libsio/deps/kenlm
-build_shared=true
-
 git submodule add https://github.com/kpu/kenlm $repo
 git submodule update --init --recursive
 
-
+build_shared=true
 cd $repo
 rm -f {lm,util}/*.o 2>/dev/null
 
