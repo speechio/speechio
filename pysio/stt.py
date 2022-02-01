@@ -28,7 +28,7 @@ import torchaudio.sox_effects
 import sentencepiece as spm
 #import k2
 
-from .backend.wenet_wrapper import stt_create, stt_loss, stt_decode
+from .wenet_wrapper import stt_create, stt_loss, stt_decode
 
 # Global Constants
 FLOAT_INF = float('inf')
@@ -514,7 +514,6 @@ class Tokenizer:
         blk:str = '<blk>',
         bos:str = '<s>',
         eos:str = '</s>',
-        sil:str = '<sil>',
         unk:str = '<unk>',
     ) :
         self.sentence_piece = spm.SentencePieceProcessor()
@@ -529,11 +528,11 @@ class Tokenizer:
                     self.token_to_index[word] = len(self.tokens)
                     self.tokens.append(word)
 
-        self.unk, self.unk_index = unk, self.token_to_index[unk]
+        #self.blk, self.blk_index = blk, self.token_to_index.get(blk, self.unk_index)
+        self.blk, self.blk_index = blk, self.token_to_index[blk]
         self.bos, self.bos_index = bos, self.token_to_index[bos]
         self.eos, self.eos_index = eos, self.token_to_index[eos]
-        self.sil, self.sil_index = sil, self.token_to_index.get(sil, self.unk_index)
-        self.blk, self.blk_index = blk, self.token_to_index.get(blk, self.unk_index)
+        self.unk, self.unk_index = unk, self.token_to_index.get(unk, self.blk_index)
 
     def encode(self, text:str, mode:str = 'token') -> list[int]:
         if mode == 'index':
@@ -701,7 +700,6 @@ def create_model(model_name:str, model_hparam:str, input_dim, tokenizer):
             bos_index = tokenizer.bos_index,
             eos_index = tokenizer.eos_index,
             unk_index = tokenizer.unk_index,
-            sil_index = tokenizer.sil_index,
         )
         return model
     else:

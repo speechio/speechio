@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
-text=data/text/AISHELL-1_trn.txt
-tokenizer=model/tokenizer/AISHELL-1
+text=data/text/AISHELL-1_train.txt
+tokenizer=model/tokenizer/zh
 
 config_dir=config/stt_zh
 tokenizer_config=${config_dir}/tokenizer.yaml
 train_config=${config_dir}/train.yaml
 test_config=${config_dir}/test.yaml
 
-dir=exp/AISHELL-1
+dir=exp/stt_zh
 
 mkdir -p $dir
 stage=0
@@ -30,8 +30,8 @@ if [ $stage -le 3 ]; then
     echo "Averaging model checkpoints ..."
     ops/stt_average $dir/checkpoints $dir/final.model # default average last 20 checkpoints
 
-    echo "Exporting runtime model ..."
-    ops/stt_export --config $train_config $dir/final.model $dir/final.pt
+    echo "Exporting torchscript model ..."
+    ops/stt_export --config $train_config $dir/final.model $dir/final.ts
 fi
 
 if [ $stage -le 4 ]; then

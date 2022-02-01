@@ -12,7 +12,7 @@ from wenet.transformer.decoder import TransformerDecoder, BiTransformerDecoder
 from wenet.transformer.ctc import CTC
 from wenet.transformer.asr_model import ASRModel
 
-def stt_create(config_filename, idim, odim, blk_index:int, bos_index:int, eos_index:int, sil_index:int, unk_index:int):
+def stt_create(config_filename, idim, odim, blk_index:int, bos_index:int, eos_index:int, unk_index:int):
         with open(config_filename, 'r') as f: 
             config = yaml.load(f, Loader=yaml.FullLoader)
 
@@ -36,6 +36,7 @@ def stt_create(config_filename, idim, odim, blk_index:int, bos_index:int, eos_in
             **config['model_conf'],
         )
 
+        # wenet assume blank is indexed as 0, so blk_index is unused here
         model.sos = bos_index
         model.eos = eos_index
 
