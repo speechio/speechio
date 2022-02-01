@@ -28,10 +28,10 @@ fi
 
 if [ $stage -le 3 ]; then
     echo "Averaging model checkpoints ..."
-    ops/stt_average $dir/checkpoints $dir/final.model # default average last 20 checkpoints
+    ops/stt_average $dir/checkpoints $dir/final.model 2> $dir/log.average # default average last 20 checkpoints
 
     echo "Exporting torchscript model ..."
-    ops/stt_export --config $train_config $dir/final.model $dir/final.ts
+    ops/stt_export --config $train_config $dir/final.model $dir/final.ts 2> $dir/log.export
 fi
 
 if [ $stage -le 4 ]; then
@@ -45,5 +45,5 @@ if [ $stage -le 5 ]; then
     ops/stt_error_rate --tokenizer char \
         --ref $dir/ref.txt \
         --hyp $dir/rec.txt \
-        $dir/RESULT
+        $dir/RESULT 2> $dir/log.eval
 fi
