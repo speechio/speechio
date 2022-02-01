@@ -1,10 +1,13 @@
 #!/bin/bash
 
-set -e
-
+repo=libsio/deps/kenlm
 build_shared=true
 
-cd kenlm
+git submodule add https://github.com/kpu/kenlm $repo
+git submodule update --init --recursive
+
+
+cd $repo
 rm -f {lm,util}/*.o 2>/dev/null
 
 CXX=${CXX:-g++}
@@ -40,3 +43,4 @@ fi
 
 cd -
 
+echo "Done."

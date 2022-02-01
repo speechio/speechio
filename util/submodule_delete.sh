@@ -1,11 +1,15 @@
-path_to_submodule=libsio/deps/abseil-cpp
+#!/usr/bin/env bash
 
-# Remove the submodule entry from .git/config
-git submodule deinit -f $path_to_submodule
+submodules="libsio/deps/abseil-cpp libsio/deps/kenlm"
 
-# Remove the submodule directory from the superproject's .git/modules directory
-rm -rf .git/modules/$path_to_submodule
+for m in $submodules; do
+    # Remove the submodule entry from .git/config
+    git submodule deinit -f $m
 
-# Remove the entry in .gitmodules and remove the submodule directory located at path/to/submodule
-git rm -f $path_to_submodule
+    # Remove the submodule directory from the project's .git/modules directory
+    rm -rf .git/modules/$m
+
+    # Remove the entry in .gitmodules and remove the submodule directory
+    git rm -f $m
+done
 

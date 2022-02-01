@@ -24,15 +24,16 @@ util/setup_wenet.sh
 ## K2, problematic
 #conda install -c k2-fsa -c pytorch -c conda-forge k2 cudatoolkit=$CUDA_VERSION python=$PYTHON_VERSION pytorch=$PYTORCH_VERSION
 
-## setup submodules
-util/setup_submodule.sh
+## setup abseil
+util/setup_abseil.sh
 
 ## setup kaldi
 util/setup_kaldi.sh
 
-## KenLM
-#pip3 install https://github.com/kpu/kenlm/archive/master.zip
-
 ## setup libtorch
 util/setup_libtorch.sh
+
+## KenLM
+#pip3 install https://github.com/kpu/kenlm/archive/master.zip
+util/setup_kenlm.sh
 
