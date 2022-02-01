@@ -6,8 +6,8 @@ fbank_feature_extractor:
     dither: 0.0
 
 tokenizer: 
-    vocab_path: model/tokenizer/AISHELL-1.vocab
-    model_path: model/tokenizer/AISHELL-1.model
+    vocab_path: model/tokenizer/zh.vocab
+    model_path: model/tokenizer/zh.model
 
 model_name: wenet
 model_hparam: wenet.yaml
