@@ -1,6 +1,7 @@
-sentencepiece
+sentencepiece 
 omegaconf
 numpy
 torch
 torchaudio
 typeguard
+
