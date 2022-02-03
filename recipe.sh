@@ -8,13 +8,13 @@ train_config=${config}/train.yaml
 test_config=${config}/test.yaml
 text=data/text/AISHELL-1_train.txt
 
-mkdir -p $dir
-
-cp $config/tokenizer.yaml $dir/tokenizer.yaml
-cp $config/train.yaml $dir/train.yaml
-cp $config/test.yaml $dir/test.yaml
-
 stage=0
+mkdir -p $dir
+if [ $stage -le 0 ]; then
+    cp $config/tokenizer.yaml $dir/tokenizer.yaml
+    cp $config/train.yaml $dir/train.yaml
+    cp $config/test.yaml $dir/test.yaml
+fi
 
 if [ $stage -le 1 ]; then
     echo "Training tokenizer from text ..."
