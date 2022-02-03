@@ -35,8 +35,8 @@ text_norm:
     case: upper # either 'upper' or 'lower'
 
 tokenizer: 
-    vocab_path: model/tokenizer/zh.vocab
-    model_path: model/tokenizer/zh.model
+    vocab_path: tokenizer.vocab
+    model_path: tokenizer.model
     blk: <blk>
     bos: <s>
     eos: </s>
