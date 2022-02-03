@@ -9,8 +9,9 @@ test_config=${config}/test.yaml
 text=data/text/AISHELL-1_train.txt
 
 stage=0
-mkdir -p $dir
+
 if [ $stage -le 0 ]; then
+    mkdir -p $dir
     cp $config/tokenizer.yaml $dir/tokenizer.yaml
     cp $config/train.yaml $dir/train.yaml
     cp $config/test.yaml $dir/test.yaml
