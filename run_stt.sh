@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 config=config/stt_zh
+dir=exp/stt_zh
+
 tokenizer_config=${config}/tokenizer.yaml
 train_config=${config}/train.yaml
 test_config=${config}/test.yaml
-
 text=data/text/AISHELL-1_train.txt
 
-dir=exp/stt_zh
 mkdir -p $dir
 
 cp $config/tokenizer.yaml $dir/tokenizer.yaml
