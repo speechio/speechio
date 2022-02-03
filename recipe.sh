@@ -31,7 +31,7 @@ fi
 
 if [ $stage -le 3 ]; then
     echo "Averaging model checkpoints ..."
-    ops/stt_average $dir/checkpoints $dir/final.model 2> $dir/log.average # default average last 20 checkpoints
+    ops/stt_average $dir/checkpoints $dir/final.model 2> $dir/log.average
 
     echo "Exporting torchscript model ..."
     ops/stt_export --config $dir/train.yaml $dir/final.model $dir/final.ts 2> $dir/log.export
