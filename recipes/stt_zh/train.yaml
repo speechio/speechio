@@ -1,0 +1,77 @@
+sample_loader:
+    field_map:
+        id: ID
+        audio: AUDIO
+        begin: BEGIN
+        duration: DURATION
+        text: TEXT
+        speaker: SPEAKER
+    min_duration: 0.5
+    max_duration: 20.0
+    min_text_length: 1
+    max_text_length: 1024
+
+resampler:
+    sample_rate: 16000
+
+perturbation:
+    mark_key: True
+    speeds: [0.9, 1.0, 1.1]
+    tempos: #[0.9, 1.0, 1.1]
+    volumes: #[0.9, 1.0, 1.1]
+
+fbank_feature_extractor:
+    num_mel_bins: 80
+    dither: 0.0
+
+spec_augment:
+    mark_key: True
+    num_t_masks: 2
+    t_mask_width_max: 50
+    num_f_masks: 2
+    f_mask_width_max: 10
+
+text_norm:
+    case: upper # either 'upper' or 'lower'
+
+tokenizer: 
+    vocab_path: tokenizer.vocab
+    model_path: tokenizer.model
+    blk: <blk>
+    bos: <s>
+    eos: </s>
+    unk: <unk>
+
+data_loader:
+    num_workers: 2
+    drop_last: False
+    batch_size: 16
+
+# training
+train_set:
+    subsets:
+    -   id: AISHELL-1-TRAIN
+        max_num_samples: -1
+valid_set:
+    subsets:
+    -   id: AISHELL-1-DEV
+        max_num_samples: 2000
+
+model_name: wenet
+model_hparam: wenet.yaml
+
+num_epochs: 120 # wenet setup: 180
+grad_accumulation: 2
+grad_clipping: 5.0
+logging_period: 100
+optimizer:
+    Adam:
+        lr: 0.001
+scheduler:
+    warmup_steps: 25000
+
+nnodes: 1
+nproc_per_node: 4
+ddp_backend: nccl
+ddp_master_addr: 'localhost'
+ddp_master_port: '12345'
