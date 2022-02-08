@@ -9,7 +9,7 @@ if [ $stage -le 0 ]; then
 fi
 
 if [ $stage -le 1 ]; then
-    echo "Training tokenizer from text: "
+    echo "Training tokenizer from text ..."
     sio/tokenizer_train  --config tokenizer.yaml  --input $text  --model tokenizer  2>log.tokenizer
 fi
 
