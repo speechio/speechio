@@ -1026,6 +1026,7 @@ def recognize(config_path, dir):
             assert num_utts == 1
 
             X, T = X.to(device), T.to(device)
-            hyps = stt_decode(model, X, T)
+            #hyps = stt_decode(model, X, T)
+            hyps = stt_decode(model, X, T, mode = 'ctc_greedy_search')
 
             print(f'{b}\t{samples[0]["key"]}\t{tokenizer.decode(hyps[0])}\t{hyps[0]}', file=sys.stdout, flush=True)
