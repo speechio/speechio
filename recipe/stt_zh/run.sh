@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 
-text=data/text/AISHELL-1_train.txt
+#text=data/text/AISHELL-1_train.txt
 
 stage=0
 
 if [ $stage -le 0 ]; then
-    ln -s $text text
+    [ ! -d config ] || { echo "No config dir, run 'ln -s ../../config config'"; exit 1; }
+    [ ! -d ops ] || { echo "No ops dir, run 'ln -s ../../ops ops'"; exit 1; }
 fi
 
 if [ $stage -le 1 ]; then
     echo "Training tokenizer from text ..."
-    ops/tokenizer_train  --config tokenizer.yaml  --input $text  --model tokenizer  2>log.tokenizer
+    [ ! -f text ] || { echo "Make sure you have 'text' file for tokenizer training"; exit 1; }
+    ops/tokenizer_train  --config tokenizer.yaml  --input text  --model tokenizer  2>log.tokenizer
 fi
 
 if [ $stage -le 2 ]; then
