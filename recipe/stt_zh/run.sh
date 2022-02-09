@@ -5,8 +5,8 @@
 stage=0
 
 if [ $stage -le 0 ]; then
-    [ ! -d config ] || { echo "No config dir, run 'ln -s ../../config config'"; exit 1; }
-    [ ! -d ops ] || { echo "No ops dir, run 'ln -s ../../ops ops'"; exit 1; }
+    [ ! -d config ] || { echo "No config dir, try 'ln -s ../../config config'"; exit 1; }
+    [ ! -d ops ] || { echo "No ops dir, try 'ln -s ../../ops ops'"; exit 1; }
 fi
 
 if [ $stage -le 1 ]; then
