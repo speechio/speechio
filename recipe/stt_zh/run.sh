@@ -22,10 +22,10 @@ fi
 
 if [ $stage -le 3 ]; then
     echo "Averaging model checkpoints ..."
-    ops/stt_average  checkpoints  final.model  2>log.average
+    ops/stt_average  checkpoints  average.pt  2>log.average
 
     echo "Exporting torchscript model ..."
-    ops/stt_export  --config train.yaml  final.model  final.ts  2>log.export
+    ops/stt_export  --config train.yaml  average.pt  final.pts  2>log.export
 fi
 
 if [ $stage -le 4 ]; then
