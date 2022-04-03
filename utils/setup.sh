@@ -19,21 +19,21 @@ conda create -n speechio python=$PYTHON_VERSION
 pip3 install -r requirements.txt
 
 ## setup wenet python dependency
-util/setup_wenet.sh
+utils/setup_wenet.sh
 
 ## K2, problematic
 #conda install -c k2-fsa -c pytorch -c conda-forge k2 cudatoolkit=$CUDA_VERSION python=$PYTHON_VERSION pytorch=$PYTORCH_VERSION
 
 ## setup abseil
-util/setup_abseil.sh
+utils/setup_abseil.sh
 
 ## setup kaldi
-util/setup_kaldi.sh
+utils/setup_kaldi.sh
 
 ## setup libtorch
-util/setup_libtorch.sh
+utils/setup_libtorch.sh
 
 ## KenLM
 #pip3 install https://github.com/kpu/kenlm/archive/master.zip
-util/setup_kenlm.sh
+utils/setup_kenlm.sh
 

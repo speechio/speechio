@@ -12,8 +12,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     logging.info(args)
 
-    if not os.path.isfile('util/oss'):
-        logging.error("Please install oss via util/setup_aliyun_oss.sh")
+    if not os.path.isfile('utils/oss'):
+        logging.error("Please install oss via utils/setup_aliyun_oss.sh")
         sys.exit(-1)
 
     if not os.path.isfile('config/credential/aliyun_oss.cfg'):
@@ -39,6 +39,6 @@ if __name__ == '__main__':
         logging.error(f'Cannot find entry {args.id} in {zoo_dir}/zoo.yaml')
         sys.exit(-1)
 
-    cmd = F'util/oss -c config/credential/aliyun_oss.cfg cp -ur {src} {dst}'
+    cmd = F'utils/oss -c config/credential/aliyun_oss.cfg cp -ur {src} {dst}'
     logging.info(cmd)
     os.system(cmd)
