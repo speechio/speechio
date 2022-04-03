@@ -29,7 +29,7 @@ if __name__ == '__main__':
     else:
         raise NotImplementedError
     
-    with open(os.path.join(zoo_dir, 'zoo.yaml'), 'r', encoding='utf8') as f:
+    with open(os.path.join('data', 'zoo.yaml'), 'r', encoding='utf8') as f:
         zoo = yaml.safe_load(f)
 
     if info := zoo.get(args.id):
