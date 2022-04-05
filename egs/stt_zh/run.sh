@@ -5,7 +5,7 @@
 stage=0
 
 if [ $stage -le 0 ]; then
-    [ ! -d data ] || { echo "No data dir, try 'ln -s ../../data data'"; exit 1; }
+    [ ! -f data.yaml ] || { echo "No data.yaml"; exit 1; }
     [ ! -d ops ] || { echo "No ops dir, try 'ln -s ../../ops ops'"; exit 1; }
 fi
 

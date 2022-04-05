@@ -35,7 +35,7 @@ FLOAT_INF = float('inf')
 DEFAULT_SEED = 37927
 FEATURE_PADDING_VALUE = 0.0
 LABEL_PADDING_VALUE = -1
-DEFAULT_DB = 'data/zoo.yaml'
+DEFAULT_DB = 'data.yaml'
 
 
 @dataclass
