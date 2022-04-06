@@ -20,7 +20,7 @@ if [ $stage -le 1 ]; then
     ops/tokenizer_encode  --model tokenizer.model  --input $text  --output lm.txt
 
     echo "Training ARPA from tokenized text ..."
-    ops/ngram_train  --config lm.yaml  --text lm.txt  --vocab tokenizer.vocab  --model lm
+    ops/lm_train  --config lm.yaml  --text lm.txt  --vocab tokenizer.vocab  --model lm
 fi
 
 
