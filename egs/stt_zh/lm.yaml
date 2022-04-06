@@ -1,0 +1,5 @@
+kenlm:
+    train_opts: "-o 6" # e.g.  "-o 4 -S 50% --prune 0 5 7 7"
+    build_opts: "" # e.g. "-q 8 -b 8"
+    build_type: trie # trie: smaller; probing: faster
+

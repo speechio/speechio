@@ -42,6 +42,6 @@ if ! which build_binary >& /dev/null ; then
 fi
 
 build_opts="" # e.g. "-q 8 -b 8" for 8bits quantization
-model_type="trie" # "trie" or "probing". trie is smaller, probing is faster.
-build_binary  $build_opts  $model_type  $dir/${arpa_name}.arpa  $dir/${arpa_name}.${model_type}
+build_type="trie" # "trie" or "probing". trie is smaller, probing is faster.
+build_binary  $build_opts  $build_type  $dir/${arpa_name}.arpa  $dir/${arpa_name}.${build_type}
 
