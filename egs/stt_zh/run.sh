@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
 
 text=data/text/AISHELL-1_train.txt
-ln -s $text text.txt
 
 stage=0
 
 if [ $stage -le 0 ]; then
-    [ ! -f data.yaml ] || { echo "No data.yaml"; exit 1; }
+    for x in data.yaml tokenizer.yaml train.yaml test.yaml; do
+        [ ! -f $x ] || { echo "Error: Cannot find $x"; exit 1; }
+    done
     [ ! -d ops ] || { echo "No ops dir, try 'ln -s ../../ops ops'"; exit 1; }
 fi
 
 
 if [ $stage -le 1 ]; then
     echo "Training tokenizer from raw text ..."
-    [ ! -f text.txt ] || { echo "Make sure you have 'text.txt' file for tokenizer training"; exit 1; }
-    ops/tokenizer_train  --config tokenizer.yaml  --input text.txt  --model tokenizer  2>log.tokenizer
+    ops/tokenizer_train  --config tokenizer.yaml  --input $text  --model tokenizer  2>log.tokenizer
 
     echo "Apply trained tokenizer to raw text ..."
-    ops/tokenizer_encode  --model tokenizer  --input text.txt  --output lm.txt
+    ops/tokenizer_encode  --model tokenizer.model  --input $text  --output lm.txt
 
     echo "Training ARPA from tokenized text ..."
-    ops/ngram_train  lm.txt  tokenizer  .  lm
+    ops/ngram_train  --config lm.yaml  --text lm.txt  --vocab tokenizer.vocab  --model lm
 fi
 
 

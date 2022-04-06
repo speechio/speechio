@@ -38,7 +38,7 @@ if __name__ == '__main__':
         import sentencepiece as spm
 
         sp = spm.SentencePieceProcessor()
-        sp.load(args.model + '.model')
+        sp.load(args.model)
 
         with open_stream(args.input, 'r') as istream, open_stream(args.output, 'w+') as ostream:
             for l in istream:
