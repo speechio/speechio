@@ -22,14 +22,13 @@ build
 ossutil_output
 oss
 
-model/tokenizer
-data/audio/*
-!data/audio/MINI
-!data/audio/zoo.yaml
-data/text/*
-!data/text/zoo.yaml
+libsio
+utils/oss
 
-util/oss
+egs/*/data/audio
+egs/*/data/text
+
+!egs/stt_zh/data/audio/MINI
 
 test/*
 test.wav

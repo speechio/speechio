@@ -1,0 +1,22 @@
+# LibriSpeech
+LIBRISPEECH_TEST_CLEAN:
+    dir: data/audio/LIBRISPEECH_TEST_CLEAN/
+    metadata: data/audio/LIBRISPEECH_TEST_CLEAN/metadata.tsv
+LIBRISPEECH_TEST_OTHER:
+    dir: data/audio/LIBRISPEECH_TEST_OTHER/
+    metadata: data/audio/LIBRISPEECH_TEST_OTHER/metadata.tsv
+
+# GigaSpeech
+GIGASPEECH_XS:
+    dir: data/audio/GIGASPEECH_V1.0.0_XS/
+    metadata: data/audio/GIGASPEECH_V1.0.0_XS/metadata.tsv
+GIGASPEECH_S:
+    dir: data/audio/GIGASPEECH_V1.0.0_S/
+    metadata: data/audio/GIGASPEECH_V1.0.0_S/metadata.tsv
+GIGASPEECH_DEV:
+    dir: data/audio/GIGASPEECH_V1.0.0_DEV/
+    metadata: data/audio/GIGASPEECH_V1.0.0_DEV/metadata.tsv
+GIGASPEECH_TEST:
+    dir: data/audio/GIGASPEECH_V1.0.0_TEST/
+    metadata: data/audio/GIGASPEECH_V1.0.0_TEST/metadata.tsv
+
