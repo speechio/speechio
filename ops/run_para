@@ -9,16 +9,16 @@ parser.add_argument("--nj", type=int, default=20, help="")
 args = parser.parse_args()
 
 def run(cmd):
-  #sys.stderr.write(cmd + '\n')
-  #subprocess.run(cmd.split())
-  os.system(cmd)
+    #sys.stderr.write(cmd + '\n')
+    #subprocess.run(cmd.split())
+    os.system(cmd)
 
 tasks = []
 with open(args.cmd_list, 'r') as f:
-  for l in f:
-    cmd = l.strip()
-    if cmd != '':
-      tasks.append(cmd)
+    for l in f:
+        cmd = l.strip()
+        if cmd != '':
+            tasks.append(cmd)
 
 sys.stderr.write("number of tasks N={}, number of workers M={}.\n".format(len(tasks), args.nj))
 
