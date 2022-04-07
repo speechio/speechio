@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+if [ $# -ne 3 ]; then
+    echo "text_norm nj itext otext_prefix"
+    exit 1;
+fi
+
+nj=$1
+text=$2
+prefix=$3
+
+opts=
+
+mkdir -p `dirname $prefix`
+
+split -n l/${nj} $text ${prefix}_
+
+for f in `ls ${prefix}_*`; do
+    ops/text_norm_zh $ops --to_upper $f ${f}_tn >& ${f}_tn.log &
+done
+wait
+
+cat ${prefix}_*_tn > ${prefix}.txt
+
+echo "TN done."
+
