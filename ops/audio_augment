@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+
+import sys, os, argparse
+import codecs, random
+
+KALDI_ROOT='/home/speechio/work/kaldi'
+ADD_NOISE_TOOL=os.path.join(KALDI_ROOT, 'src', 'featbin', 'wav-reverberate')
+SOX='sox'
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("odir", type=str, help="ouput dir")
+
+parser.add_argument("--nj", type=int, default=30, help="")
+
+parser.add_argument("--list", type=str, default="", help="wav.list")
+parser.add_argument("--scp", type=str, default="", help="wav.scp")
+parser.add_argument("--trans", type=str, default="", help="trans.txt")
+parser.add_argument("--utt2spk", type=str, default="", help="utt2spk")
+
+parser.add_argument("--key_append_volume", type=str, default="true", help="true / false")
+parser.add_argument("--volumes", type=str, default="", help="0.1:0.3:1.0 means [0.1, 0.4, 0.7, 1.0], upper bound INCLUDED")
+
+parser.add_argument("--key_append_tempo", type=str, default="true", help="true / false")
+parser.add_argument("--tempos", type=str, default="", help="0.9:0.1:1.2 means [0.9, 1.0, 1.1, 1.2], upper bound INCLUDED")
+
+parser.add_argument("--key_append_speed", type=str, default="true", help="true / false")
+parser.add_argument("--speeds", type=str, default="", help="0.9:0.1:1.2 means [0.9, 1.0, 1.1, 1.2], upper bound INCLUDED")
+
+parser.add_argument("--key_append_snr", type=str, default="true", help="true / false")
+parser.add_argument("--noises", type=str, default="", help="")
+parser.add_argument("--snrs", type=str, default="", help="3.0:1.0:25.0 means [3,4,5...,24, 25], upper bound INCLUDED.")
+parser.add_argument("--start_time", type=str, default="0", help="where to start adding noise(in sec), default 0 means beginning of input wav")
+parser.add_argument("--normalize_output", type=str, default="false", help="true / false")
+parser.add_argument("--background_mode", type=str, default="true", help="true / false")
+parser.add_argument("--random_noise_position", type=str, default="true", help="true / false")
+
+parser.add_argument("--key_append_string", type=str, default="", help="any aux string")
+
+args = parser.parse_args()
+
+# validate args
+assert((args.list != '') or (args.scp != ''))
+
+assert(args.key_append_volume == 'true' or args.key_append_volume == 'false')
+assert(args.key_append_tempo == 'true' or args.key_append_tempo == 'false')
+assert(args.key_append_speed == 'true' or args.key_append_speed == 'false')
+
+assert(args.key_append_snr == 'true' or args.key_append_snr == 'false')
+assert(args.normalize_output == 'true' or args.normalize_output == 'false')
+assert(args.background_mode == 'true' or args.background_mode == 'false')
+assert(args.random_noise_position == 'true' or args.random_noise_position == 'false')
+
+# parse volume perturbation
+volume_list = []
+if (args.tempos != ''):
+  fields = args.volumes.split(':')
+  assert(len(fields) == 3)  # lower:step:upper
+  volume_lower, volume_step, volume_upper = [ float(f) for f in fields ]
+  assert((volume_lower <= volume_upper) and (volume_step > 0))
+
+  x = volume_lower
+  while (x < volume_upper + 0.00001): # add 0.00001 to include upper bound
+    volume_list.append(x)
+    x += volume_step
+
+  sys.stderr.write('Volume Perturbation Range: [')
+  for x in volume_list:
+    sys.stderr.write('{:.2f}, '.format(x))
+  sys.stderr.write(']\n')
+
+# parse tempo perturbation
+tempo_list = []
+if (args.tempos != ''):
+  fields = args.tempos.split(':')
+  assert(len(fields) == 3)  # lower:step:upper
+  tempo_lower, tempo_step, tempo_upper = [ float(f) for f in fields ]
+  assert((tempo_lower <= tempo_upper) and (tempo_step > 0))
+
+  x = tempo_lower
+  while (x < tempo_upper + 0.00001): # add 0.00001 to include upper bound
+    tempo_list.append(x)
+    x += tempo_step
+
+  sys.stderr.write('Tempo Perturbation Range: [')
+  for x in tempo_list:
+    sys.stderr.write('{:.2f}, '.format(x))
+  sys.stderr.write(']\n')
+
+# parse speed perturbation
+speed_list = []
+if (args.speeds != ''):
+  fields = args.speeds.split(':')
+  assert(len(fields) == 3)  # lower:step:upper
+  speed_lower, speed_step, speed_upper = [ float(f) for f in fields ]
+  assert((speed_lower <= speed_upper) and (speed_step > 0))
+
+  x = speed_lower
+  while (x < speed_upper + 0.00001):  # add 0.00001 to include upper bound
+    speed_list.append(x)
+    x += speed_step
+
+  sys.stderr.write('Speed Perturbation Range: [')
+  for x in speed_list:
+    sys.stderr.write('{:.2f}, '.format(x))
+  sys.stderr.write(']\n')
+
+# prepare noise
+noise_list = []
+snr_list = []
+add_noise_opts = ''
+if (args.noises != ''):
+  # setup add noise options
+  add_noise_opts += ' --start-times={} '.format(args.start_time)
+  add_noise_opts += ' --normalize-output={} '.format(args.normalize_output)
+  add_noise_opts += ' --background-mode={} '.format(args.background_mode)
+  add_noise_opts += ' --random-noise-position={} '.format(args.random_noise_position)
+
+  # load noise library
+  assert(os.path.isfile(args.noises))
+  with open(args.noises, 'r') as f:
+    for l in f:
+      l = l.strip()
+      if l != "":
+        noise_list.append(l)
+  sys.stderr.write("Noise Library Size:{}\n".format(len(noise_list)))
+
+  # parse target snrs
+  assert(args.snrs != '')
+  fields = args.snrs.split(':')
+  assert(len(fields) == 3)  # lower:step:upper
+  snr_lower, snr_step, snr_upper = [ float(f) for f in fields ]
+  assert((snr_lower <= snr_upper) and (snr_step > 0))
+
+  x = snr_lower
+  while (x < snr_upper + 0.00001): # add 0.00001 to deal with round off
+    snr_list.append(x)
+    x += snr_step
+
+  sys.stderr.write('Target SNRs: [')
+  for snr in snr_list:
+    sys.stderr.write('{}, '.format(snr))
+  sys.stderr.write(']\n')
+
+# load info about input data
+keys = []
+wavs = {}
+trans = {}
+utt2spk = {}
+task_list = []
+
+if (args.list != ''):
+  sys.stderr.write('Data input type: LIST\n')
+  # load list
+  assert(os.path.isfile(args.list))
+  with open(args.list, 'r') as wav_list:
+    for l in wav_list:
+      f = l.strip()
+      if f != "":
+        filename = os.path.basename(f)
+        key, ext = os.path.splitext(filename)
+        keys.append(key)
+        assert(wavs.get(key) == None) # check duplicated key
+        wavs[key] = f
+  sys.stderr.write('# of wavs:{}\n'.format(len(wavs)))
+elif (args.scp != ""):
+  sys.stderr.write('Data input type: SCP\n')
+  # load scp
+  assert(os.path.isfile(args.scp))
+  with open(args.scp, 'r') as scp_list:
+    for l in scp_list:
+      l = l.strip()
+      if (l != ''):
+        key, f = l.split(maxsplit=1)
+        assert(len(keys) == len(wavs))
+        keys.append(key)
+        assert(wavs.get(key) == None) # check duplicated key
+        wavs[key] = f
+  sys.stderr.write('# of wavs loaded:{}\n'.format(len(wavs)))
+  # load option trans
+  if args.trans != '':
+    assert(os.path.isfile(args.trans))
+    with codecs.open(args.trans, 'r', 'utf8') as trans_list:
+      for l in trans_list:
+        l = l.strip()
+        if (l != ''):
+          key, text = l.split(maxsplit=1)
+          assert(trans.get(key) == None)
+          trans[key] = text
+  sys.stderr.write('# of trans loaded:{}\n'.format(len(trans)))
+  # load optional utt2spk
+  if (args.utt2spk != ''):
+    assert(os.path.isfile(args.utt2spk))
+    with open(args.utt2spk, 'r') as utt2spk_file:
+      for l in utt2spk_file:
+        l = l.strip()
+        if (l != ''):
+          key, spk = l.split(maxsplit=1)
+          assert(utt2spk.get(key) == None)
+          utt2spk[key] = spk
+  sys.stderr.write('# of utt2spk loaded:{}\n'.format(len(utt2spk)))
+else:
+  sys.stderr.write('unsupported input, must be wav.list or wav.scp')
+  exit(0)
+
+# audio augmentation
+os.mkdir(args.odir)
+os.mkdir(os.path.join(args.odir, 'wav'))
+
+oscp = open(os.path.join(args.odir, 'wav.scp'), 'w+')
+if args.trans != '':
+  otrans = codecs.open(os.path.join(args.odir, 'trans.txt'), 'w+', 'utf8')
+outt2spk = open(os.path.join(args.odir, 'utt2spk'), 'w+')
+
+for i in range(len(keys)):
+  key = keys[i]
+  wav = wavs.get(key)
+  assert(wav != None) # no wav match the key?
+
+  cmd = []
+  cmd.append('cat {} '.format(wav))
+  new_key = key
+
+  if (len(volume_list) != 0):
+    volume = random.choice(volume_list)
+    cmd.append('{} -v {:.2f} -t wav - -t wav - '.format(SOX, volume))
+    if (args.key_append_volume == 'true'):
+      new_key += '__VOL_{:.2f}'.format(volume)
+
+  if (len(tempo_list) != 0):
+    tempo = random.choice(tempo_list)
+    cmd.append('{} -t wav - -t wav - tempo {:.2f}'.format(SOX, tempo))
+    if (args.key_append_tempo == 'true'):
+      new_key += '__TP_{:.2f}'.format(tempo)
+  
+  if (len(speed_list) != 0):
+    speed = random.choice(speed_list)
+    cmd.append('{} -t wav - -t wav - speed {:.2f}'.format(SOX, speed))
+    if (args.key_append_speed == 'true'):
+      new_key += '__SP_{:.2f}'.format(speed)
+
+  if (len(snr_list) != 0):
+    noise = random.choice(noise_list)
+    snr = random.choice(snr_list)
+    cmd.append('{} {} --additive-signals={} --snrs={} - - '.format(ADD_NOISE_TOOL, add_noise_opts, noise, snr))
+    if (args.key_append_snr):
+      new_key += '__SNR_{}dB'.format(snr)
+
+  if (args.key_append_string != ''):
+    new_key += '__{}'.format(args.key_append_string)
+
+  new_wav = os.path.join(args.odir, 'wav', new_key+'.wav')
+  task = ' | '.join(cmd) + ' > {}'.format(new_wav)
+
+  task_list.append(task)
+
+  # write new wav.scp
+  oscp.write('{}\t{}\n'.format(new_key, os.path.join('wav', new_key+'.wav')))
+  
+  # write new trans.txt
+  if (args.trans != ''):
+    text = trans.get(key)
+    assert(text != None) # missing trans?
+    otrans.write('{}\t{}\n'.format(new_key, text))
+  
+  # write new utt2spk
+  spk = utt2spk.get(key)
+  if spk != None:
+    outt2spk.write('{}\t{}\n'.format(new_key, spk))
+  else:
+    outt2spk.write('{}\t{}\n'.format(new_key, key))
+
+oscp.close()
+if (args.trans != ''):
+  otrans.close()
+outt2spk.close()
+sys.stderr.write('New meta data written to: {}\n'.format(args.odir))
+
+for task in task_list:
+  sys.stdout.write(task + '\n')
+sys.stderr.write('Audio processing commands are written to STDOUT, run them to generate new data\n')
