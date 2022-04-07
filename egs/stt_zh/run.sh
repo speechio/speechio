@@ -6,9 +6,9 @@ stage=0
 
 if [ $stage -le 0 ]; then
     for x in data.yaml tokenizer.yaml train.yaml test.yaml lm.yaml $text; do
-        [ ! -f $x ] || { echo "Error: Cannot find $x"; exit 1; }
+        [ -f $x ] || { echo "Error: Cannot find $x"; exit 1; }
     done
-    [ ! -d ops ] || { echo "No ops dir, try 'ln -s ../../ops ops'"; exit 1; }
+    [ -d ops ] || { echo "No ops dir, try 'ln -s ../../ops ops'"; exit 1; }
 fi
 
 
