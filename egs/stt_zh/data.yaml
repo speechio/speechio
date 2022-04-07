@@ -25,3 +25,4 @@ AISHELL-2-IOS-DEV:
 AISHELL-2-IOS-TEST:
     dir: data/audio/AISHELL-2/iOS/test/
     metadata: data/audio/AISHELL-2/iOS/test/metadata.tsv
+
