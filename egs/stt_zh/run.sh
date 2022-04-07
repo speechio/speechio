@@ -35,14 +35,14 @@ fi
 
 if [ $stage -le 4 ]; then
     echo "Decoding test set ..."
-    ops/stt  --config test.yaml  .  1>test.txt  2>log.test
+    ops/stt  --config test.yaml  .  1>test.tsv  2>log.test
 fi
 
 
 if [ $stage -le 5 ]; then
     echo "Evaluating error rate ..."
-    awk -F'\t' '{print $2, $3}' test.txt >rec.txt
-    ops/stt_error_rate  --tokenizer char  --ref ref.txt  --hyp rec.txt  RESULT  2>log.eval
+    awk -F'\t' '{print $2, $3}' test.tsv >test.hyp
+    ops/stt_error_rate  --tokenizer char  --ref test.ref  --hyp test.hyp  RESULT  2>log.eval
 fi
 
 
