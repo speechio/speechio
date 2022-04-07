@@ -1,8 +1,8 @@
 sentencepiece:
     # https://github.com/google/sentencepiece/blob/master/doc/options.md
     model_type: unigram # ["unigram", "bpe", "char"]
-    vocab_size: 4096
-    character_coverage: 0.995
+    vocab_size: 5000
+    character_coverage: 0.999
     user_defined_symbols: "" # comma seperated symbols
     pad_id: 0
     bos_id: 1
@@ -14,6 +14,7 @@ sentencepiece:
     unk_piece: <unk> 
     max_sentencepiece_length: 6 # default 16
     add_dummy_prefix: false
-    train_extremely_large_corpus: false
+    train_extremely_large_corpus: true
     num_threads: 16
+    required_chars: "A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,0,1,2,3,4,5,6,7,8,9"
 
