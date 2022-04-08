@@ -9,14 +9,14 @@ nj=$1
 text=$2
 prefix=$3
 
-opts=
+opts="--to_upper --check_charset"
 
 mkdir -p `dirname $prefix`
 
 split -n l/${nj} $text ${prefix}_
 
 for f in `ls ${prefix}_*`; do
-    ops/text_norm_zh $ops --to_upper $f ${f}_tn >& ${f}_tn.log &
+    ops/cn_tn.py $ops $f ${f}_tn >& ${f}_tn.log &
 done
 wait
 
