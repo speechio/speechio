@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
+# coding = utf8
+#
 # Copyright (c) 2021 Jiayu DU
 # All rights reserved.
 
-# example:
-#   ops/tokenizer_encode --input input.txt --model tokenizer --output_format id --output encoded.txt
-#
-# example:
-#   cat input.txt | ops/tokenizer_encode --model tokenizer > encoded.txt
-
-import sys, os
-import argparse
+import sys, os, argparse
+import sentencepiece as spm
 from contextlib import contextmanager
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--backend', choices = ['sentencepiece'], default = 'sentencepiece')
+    DESCRIPTION = '''
+    e.g:
+        cat i.txt | ops/tokenizer_encode --model tokenizer.model > o.txt
+
+        ops/tokenizer_encode  --model tokenizer.model  --input i.txt  --output o.txt
+    '''
+    parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--model', type = str, required = True)
     parser.add_argument('--input', type = str, default = '-')
     parser.add_argument('--output', type = str, default = '-')
-    parser.add_argument('--output_format', choices=['piece', 'id'], default = 'piece')
+    parser.add_argument('--format', choices=['piece', 'id'], default = 'piece')
     args = parser.parse_args()
     print(args, file=sys.stderr)
 
@@ -34,24 +35,20 @@ if __name__ == '__main__':
         else:
             yield open(fname, mode, encoding='utf8')
 
-    if args.backend == 'sentencepiece':
-        import sentencepiece as spm
 
-        sp = spm.SentencePieceProcessor()
-        sp.load(args.model)
+    sp = spm.SentencePieceProcessor()
+    sp.load(args.model)
 
-        with open_stream(args.input, 'r') as istream, open_stream(args.output, 'w+') as ostream:
-            for l in istream:
-                if args.output_format == 'piece':
-                    pieces = sp.EncodeAsPieces(l.strip())
-                    encoded = ' '.join(pieces)
-                elif args.output_format == 'id':
-                    ids = sp.EncodeAsIds(l.strip())
-                    encoded = ' '.join([ str(x) for x in ids ])
-                else:
-                    raise NotImplementedError
+    with open_stream(args.input, 'r') as istream, open_stream(args.output, 'w+') as ostream:
+        for l in istream:
+            if args.format == 'piece':
+                pieces = sp.EncodeAsPieces(l.strip())
+                encoded = ' '.join(pieces)
+            elif args.format == 'id':
+                ids = sp.EncodeAsIds(l.strip())
+                encoded = ' '.join([ str(x) for x in ids ])
+            else:
+                raise NotImplementedError
 
-                print(encoded, file = ostream)
+            print(encoded, file = ostream)
 
-    else:
-        raise NotImplementedError(F'Unsupported tokenizer backend: {args.backend}')
