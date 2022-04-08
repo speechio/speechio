@@ -4,27 +4,27 @@ import sys, os, argparse
 import subprocess, multiprocessing
 
 parser = argparse.ArgumentParser()
-parser.add_argument("cmd_list", type=str, help="cmd.list")
+parser.add_argument("cmds", type=str, help="cmd.list")
 parser.add_argument("--nj", type=int, default=20, help="")
 args = parser.parse_args()
 
-def run(cmd):
-    #sys.stderr.write(cmd + '\n')
-    #subprocess.run(cmd.split())
-    os.system(cmd)
-
 tasks = []
-with open(args.cmd_list, 'r') as f:
+with open(args.cmds, 'r', encoding='utf8') as f:
     for l in f:
-        cmd = l.strip()
-        if cmd != '':
+        if l.startswith('#'):
+            continue # skip comments
+        if (cmd := l.strip()):
             tasks.append(cmd)
 
-sys.stderr.write("number of tasks N={}, number of workers M={}.\n".format(len(tasks), args.nj))
+print(f'{__file__}: tasks={len(tasks)}, workers={args.nj}', file = sys.stderr)
+
+def run(cmd):
+    print(cmd, file = sys.stderr)
+    os.system(cmd)
 
 pool = multiprocessing.Pool(args.nj)
 futures = [ pool.apply_async(run, (task,)) for task in tasks ]
 output = [ res.get() for res in futures ]
 
-sys.stderr.write('Parallel executing batch commands {} done.\n'.format(args.cmd_list))
+print(f'{__file__}: parallel executing batch commands {args.cmds} done.', file = sys.stderr)
 
