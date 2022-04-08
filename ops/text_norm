@@ -16,7 +16,7 @@ mkdir -p `dirname $prefix`
 split -n l/${nj} $text ${prefix}_
 
 for f in `ls ${prefix}_*`; do
-    ops/cn_tn.py $ops $f ${f}_tn >& ${f}_tn.log &
+    ops/cn_tn.py $opts $f ${f}_tn >& ${f}_tn.log &
 done
 wait
 
