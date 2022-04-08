@@ -16,7 +16,7 @@ fi
 if [ $stage -le 1 ]; then
     echo "cleaning raw text ..."
     ops/text_norm  $nj  $raw_text  ./text_norm_dir/text  2>log.tokenizer
-    ln -s ./text_norm_dir/text.txt text.txt
+    rm -f text.txt && ln -s ./text_norm_dir/text.txt text.txt
 fi
 
 
@@ -57,8 +57,8 @@ fi
 if [ $stage -le 7 ]; then
     echo "Apply trained tokenizer to raw text ..."
     #ops/tokenizer_encode  --model tokenizer.model  --input text.txt  --output lm.txt
-    ops/text_tokenize  $nj  text.txt  tokenizer.model  ./text_tokenize_dir/lm
-    ln -s ./text_tokenize_dir/lm.txt lm.txt
+    ops/text_tokenize  $nj  text.txt  tokenizer.model  ./text_tokenize_dir/text
+    rm -f text.txt && ln -s ./text_tokenize_dir/text.txt text.txt
 
     echo "Training ARPA from tokenized text ..."
     ops/lm_train  --config lm.yaml  --text lm.txt  --vocab tokenizer.vocab  --model lm
