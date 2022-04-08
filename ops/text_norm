@@ -9,7 +9,7 @@ nj=$1
 text=$2
 prefix=$3
 
-opts="--to_upper --check_charset --remove_space"
+opts="--to_upper --check_chars --remove_space"
 
 mkdir -p `dirname $prefix`
 
