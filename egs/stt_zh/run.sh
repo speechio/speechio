@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-text=data/text/AISHELL-1_train.txt
+raw_text=data/text/AISHELL-1_train.txt
 
 stage=0
+nj=40
 
 if [ $stage -le 0 ]; then
     for x in data.yaml tokenizer.yaml train.yaml test.yaml lm.yaml $text; do
@@ -13,18 +14,25 @@ fi
 
 
 if [ $stage -le 1 ]; then
-    echo "Training tokenizer from raw text ..."
-    ops/tokenizer_train  --config tokenizer.yaml  --input $text  --model tokenizer  2>log.tokenizer
+    echo "cleaning raw text ..."
+    ops/text_norm  $nj  $raw_text  ./text_norm_dir/text  2>log.tokenizer
+    ln -s ./text_norm_dir/text.txt text.txt
 fi
 
 
 if [ $stage -le 2 ]; then
-    echo "Traning stt model ..."
-    ops/stt_train  --node_rank 0  --config train.yaml  .  2>log.train
+    echo "Training tokenizer from raw text ..."
+    ops/tokenizer_train  --config tokenizer.yaml  --input text.txt  --model tokenizer  2>log.tokenizer
 fi
 
 
 if [ $stage -le 3 ]; then
+    echo "Training stt model ..."
+    ops/stt_train  --node_rank 0  --config train.yaml  .  2>log.train
+fi
+
+
+if [ $stage -le 4 ]; then
     echo "Averaging model checkpoints ..."
     ops/stt_average  checkpoints  average.pt  2>log.average
 
@@ -33,22 +41,22 @@ if [ $stage -le 3 ]; then
 fi
 
 
-if [ $stage -le 4 ]; then
+if [ $stage -le 5 ]; then
     echo "Decoding test set ..."
     ops/stt  --config test.yaml  .  1>test.tsv  2>log.test
 fi
 
 
-if [ $stage -le 5 ]; then
+if [ $stage -le 6 ]; then
     echo "Evaluating error rate ..."
     awk -F'\t' '{print $2"\t"$3}' test.tsv >test.hyp
     ops/stt_error_rate  --tokenizer char  --ref test.ref  --hyp test.hyp  RESULT  2>log.eval
 fi
 
 
-if [ $stage -le 6 ]; then
+if [ $stage -le 7 ]; then
     echo "Apply trained tokenizer to raw text ..."
-    ops/tokenizer_encode  --model tokenizer.model  --input $text  --output lm.txt
+    ops/tokenizer_encode  --model tokenizer.model  --input text.txt  --output lm.txt
 
     echo "Training ARPA from tokenized text ..."
     ops/lm_train  --config lm.yaml  --text lm.txt  --vocab tokenizer.vocab  --model lm
