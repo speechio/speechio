@@ -14,7 +14,9 @@ sentencepiece:
     unk_piece: <unk> 
     max_sentencepiece_length: 6 # default 16
     add_dummy_prefix: false
+    num_threads: 40
     train_extremely_large_corpus: true
-    num_threads: 16
+    shuffle_input_sentence: true
+    input_sentence_size: 20000000
     required_chars: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
