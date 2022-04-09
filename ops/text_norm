@@ -18,8 +18,8 @@ split -n l/${nj} $text ${prefix}_
 
 
 echo "$0: Normailzing all partitions in parallel"
-for f in `ls ${prefix}_*`; do
-    ops/cn_tn.py $opts $f ${f}.out >& ${f}.log &
+for x in `ls ${prefix}_*`; do
+    ops/cn_tn.py $opts $x ${x}.out >& ${x}.log &
 done
 wait
 

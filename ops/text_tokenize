@@ -16,8 +16,8 @@ echo "$0: Partitioning input text"
 split -n l/${nj} $text ${prefix}_
 
 echo "$0: tokenizing all partitions in parallel"
-for f in `ls ${prefix}_*`; do
-    ops/tokenizer_encode --model $tokenizer --input $f --output ${f}.out >& ${f}.log &
+for x in `ls ${prefix}_*`; do
+    ops/tokenizer_encode --model $tokenizer --input $x --output ${x}.out >& ${x}.log &
 done
 wait
 
