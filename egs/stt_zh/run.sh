@@ -14,14 +14,14 @@ fi
 
 
 if [ $stage -le 1 ]; then
-    echo "cleaning raw text ..."
+    echo "normalizing raw text ..."
     ops/text_norm  $nj  $raw_text  ./text_norm_dir/text  2>log.tokenizer
     rm -f text.txt && ln -s ./text_norm_dir/text.txt text.txt
 fi
 
 
 if [ $stage -le 2 ]; then
-    echo "Training tokenizer from raw text ..."
+    echo "Training tokenizer ..."
     ops/tokenizer_train  --config tokenizer.yaml  --input text.txt  --model tokenizer  2>log.tokenizer
 fi
 
