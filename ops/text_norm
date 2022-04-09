@@ -19,12 +19,12 @@ split -n l/${nj} $text ${prefix}_
 
 echo "$0: Normailzing all partitions in parallel"
 for f in `ls ${prefix}_*`; do
-    ops/cn_tn.py $opts $f ${f}_out >& ${f}.log &
+    ops/cn_tn.py $opts $f ${f}.out >& ${f}.log &
 done
 wait
 
 echo "$0: Merging all partition results"
-cat ${prefix}_*_out > ${prefix}.txt
+cat ${prefix}_*.out > ${prefix}.txt
 
 echo "$0: Done"
 
