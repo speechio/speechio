@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 if [ $# -ne 4 ]; then
-    echo "tokenize nj itext tokenizer output_prefix"
+    echo "tokenize nj tokenizer input.txt output_prefix"
     exit 1;
 fi
 
 nj=$1
-text=$2
-tokenizer=$3
+tokenizer=$2
+text=$3
 prefix=$4
 
 mkdir -p `dirname $prefix`
