@@ -42,7 +42,7 @@ fi
 
 if [ $stage -le 5 ]; then
     echo "Decoding test set ..."
-    ops/stt  --config test.yaml  .  1>test.tsv  2>log.test
+    ops/stt_test  --config test.yaml  .  1>test.tsv  2>log.test
 fi
 
 
