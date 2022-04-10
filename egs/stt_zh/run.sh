@@ -15,8 +15,7 @@ fi
 
 if [ $stage -le 1 ]; then
     echo "normalizing raw text ..."
-    ops/text_norm  $nj  $raw_text  ./text_norm_dir/text  2>log.tokenizer
-    rm -f text.txt && ln -s ./text_norm_dir/text.txt text.txt
+    ops/text_norm  --nj $nj  --input $raw_text  --output text.txt  2>log.text_norm
 fi
 
 

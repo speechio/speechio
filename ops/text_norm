@@ -1,30 +1,46 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
+# coding = utf8
 
-if [ $# -ne 3 ]; then
-    echo "text_norm nj itext output_prefix"
-    exit 1;
-fi
+import sys, os, argparse
 
-nj=$1
-text=$2
-prefix=$3
+if __name__ == '__main__':
+    DESCRIPTION = '''
+    e.g:
+        ops/text_norm --nj 10 --input i.txt --output o.txt
+    '''
+    parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--nj', type = int, default = 1)
+    parser.add_argument('--opts', type = str, default = "--to_upper --check_chars --remove_space")
 
-opts="--to_upper --check_chars --remove_space"
+    parser.add_argument('--input', type = str, required = True)
+    parser.add_argument('--output', type = str, required = True)
+    args = parser.parse_args()
+    print(args, file=sys.stderr)
 
-mkdir -p `dirname $prefix`
+    if args.nj == 1:
 
-echo "$0: Partitioning input text"
-split -n l/${nj} $text ${prefix}_
+        os.system(f'ops/cn_tn.py {args.opts} args.input args.output')
 
+    else:
+        import glob
 
-echo "$0: Normailzing all partitions in parallel"
-for x in `ls ${prefix}_*`; do
-    ops/cn_tn.py $opts $x ${x}.out >& ${x}.log &
-done
-wait
+        wdir = args.output + '.dir'
+        os.makedirs(wdir, exist_ok = True)
 
-echo "$0: Merging all partition results"
-cat ${prefix}_*.out > ${prefix}.txt
+        print(f'Partitioning input {args.input} into {wdir} ...', file = sys.stderr)
+        os.system(f'split -n l/{args.nj} {args.input} {os.path.join(wdir, "split.")}')
 
-echo "$0: Done"
+        print('Tokenizing all partitions ...', file = sys.stderr)
+        partitions = glob.glob(os.path.join(wdir, 'split.*'))
+
+        cmds = os.path.join(wdir, 'cmds')
+        with open(cmds, 'w+') as f:
+            for x in partitions:
+                out = os.path.join(wdir, os.path.basename(x).replace('split', 'out'))
+                log = os.path.join(wdir, os.path.basename(x).replace('split', 'log'))
+                print(f'ops/cn_tn.py {args.opts} {x} {out} >& {log}', file = f)
+        os.system(f'ops/run_para --nj {args.nj} {cmds}')
+
+        print('Merging results of all partitions ...', file = sys.stderr)
+        os.system(f'cat {os.path.join(wdir, "out.*")} > {args.output}')
 
