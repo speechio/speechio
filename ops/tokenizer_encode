@@ -8,6 +8,34 @@ import sys, os, argparse
 import sentencepiece as spm
 from contextlib import contextmanager
 
+@contextmanager
+def open_stream(fname, mode):
+    if fname == '-':
+        if mode == 'r':
+            yield sys.stdin
+        elif mode == 'w+':
+            yield sys.stdout
+        else:
+            raise NotImplementedError
+    else:
+        yield open(fname, mode, encoding='utf8')
+
+
+def tokenize(model, input_file, output_file, output_format):
+    with open_stream(input_file, 'r') as istream, open_stream(output_file, 'w+') as ostream:
+        for l in istream:
+            if output_format == 'piece':
+                pieces = model.EncodeAsPieces(l.strip())
+                encoded = ' '.join(pieces)
+            elif output_format == 'id':
+                ids = model.EncodeAsIds(l.strip())
+                encoded = ' '.join([ str(x) for x in ids ])
+            else:
+                raise NotImplementedError
+
+            print(encoded, file = ostream)
+
+
 if __name__ == '__main__':
     DESCRIPTION = '''
     e.g:
@@ -16,6 +44,7 @@ if __name__ == '__main__':
         ops/tokenizer_encode  --model tokenizer.model  --input i.txt  --output o.txt
     '''
     parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--nj', type = int, default = 1)
     parser.add_argument('--model', type = str, required = True)
     parser.add_argument('--input', type = str, default = '-')
     parser.add_argument('--output', type = str, default = '-')
@@ -23,32 +52,37 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args, file=sys.stderr)
 
-    @contextmanager
-    def open_stream(fname, mode):
-        if fname == '-':
-            if mode == 'r':
-                yield sys.stdin
-            elif mode == 'w+':
-                yield sys.stdout
-            else:
-                raise NotImplementedError
-        else:
-            yield open(fname, mode, encoding='utf8')
+    if args.nj == 1:
 
+        model = spm.SentencePieceProcessor()
+        model.load(args.model)
 
-    sp = spm.SentencePieceProcessor()
-    sp.load(args.model)
+        tokenize(model, args.input, args.output, args.format)
 
-    with open_stream(args.input, 'r') as istream, open_stream(args.output, 'w+') as ostream:
-        for l in istream:
-            if args.format == 'piece':
-                pieces = sp.EncodeAsPieces(l.strip())
-                encoded = ' '.join(pieces)
-            elif args.format == 'id':
-                ids = sp.EncodeAsIds(l.strip())
-                encoded = ' '.join([ str(x) for x in ids ])
-            else:
-                raise NotImplementedError
+    else:
 
-            print(encoded, file = ostream)
+        import glob
+
+        assert(args.input != '-')
+        assert(args.output != '-')
+
+        wdir = args.output + '.dir'
+        os.makedirs(wdir, exist_ok = True)
+
+        print(f'Partitioning input {args.input} into {wdir} ...', file = sys.stderr)
+        os.system(f'split -n l/{args.nj} {args.input} {os.path.join(wdir, "split.")}')
+
+        print('Tokenizing all partitions ...', file = sys.stderr)
+        partitions = glob.glob(os.path.join(wdir, 'split.*'))
+
+        cmds = os.path.join(wdir, 'cmds')
+        with open(cmds, 'w+') as f:
+            for x in partitions:
+                out = os.path.join(wdir, os.path.basename(x).replace('split', 'out'))
+                log = os.path.join(wdir, os.path.basename(x).replace('split', 'log'))
+                print(f'ops/tokenizer_encode --model {args.model} --input {x} --output {out} --format {args.format} >& {log}', file = f)
+        os.system(f'ops/run_para --nj {args.nj} {cmds}')
+
+        print('Merging results of all partitions ...', file = sys.stderr)
+        os.system(f'cat {os.path.join(wdir, "out.*")} > {args.output}')
 
