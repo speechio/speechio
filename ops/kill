@@ -7,13 +7,13 @@ if __name__ == '__main__':
     parser.add_argument('operation', type = str, choices = ['stt', 'lm', 'tokenizer'])
     args = parser.parse_args()
 
-    kmap = {
+    pmap = {
         'stt': 'stt_train',
         'lm': 'lm_train',
         'tokenizer': 'tokenizer_train',
     }
 
-    cmd = f'pkill -f {kmap[args.operation]}'
+    cmd = f'pkill -f {pmap[args.operation]}'
     print(cmd, file = sys.stderr)
     os.system(cmd)
 
