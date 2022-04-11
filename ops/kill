@@ -13,7 +13,7 @@ if __name__ == '__main__':
         'tokenizer': 'tokenizer_train',
     }
 
-    cmd = f'kill -f {kmap[args.operation]}'
+    cmd = f'pkill -f {kmap[args.operation]}'
     print(cmd, file = sys.stderr)
     os.system(cmd)
 
