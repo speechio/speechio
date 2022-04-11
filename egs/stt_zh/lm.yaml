@@ -1,4 +1,3 @@
-model_type: ngram
 kenlm:
     train_opts: "-o 6" # e.g.  "-o 4 -S 50% --prune 0 5 7 7"
     build_opts: "" # For 8bit quantization, use "-q 8 -b 8"
