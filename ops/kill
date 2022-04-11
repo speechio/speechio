@@ -1,2 +1,19 @@
-#!/usr/bin/env bash
-pkill -f stt_train
+#!/usr/bin/env python3
+
+import argparse, os, sys
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('operation', type = str, choices = ['stt', 'lm', 'tokenizer'])
+    args = parser.parse_args()
+
+    kmap = {
+        'stt': 'stt_train',
+        'lm': 'lm_train',
+        'tokenizer': 'tokenizer_train',
+    }
+
+    cmd = f'kill -f {kmap[args.operation]}'
+    print(cmd, file = sys.stderr)
+    os.system(cmd)
+
