@@ -23,14 +23,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args, file = sys.stderr)
 
-    config = OmegaConf.load(args.config)
+    config = OmegaConf.load(args.config)['kenlm']
     print(f'LM config: {config}', file = sys.stderr)
-
-    opts = config["kenlm"]
 
     lm_vocab = args.model + '.vocab'
     lm_arpa = args.model + '.arpa'
-    lm_binary = args.model + f'.{opts["build_type"]}'
+    lm_binary = args.model + f'.{config["build_type"]}'
 
     # 1. Generate LM vocabulary from tokenizer's vocabulary
     tokens = []
@@ -49,13 +47,13 @@ if __name__ == '__main__':
     print(f'Vocabulary size: {len(words)}', file = sys.stderr)
 
     # 2. Train ngram arpa model
-    train_cmd = f'cat {lm_vocab} {args.text} | lmplz {opts["train_opts"]} --limit_vocab_file {lm_vocab} > {lm_arpa}'
+    train_cmd = f'cat {lm_vocab} {args.text} | lmplz {config["train_opts"]} --limit_vocab_file {lm_vocab} > {lm_arpa}'
     print(train_cmd, file = sys.stderr)
     if not args.dryrun:
         os.system(train_cmd)
 
     # 3. Build KenLM binary out of trained arpa model
-    build_cmd = f'build_binary {opts["build_opts"]} {opts["build_type"]} {lm_arpa} {lm_binary}'
+    build_cmd = f'build_binary {config["build_opts"]} {config["build_type"]} {lm_arpa} {lm_binary}'
     print(build_cmd, file = sys.stderr)
     if not args.dryrun:
         os.system(build_cmd)
