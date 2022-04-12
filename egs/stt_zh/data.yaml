@@ -26,3 +26,18 @@ AISHELL-2-IOS-TEST:
     dir: data/audio/AISHELL-2/iOS/test/
     metadata: data/audio/AISHELL-2/iOS/test/metadata.tsv
 
+# mobile channels
+mobile_0007:
+    dir: data/audio/mobile_0007/
+    metadata: data/audio/mobile_0007/metadata.tsv
+mobile_0007_aug:
+    dir: data/audio/mobile_0007_aug/
+    metadata: data/audio/mobile_0007_aug/metadata.tsv
+
+mobile_2000h:
+    dir: data/audio/mobile_2000h/
+    metadata: data/audio/mobile_2000h/metadata.tsv
+mobile_2000h_aug:
+    dir: data/audio/mobile_2000h_aug/
+    metadata: data/audio/mobile_2000h_aug/metadata.tsv
+
