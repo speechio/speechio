@@ -1,5 +1,5 @@
 .DS_Store
-config/credential/*.cfg
+credentials/*.cfg
 
 *.so
 *.a
@@ -15,32 +15,17 @@ tmp*
 *.pts
 nohup.out
 
-build
-
 # oss
 .ossutil_checkpoint
 ossutil_output
 oss
 
 libsio
-utils/oss
 
-egs/*/data/audio
-egs/*/data/text
-
-!egs/stt_zh/data/audio/MINI
+!data/audio/MINI
 
 test/*
 test.wav
-
-toolkit/speechbrain
-toolkit/wenet
-exp
-
-RESULT
-rec.txt
-ref.txt
-res.test
 
 wenet
 kaldi_dist
