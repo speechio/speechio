@@ -1,10 +1,10 @@
 # metadata.tsv specifications
 
 ## Fields
-- ID: unique string identifier of an audio segment
+- ID (optional): unique identifier of an audio segment
 - AUDIO: file path of the containing audio
 - BEGIN (optional): in seconds, default: 0.0
 - DURATION (optional): in seconds, default: float infinity
-- TEXT (optional): content label. default: empty string ""
-- SPEAKER (optional): unique string identifier for a speaker, default: empty string ""
+- TEXT (optional): speech to text labels. default: empty string ""
+- SPEAKER (optional): unique identifier of the speaker, default: empty string ""
 
