@@ -22,11 +22,12 @@ oss
 
 libsio
 
-data/audio
 !data/audio/MINI
+!data/audio/README.md
+data/audio
 
-data/text
 !data/text/MINI.txt
+data/text
 
 test/*
 test.wav
