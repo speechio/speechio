@@ -22,7 +22,11 @@ oss
 
 libsio
 
+data/audio
 !data/audio/MINI
+
+data/text
+!data/text/MINI
 
 test/*
 test.wav
