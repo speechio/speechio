@@ -26,7 +26,7 @@ data/audio
 !data/audio/MINI
 
 data/text
-!data/text/MINI
+!data/text/MINI.txt
 
 test/*
 test.wav
