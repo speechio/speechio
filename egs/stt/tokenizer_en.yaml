@@ -4,12 +4,15 @@ sentencepiece:
     vocab_size: 1024
     character_coverage: 1.0
     user_defined_symbols: "" # comma seperated symbols
-    pad_id: -1
-    unk_id: 0
-    bos_id: 1
+    pad_id: 0
+    bos_id: 
     eos_id: 2
-    unk_piece: <unk>  # <UNK> for Kaldi 
+    unk_id: 3
+    pad_piece: <blk> # blank
+    bos_piece: <s>
+    eos_piece: </s>
+    unk_piece: <unk> 
     max_sentencepiece_length: 16 # default 16
     add_dummy_prefix: true
-    train_extremely_large_corpus: false
-    num_threads: 16
+    num_threads: 40
+    train_extremely_large_corpus: true
