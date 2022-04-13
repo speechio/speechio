@@ -10,7 +10,7 @@ if __name__ == '__main__':
     '''
     parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--nj', type = int, default = 1)
-    parser.add_argument('--opts', type = str, default = "--to_upper --check_chars --remove_space")
+    parser.add_argument('--opts', type = str, default = "--to_banjiao --to_upper --check_chars --remove_space")
 
     parser.add_argument('--input', type = str, required = True)
     parser.add_argument('--output', type = str, required = True)
