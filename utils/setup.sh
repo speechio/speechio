@@ -14,7 +14,7 @@ conda create -n speechio python=$PYTHON_VERSION
 #conda install -c nvidia cudatoolkit=$CUDA_VERSION
 
 ##
-pip3 install -r requirements.txt
+pip3 install -r .requirements.txt
 
 ## setup wenet python dependency
 utils/setup_wenet.sh
