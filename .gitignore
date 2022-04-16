@@ -20,8 +20,6 @@ nohup.out
 ossutil_output
 oss
 
-libsio
-
 !data/audio/MINI
 !data/audio/README.md
 data/audio
@@ -29,10 +27,7 @@ data/audio
 !data/text/MINI.txt
 data/text
 
-test/*
-test.wav
+checkpoints
 
 wenet
-kaldi_dist
-libtorch
-libtorch-shared-with-deps-latest.zip
+
