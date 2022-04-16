@@ -29,11 +29,12 @@ data/audio
 data/text
 
 # generated resources
-mean_var_norm.txt
-mean_var_stats.json
-
+text.txt
 tokenizer.vocab
 tokenizer.model
+
+mean_var_norm.txt
+mean_var_stats.json
 
 checkpoints
 average.pt

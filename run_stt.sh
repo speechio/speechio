@@ -6,7 +6,7 @@ stage=0
 nj=40
 
 if [ $stage -le 0 ]; then
-    for x in tokenizer.yaml train.yaml test.yaml lm.yaml $text; do
+    for x in tokenizer.yaml stt.yaml stt_test.yaml lm.yaml $text; do
         [ -f $x ] || { echo "Error: Cannot find $x"; exit 1; }
     done
     [ -d data ] || { echo "No data dir, try 'ln -s ../../data data'"; exit 1; }
@@ -28,7 +28,7 @@ fi
 
 if [ $stage -le 3 ]; then
     echo "Training stt model ..."
-    ops/stt_train  --node_rank 0  --config train.yaml  .  2>log.train
+    ops/stt_train  --config stt.yaml  --node_rank 0  .  2>log.train
 fi
 
 
@@ -37,13 +37,13 @@ if [ $stage -le 4 ]; then
     ops/stt_average  checkpoints  average.pt  2>log.average
 
     echo "Exporting torchscript model ..."
-    ops/stt_export  --config train.yaml  average.pt  final.pts  2>log.export
+    ops/stt_export  --config stt.yaml  average.pt  final.pts  2>log.export
 fi
 
 
 if [ $stage -le 5 ]; then
     echo "Decoding test set ..."
-    ops/stt_test  --config test.yaml  .  1>test.tsv  2>log.test
+    ops/stt_test  --config stt_test.yaml  .  1>test.tsv  2>log.test
 fi
 
 
