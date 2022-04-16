@@ -16,7 +16,7 @@ nohup.out
 
 # oss
 oss
-aliyun_oss.cfg
+oss.cfg
 .ossutil_checkpoint
 ossutil_output
 
