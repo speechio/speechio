@@ -8,17 +8,18 @@ credentials/*.cfg
 __pycache__
 
 .vscode
-log
 *.log
-tmp*
-*.pt
-*.pts
+log.*
+tmp
+tmp.*
 nohup.out
 
 # oss
 .ossutil_checkpoint
 ossutil_output
 oss
+
+wenet
 
 !data/audio/MINI
 !data/audio/README.md
@@ -27,7 +28,24 @@ data/audio
 !data/text/MINI.txt
 data/text
 
-checkpoints
+# generated resources
+mean_var_norm.txt
+mean_var_stats.json
 
-wenet
+tokenizer.vocab
+tokenizer.model
+
+checkpoints
+average.pt
+final.pts
+
+lm.txt
+lm.arpa
+lm.trie
+lm.vocab
+
+test.hyp
+test.ref
+test.tsv
+RESULT
 
