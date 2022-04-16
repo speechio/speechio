@@ -16,8 +16,8 @@ if __name__ == '__main__':
         logging.error("Please install oss via utils/setup_aliyun_oss.sh")
         sys.exit(-1)
 
-    if not os.path.isfile('credentials/aliyun_oss.cfg'):
-        logging.error('Cannot find oss credential in credentials/aliyun_oss.cfg.')
+    if not os.path.isfile('utils/aliyun_oss.cfg'):
+        logging.error('Cannot find oss credential in utils/aliyun_oss.cfg.')
         sys.exit(-1)
 
     if args.type == 'model':
@@ -39,6 +39,6 @@ if __name__ == '__main__':
         logging.error(f'Cannot find entry {args.id} in {zoo_dir}/zoo.yaml')
         sys.exit(-1)
 
-    cmd = F'utils/oss -c credentials/aliyun_oss.cfg cp -ur {src} {dst}'
+    cmd = F'utils/oss -c utils/aliyun_oss.cfg cp -ur {src} {dst}'
     logging.info(cmd)
     os.system(cmd)
