@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 
-export WENET_ROOT=/home/speechio/work/wenet
-
 export CUDA_VERSION=10.2
 export PYTHON_VERSION=3.9
 export PYTORCH_VERSION=1.9
 
-## Create & Activate virtual env 
-conda create -n speechio python=$PYTHON_VERSION
-#conda activate speechio || exit 1
-
 ## CUDA
 #conda install -c nvidia cudatoolkit=$CUDA_VERSION
 
-##
-pip3 install -r utils/requirements.txt
+## Create & Activate virtual env 
+conda create -n speechio python=$PYTHON_VERSION
+conda activate speechio || exit 1
+
+pip3 install numpy
+pip3 install torch
+pip3 install torchaudio
+pip3 install sentencepiece 
+pip3 install omegaconf
+pip3 install typeguard
 
 ## setup wenet python dependency
 utils/setup_wenet.sh
