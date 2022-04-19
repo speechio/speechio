@@ -20,6 +20,8 @@ oss.cfg
 .ossutil_checkpoint
 ossutil_output
 
+kenlm
+
 wenet
 
 !data/audio/MINI
@@ -28,6 +30,8 @@ data/audio
 
 !data/text/MINI.txt
 data/text
+
+egs
 
 # generated resources
 text.txt
