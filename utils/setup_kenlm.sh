@@ -14,5 +14,5 @@ cmake ..
 make -j 4
 cd -
 
-echo "KenLM has been installed to $dir/build/bin, please add it to your PATH"
+echo "KenLM tools have been installed to: $dir/build/bin, please add it to your PATH"
 
