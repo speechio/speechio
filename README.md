@@ -10,7 +10,7 @@ A dataset is represented with a single table `metadata.tsv`:
 TSV fields are specified by:
 | Field | Type | Description | Optional | Default |
 |-|-|-|-|-|
-| ID | string | A unique identifier for the utterance | &check; | audio file name |
+| ID | string | A unique identifier for the utterance | &check; | value of AUDIO field |
 | AUDIO | string | Audio path containing the utterance | &cross; | |
 | BEGIN | float | Utterance beginning inside audio file (in sec) | &check; | 0.0 |
 | DURATION | float | Utterance duration (in sec) | &check; | length of the audio |
