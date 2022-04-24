@@ -33,14 +33,14 @@ Same as above, except explicitly specified utterance IDs
 | AUD002 | data/audio/MINI/AUD002.wav |
 | ... | ... |
 
-A short-form dataset that can be used in ASR training
+A short-audio dataset for STT/TTS
 | ID | AUDIO | TEXT |
 | - | - | - |
 | AUD001 | data/audio/MINI/AUD001.wav | HEY THERE |
 | AUD002 | data/audio/MINI/AUD002.wav | HOW ARE YOU |
 | ... | ... |
 
-A long-form dataset for speech-to-text tasks
+A long-audio dataset for STT/TTS
 | ID | AUDIO | BEGIN | END | TEXT |
 | - | - | - | - | - |
 | AUD001_SEG0001 | data/audio/MINI/AUD001.wav | 0.5 | 1.3 | HEY THERE |
@@ -48,7 +48,7 @@ A long-form dataset for speech-to-text tasks
 | ... | ... | ... | ... | ... |
 | AUD123_SEG456 | data/audio/MINI/AUD123.wav | 1234.5 | 1235.0 | BLA BLA BLA |
 
-A minimal short-form dataset for speaker related tasks
+A short-audio dataset for speaker related tasks
 | ID | AUDIO | SPEAKER |
 | - | - | - |
 | AUD001 | data/audio/MINI/AUD001.wav | SPK001 |
