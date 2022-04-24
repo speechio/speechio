@@ -19,14 +19,7 @@ TSV fields are specified by:
 
 ## Metadata examples
 
-An unlabeled dataset for inference only.
-| AUDIO |
-| - |
-| data/audio/MINI/AUD001.wav |
-| data/audio/MINI/AUD002.wav |
-| ... |
-
-Same as above, except explicitly specified utterance IDs
+An unlabeled dataset for inference only. 
 | ID | AUDIO |
 | - | - |
 | AUD001 | data/audio/MINI/AUD001.wav |
@@ -47,10 +40,3 @@ A long-audio dataset for STT/TTS
 | AUD001_SEG0002 | data/audio/MINI/AUD001.wav | 1.3 | 2.5 | HOW ARE YOU |
 | ... | ... | ... | ... | ... |
 | AUD123_SEG4567 | data/audio/MINI/AUD123.wav | 1234.5 | 1235.0 | BLA BLA BLA |
-
-A short-audio dataset for speaker related tasks
-| ID | AUDIO | SPEAKER |
-| - | - | - |
-| AUD001 | data/audio/MINI/AUD001.wav | SPK001 |
-| AUD002 | data/audio/MINI/AUD002.wav | SPK002 |
-| ... | ... | ... |
