@@ -2,12 +2,7 @@
 It's all about organizing your speech data, really.
 
 ## Dataset metadata
-A dataset is represented with a single table `metadata.tsv`:
-* compact
-* human-readable
-* easy to parse, merge, split, modify etc
-
-TSV fields are specified by:
+A SpeechIO dataset is described by a single table `metadata.tsv`, with fields specified as follows:
 | Field | Type | Description | Optional | Default |
 |-|-|-|-|-|
 | ID | string | A unique identifier for the utterance | &check; | value of AUDIO field |
