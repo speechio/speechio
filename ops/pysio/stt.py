@@ -28,6 +28,7 @@ import torchaudio.sox_effects
 import sentencepiece as spm
 #import k2
 
+from cn_tn import TextNorm
 from .wenet_wrapper import stt_create, stt_loss, stt_decode
 
 # Global Constants
@@ -552,17 +553,6 @@ class Tokenizer:
     def __call__(self, text) -> tuple[list[str], list[int]] :
         return self.encode(text, 'token'), self.encode(text, 'index')
 
-
-class TextNorm:
-    def __init__(self, case:str):
-        self.case = case
-
-    def __call__(self, text):
-        if self.case == 'upper':
-            text = text.upper()
-        elif self.case == 'lower':
-            text = text.lower()
-        return text
 
 
 class DataPipe:

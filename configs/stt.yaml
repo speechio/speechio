@@ -32,7 +32,13 @@ spec_augment:
     f_mask_width_max: 10
 
 text_norm:
-    case: upper # either 'upper' or 'lower'
+    to_banjiao: true
+    to_upper: true
+    to_lower: false
+    remove_fillers: false
+    remove_erhua: false
+    check_chars: true
+    remove_space: true
 
 tokenizer: 
     vocab_path: tokenizer.vocab
