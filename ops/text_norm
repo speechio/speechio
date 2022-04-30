@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     if args.nj == 1:
 
-        os.system(f'ops/cn_tn.py {args.opts} args.input args.output')
+        os.system(f'ops/cn_tn.py {args.opts} {args.input} {args.output}')
 
     else:
         import glob
