@@ -40,15 +40,14 @@ if __name__ == '__main__':
     DESCRIPTION = '''
     e.g:
         cat i.txt | ops/tokenizer_encode --model tokenizer.model > o.txt
-
         ops/tokenizer_encode  --model tokenizer.model  --input i.txt  --output o.txt
     '''
     parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--nj', type = int, default = 1)
-    parser.add_argument('--model', type = str, required = True)
-    parser.add_argument('--input', type = str, default = '-')
-    parser.add_argument('--output', type = str, default = '-')
-    parser.add_argument('--format', choices=['piece', 'id'], default = 'piece')
+    parser.add_argument('-n', '--nj', type = int, default = 1)
+    parser.add_argument('-m', '--model', type = str, required = True)
+    parser.add_argument('-i', '--input', type = str, default = '-')
+    parser.add_argument('-o', '--output', type = str, default = '-')
+    parser.add_argument('-f', '--format', choices=['piece', 'id'], default = 'piece')
     args = parser.parse_args()
     print(args, file=sys.stderr)
 
@@ -56,7 +55,6 @@ if __name__ == '__main__':
 
         model = spm.SentencePieceProcessor()
         model.load(args.model)
-
         tokenize(model, args.input, args.output, args.format)
 
     else:
@@ -70,19 +68,20 @@ if __name__ == '__main__':
         os.makedirs(wdir, exist_ok = True)
 
         print(f'Partitioning input {args.input} into {wdir} ...', file = sys.stderr)
-        os.system(f'split -n l/{args.nj} {args.input} {os.path.join(wdir, "split.")}')
+        os.system(f'split -n l/{args.nj} {args.input} {os.path.join(wdir, "part.")}')
 
-        print('Tokenizing all partitions ...', file = sys.stderr)
-        partitions = glob.glob(os.path.join(wdir, 'split.*'))
+        print('Tokenizing all parts ...', file = sys.stderr)
+        parts = glob.glob(os.path.join(wdir, 'part.*'))
 
         cmds = os.path.join(wdir, 'cmds')
         with open(cmds, 'w+') as f:
-            for x in partitions:
-                out = os.path.join(wdir, os.path.basename(x).replace('split', 'out'))
-                log = os.path.join(wdir, os.path.basename(x).replace('split', 'log'))
+            for x in parts:
+                out = os.path.join(wdir, os.path.basename(x).replace('part', 'out'))
+                log = os.path.join(wdir, os.path.basename(x).replace('part', 'log'))
                 print(f'ops/tokenizer_encode --model {args.model} --input {x} --output {out} --format {args.format} >& {log}', file = f)
         os.system(f'ops/run_para --nj {args.nj} {cmds}')
 
-        print('Merging results of all partitions ...', file = sys.stderr)
+        print('Merging results ...', file = sys.stderr)
         os.system(f'cat {os.path.join(wdir, "out.*")} > {args.output}')
+
 
