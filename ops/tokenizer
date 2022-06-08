@@ -21,33 +21,47 @@ def open_stream(fname, mode):
         yield open(fname, mode, encoding='utf8')
 
 
-def tokenize(model, input_file, output_file, output_format):
+def tokenizer_apply(model, mode, input_file, output_file, token):
     with open_stream(input_file, 'r') as istream, open_stream(output_file, 'w+') as ostream:
-        for l in istream:
-            if output_format == 'piece':
-                pieces = model.EncodeAsPieces(l.strip())
-                encoded = ' '.join(pieces)
-            elif output_format == 'id':
-                ids = model.EncodeAsIds(l.strip())
-                encoded = ' '.join([ str(x) for x in ids ])
-            else:
-                raise NotImplementedError
-
-            print(encoded, file = ostream)
+        if mode == 'encode':
+            for l in istream:
+                if token == 'piece':
+                    pieces = model.EncodeAsPieces(l.strip())
+                    encoded = ' '.join(pieces)
+                elif token == 'id':
+                    ids = model.EncodeAsIds(l.strip())
+                    encoded = ' '.join([ str(x) for x in ids ])
+                else:
+                    raise NotImplementedError
+                print(encoded, file = ostream)
+        else if mode == 'decode':
+            for l in istream:
+                if token == 'piece':
+                    pieces = l.strip().split()
+                    decoded = sp.DecodePieces(pieces)
+                elif token == 'id':
+                    ids = [ int(x) for x in l.strip().split() ]
+                    decoded = sp.DecodeIds(ids)
+                else:
+                    raise NotImplementedError
+                print(decoded, file = ostream)
+        else:
+            raise NotImplementedError
 
 
 if __name__ == '__main__':
     DESCRIPTION = '''
     e.g:
-        cat i.txt | ops/tokenize -m tokenizer.model > o.txt
-        ops/tokenize -m tokenizer.model -i i.txt -o o.txt
+        cat i.txt | ops/tokenizer -m tokenizer.model > o.txt
+        ops/tokenizer -m tokenizer.model -i i.txt -o o.txt
     '''
     parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-n', '--nj', type = int, default = 1)
     parser.add_argument('-m', '--model', type = str, required = True)
+    parser.add_argument('-x', '--mode', choices=['encode', 'decode'], default = 'encode')
+    parser.add_argument('-t', '--token', choices=['piece', 'id'], default = 'piece')
     parser.add_argument('-i', '--input', type = str, default = '-')
     parser.add_argument('-o', '--output', type = str, default = '-')
-    parser.add_argument('-f', '--format', choices=['piece', 'id'], default = 'piece')
     args = parser.parse_args()
     print(args, file=sys.stderr)
 
@@ -55,7 +69,7 @@ if __name__ == '__main__':
 
         model = spm.SentencePieceProcessor()
         model.load(args.model)
-        tokenize(model, args.input, args.output, args.format)
+        tokenizer_apply(model, args.input, args.output, args.token)
 
     else:
 
@@ -75,7 +89,7 @@ if __name__ == '__main__':
             for x in glob.glob(os.path.join(wdir, 'part.*')):
                 out = os.path.join(wdir, os.path.basename(x).replace('part', 'out'))
                 log = os.path.join(wdir, os.path.basename(x).replace('part', 'log'))
-                print(f'ops/tokenize -m {args.model} -i {x} -o {out} -f {args.format} >& {log}', file = f)
+                print(f'ops/tokenizer -m {args.model} -x {args.mode} -t {args.token} -i {x} -o {out} >& {log}', file = f)
         os.system(f'ops/run_para --nj {args.nj} {os.path.join(wdir, "cmds.sh")}')
 
         print('Merging results ...', file = sys.stderr)
