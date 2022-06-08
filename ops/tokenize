@@ -39,8 +39,8 @@ def tokenize(model, input_file, output_file, output_format):
 if __name__ == '__main__':
     DESCRIPTION = '''
     e.g:
-        cat i.txt | ops/tokenizer_encode --model tokenizer.model > o.txt
-        ops/tokenizer_encode  --model tokenizer.model  --input i.txt  --output o.txt
+        cat i.txt | ops/tokenize -m tokenizer.model > o.txt
+        ops/tokenize -m tokenizer.model -i i.txt -o o.txt
     '''
     parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-n', '--nj', type = int, default = 1)
@@ -71,17 +71,13 @@ if __name__ == '__main__':
         os.system(f'split -n l/{args.nj} {args.input} {os.path.join(wdir, "part.")}')
 
         print('Tokenizing all parts ...', file = sys.stderr)
-        parts = glob.glob(os.path.join(wdir, 'part.*'))
-
-        cmds = os.path.join(wdir, 'cmds')
-        with open(cmds, 'w+') as f:
-            for x in parts:
+        with open(os.path.join(wdir, 'cmds.sh'), 'w+') as f:
+            for x in glob.glob(os.path.join(wdir, 'part.*')):
                 out = os.path.join(wdir, os.path.basename(x).replace('part', 'out'))
                 log = os.path.join(wdir, os.path.basename(x).replace('part', 'log'))
-                print(f'ops/tokenizer_encode --model {args.model} --input {x} --output {out} --format {args.format} >& {log}', file = f)
-        os.system(f'ops/run_para --nj {args.nj} {cmds}')
+                print(f'ops/tokenize -m {args.model} -i {x} -o {out} -f {args.format} >& {log}', file = f)
+        os.system(f'ops/run_para --nj {args.nj} {os.path.join(wdir, "cmds.sh")}')
 
         print('Merging results ...', file = sys.stderr)
         os.system(f'cat {os.path.join(wdir, "out.*")} > {args.output}')
-
 
