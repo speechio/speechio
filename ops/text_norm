@@ -29,17 +29,16 @@ if __name__ == '__main__':
         os.makedirs(wdir, exist_ok = True)
 
         print(f'Partitioning input {args.input} into {wdir} ...', file = sys.stderr)
-        os.system(f'split -n l/{args.num_workers} {args.input} {os.path.join(wdir, "split.")}')
+        os.system(f'split -n l/{args.num_workers} {args.input} {os.path.join(wdir, "part.")}')
+
+        cmds = os.path.join(wdir, 'cmds.sh')
+        with open(cmds, 'w+') as f:
+            for part in glob.glob(os.path.join(wdir, 'part.*')):
+                out = os.path.join(wdir, os.path.basename(part).replace('part', 'out'))
+                log = os.path.join(wdir, os.path.basename(part).replace('part', 'log'))
+                print(f'ops/cn_tn.py {args.opts} {x} {out} >& {log}', file = f)
 
         print('Tokenizing all partitions ...', file = sys.stderr)
-        partitions = glob.glob(os.path.join(wdir, 'split.*'))
-
-        cmds = os.path.join(wdir, 'cmds')
-        with open(cmds, 'w+') as f:
-            for x in partitions:
-                out = os.path.join(wdir, os.path.basename(x).replace('split', 'out'))
-                log = os.path.join(wdir, os.path.basename(x).replace('split', 'log'))
-                print(f'ops/cn_tn.py {args.opts} {x} {out} >& {log}', file = f)
         os.system(f'ops/run_para -n {args.num_workers} {cmds}')
 
         print('Merging results of all partitions ...', file = sys.stderr)
