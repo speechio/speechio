@@ -56,7 +56,7 @@ fi
 
 if [ $stage -le 7 ]; then
     echo "Apply trained tokenizer to raw text ..."
-    ops/tokenizer -n $nj -m tokenizer.model -x encode -i text.txt -o lm.txt
+    ops/tokenizer -n $nj -m tokenizer.model -i text.txt -o lm.txt
 
     echo "Training ARPA from tokenized text ..."
     ops/lm_train  --config lm.yaml  --text lm.txt  --vocab tokenizer.vocab  --model lm

@@ -85,10 +85,10 @@ if __name__ == '__main__':
 
         print('Tokenizing all parts ...', file = sys.stderr)
         with open(os.path.join(wdir, 'cmds.sh'), 'w+') as f:
-            for x in glob.glob(os.path.join(wdir, 'part.*')):
-                out = os.path.join(wdir, os.path.basename(x).replace('part', 'out'))
-                log = os.path.join(wdir, os.path.basename(x).replace('part', 'log'))
-                print(f'ops/tokenizer -m {args.model} -x {args.mode} -t {args.token} -i {x} -o {out} >& {log}', file = f)
+            for part in glob.glob(os.path.join(wdir, 'part.*')):
+                out = os.path.join(wdir, os.path.basename(part).replace('part', 'out'))
+                log = os.path.join(wdir, os.path.basename(part).replace('part', 'log'))
+                print(f'ops/tokenizer -m {args.model} -x {args.mode} -t {args.token} -i {part} -o {out} >& {log}', file = f)
         os.system(f'ops/run_para -n {args.num_workers} {os.path.join(wdir, "cmds.sh")}')
 
         print('Merging results ...', file = sys.stderr)
