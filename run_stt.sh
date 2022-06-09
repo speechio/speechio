@@ -16,13 +16,13 @@ fi
 
 if [ $stage -le 1 ]; then
     echo "normalizing raw text ..."
-    ops/text_norm  --nj $nj  --input $raw_text  --output text.txt  2>log.text_norm
+    ops/text_norm -n $nj -i $raw_text -o text.txt 2>log.text_norm
 fi
 
 
 if [ $stage -le 2 ]; then
     echo "Training tokenizer ..."
-    ops/tokenizer_train  --config tokenizer.yaml  --input text.txt  --model tokenizer  2>log.tokenizer
+    ops/tokenizer_train -c tokenizer.yaml -t text.txt -m tokenizer 2>log.tokenizer
 fi
 
 

@@ -6,18 +6,19 @@ import sys, os, argparse
 if __name__ == '__main__':
     DESCRIPTION = '''
     e.g:
-        ops/text_norm --nj 10 --input i.txt --output o.txt
+        ops/text_norm -n 10 -i i.txt -o o.txt
     '''
     parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--nj', type = int, default = 1)
-    parser.add_argument('--opts', type = str, default = "--to_banjiao --to_upper --check_chars --remove_space")
 
-    parser.add_argument('--input', type = str, required = True)
-    parser.add_argument('--output', type = str, required = True)
+    parser.add_argument('-n', '--num_workers', type = int, default = 1)
+    parser.add_argument('--opts', type = str, default = "--to_banjiao --to_upper --check_chars --remove_space")
+    parser.add_argument('-i', '--input', type = str, required = True)
+    parser.add_argument('-o', '--output', type = str, required = True)
+
     args = parser.parse_args()
     print(args, file=sys.stderr)
 
-    if args.nj == 1:
+    if args.num_workers == 1:
 
         os.system(f'ops/cn_tn.py {args.opts} {args.input} {args.output}')
 
@@ -28,7 +29,7 @@ if __name__ == '__main__':
         os.makedirs(wdir, exist_ok = True)
 
         print(f'Partitioning input {args.input} into {wdir} ...', file = sys.stderr)
-        os.system(f'split -n l/{args.nj} {args.input} {os.path.join(wdir, "split.")}')
+        os.system(f'split -n l/{args.num_workers} {args.input} {os.path.join(wdir, "split.")}')
 
         print('Tokenizing all partitions ...', file = sys.stderr)
         partitions = glob.glob(os.path.join(wdir, 'split.*'))
@@ -39,7 +40,7 @@ if __name__ == '__main__':
                 out = os.path.join(wdir, os.path.basename(x).replace('split', 'out'))
                 log = os.path.join(wdir, os.path.basename(x).replace('split', 'log'))
                 print(f'ops/cn_tn.py {args.opts} {x} {out} >& {log}', file = f)
-        os.system(f'ops/run_para --nj {args.nj} {cmds}')
+        os.system(f'ops/run_para -n {args.num_workers} {cmds}')
 
         print('Merging results of all partitions ...', file = sys.stderr)
         os.system(f'cat {os.path.join(wdir, "out.*")} > {args.output}')

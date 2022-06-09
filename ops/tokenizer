@@ -56,7 +56,7 @@ if __name__ == '__main__':
         ops/tokenizer -m tokenizer.model -i i.txt -o o.txt
     '''
     parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-n', '--nj', type = int, default = 1)
+    parser.add_argument('-n', '--num_workers', type = int, default = 1)
     parser.add_argument('-m', '--model', type = str, required = True)
     parser.add_argument('-x', '--mode', choices=['encode', 'decode'], default = 'encode')
     parser.add_argument('-t', '--token', choices=['piece', 'id'], default = 'piece')
@@ -65,14 +65,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args, file=sys.stderr)
 
-    if args.nj == 1:
+    if args.num_workers == 1:
 
         model = spm.SentencePieceProcessor()
         model.load(args.model)
         tokenizer_apply(model, args.input, args.output, args.token)
 
     else:
-
         import glob
 
         assert(args.input != '-')
@@ -82,7 +81,7 @@ if __name__ == '__main__':
         os.makedirs(wdir, exist_ok = True)
 
         print(f'Partitioning input {args.input} into {wdir} ...', file = sys.stderr)
-        os.system(f'split -n l/{args.nj} {args.input} {os.path.join(wdir, "part.")}')
+        os.system(f'split -n l/{args.num_workers} {args.input} {os.path.join(wdir, "part.")}')
 
         print('Tokenizing all parts ...', file = sys.stderr)
         with open(os.path.join(wdir, 'cmds.sh'), 'w+') as f:
@@ -90,7 +89,7 @@ if __name__ == '__main__':
                 out = os.path.join(wdir, os.path.basename(x).replace('part', 'out'))
                 log = os.path.join(wdir, os.path.basename(x).replace('part', 'log'))
                 print(f'ops/tokenizer -m {args.model} -x {args.mode} -t {args.token} -i {x} -o {out} >& {log}', file = f)
-        os.system(f'ops/run_para --nj {args.nj} {os.path.join(wdir, "cmds.sh")}')
+        os.system(f'ops/run_para -n {args.num_workers} {os.path.join(wdir, "cmds.sh")}')
 
         print('Merging results ...', file = sys.stderr)
         os.system(f'cat {os.path.join(wdir, "out.*")} > {args.output}')

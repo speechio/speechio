@@ -1,30 +1,29 @@
 #!/usr/bin/env python3
 
 import sys, os, argparse
-import subprocess, multiprocessing
+import multiprocessing
 
-parser = argparse.ArgumentParser()
-parser.add_argument("cmds", type=str, help="a list of shell commands that can run in parallel.")
-parser.add_argument("--nj", type=int, default=20, help="")
-args = parser.parse_args()
+def run(task):
+    print(task, file = sys.stderr)
+    os.system(task)
 
-tasks = []
-with open(args.cmds, 'r', encoding='utf8') as f:
-    for l in f:
-        if l.startswith('#'):
-            continue # skip comments
-        if (cmd := l.strip()):
-            tasks.append(cmd)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
 
-print(f'{__file__}: tasks={len(tasks)}, workers={args.nj}', file = sys.stderr)
+    parser.add_argument('-n', '--num_workers', type=int, default=20, help="number of parallel workers")
+    parser.add_argument('cmds', type=str, help="a list of shell commands.")
 
-def run(cmd):
-    print(cmd, file = sys.stderr)
-    os.system(cmd)
+    args = parser.parse_args()
 
-pool = multiprocessing.Pool(args.nj)
-futures = [ pool.apply_async(run, (task,)) for task in tasks ]
-output = [ res.get() for res in futures ]
+    tasks = []
+    with open(args.cmds, 'r', encoding='utf8') as f:
+        for line in f:
+            if not line.startswith('#'): # skip comments
+                if x := line.strip():
+                    tasks.append(x)
 
-print(f'{__file__}: parallel executing batch commands {args.cmds} done.', file = sys.stderr)
+    print(f'{sys.argv[0]}: tasks={len(tasks)}, workers={args.num_workers}', file=sys.stderr)
+    pool = multiprocessing.Pool(args.num_workers)
+    result = [ y.get() for y in [ pool.apply_async(run, (x,)) for x in tasks ] ]
+    print(f'{sys.argv[0]}: {args.cmds} done.', file=sys.stderr)
 
