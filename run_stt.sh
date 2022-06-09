@@ -22,7 +22,7 @@ fi
 
 if [ $stage -le 2 ]; then
     echo "Training tokenizer ..."
-    ops/tokenizer_train -c tokenizer.yaml -t text.txt -m tokenizer 2>log.tokenizer
+    ops/tokenizer_train -c tokenizer.yaml -i text.txt -o tokenizer 2>log.tokenizer
 fi
 
 
@@ -59,6 +59,6 @@ if [ $stage -le 7 ]; then
     ops/tokenizer -n $nj -m tokenizer.model -i text.txt -o lm.txt
 
     echo "Training ARPA from tokenized text ..."
-    ops/lm_train  --config lm.yaml  --text lm.txt  --vocab tokenizer.vocab  --model lm
+    ops/lm_train -c lm.yaml -v tokenizer.vocab -i lm.txt -o lm
 fi
 

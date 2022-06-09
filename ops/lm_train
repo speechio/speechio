@@ -15,10 +15,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--dryrun', type = bool, default = False)
-    parser.add_argument('--config', type = str, required = True)
-    parser.add_argument('--text', type = str, required = True, help = 'input text (tokenized)')
-    parser.add_argument('--vocab', type = str, required = True, help = 'input tokenizer, need its vocabulary')
-    parser.add_argument('--model', type = str, required = True, help = 'output path prefix, e.g. egs/stt/lm{.vocab, .arpa, .trie}')
+    parser.add_argument('-c', '--config', type = str, required = True)
+    parser.add_argument('-v', '--vocab', type = str, required = True, help = "tokenizer's vocabulary, LM's vocab will be generated from this.")
+    parser.add_argument('-i', '--text', type = str, required = True, help = 'input text (normalized & tokenized)')
+    parser.add_argument('-o', '--model_prefix', type = str, required = True, help = 'output model prefix, e.g. egs/stt/lm{.vocab, .arpa, .trie}')
 
     args = parser.parse_args()
     print(args, file = sys.stderr)
@@ -26,9 +26,9 @@ if __name__ == '__main__':
     config = OmegaConf.load(args.config)['kenlm']
     print(f'LM config: {config}', file = sys.stderr)
 
-    lm_vocab = args.model + '.vocab'
-    lm_arpa = args.model + '.arpa'
-    lm_binary = args.model + f'.{config["build_type"]}'
+    lm_vocab = args.model_prefix + '.vocab'
+    lm_arpa = args.model_prefix + '.arpa'
+    lm_binary = args.model_prefix + f'.{config["build_type"]}'
 
     # 1. Generate LM vocabulary from tokenizer's vocabulary
     tokens = []
