@@ -13,8 +13,8 @@ from pysio import stt
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--node_rank', type = int, required = True)
-    parser.add_argument('--config', type = str, required = True)
-    parser.add_argument('dir', type = str)
+    parser.add_argument('-c', '--config', type = str, required = True)
+    parser.add_argument('-o', '--dir', type = str)
     args = parser.parse_args()
     print(args)
 

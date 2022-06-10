@@ -290,24 +290,24 @@ def LoadUtterances(filepath, format):
     return utts
 
 
-def tokenize_text(text, tokenizer):
-    if tokenizer == 'word':
+def tokenize_text(text, token_type):
+    if token_type == 'word':
         return text.split()
-    elif tokenizer == 'char':
+    elif token_type == 'char':
         return [ ch for ch in ''.join(text.split()) ]
     else:
-        raise RuntimeError(F'ERROR: Unsupported tokenizer {tokenizer}')
+        raise RuntimeError(F'ERROR: Unsupported token type: {token_type}')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # optional
-    parser.add_argument('--tokenizer', choices=['word', 'char'], default='word', help='word for WER, char for CER')
+    parser.add_argument('-t', '--token', choices=['word', 'char'], default='word', help='word for WER, char for CER')
     parser.add_argument('--ref-format', choices=['text'], default='text', help='reference format, first col is utt_id, the rest is text')
     parser.add_argument('--hyp-format', choices=['text'], default='text', help='hypothesis format, first col is utt_id, the rest is text')
     # required
-    parser.add_argument('--ref', type=str, required=True, help='input reference file')
-    parser.add_argument('--hyp', type=str, required=True, help='input hypothesis file')
+    parser.add_argument('-r', '--ref', type=str, required=True, help='input reference file')
+    parser.add_argument('-h', '--hyp', type=str, required=True, help='input hypothesis file')
 
     parser.add_argument('result_file', type=str)
     args = parser.parse_args()
@@ -341,8 +341,8 @@ if __name__ == '__main__':
             hyp = hyp_utts[uid]
 
             alignment, score = EditDistance(
-                tokenize_text(ref.text, args.tokenizer),
-                tokenize_text(hyp.text, args.tokenizer)
+                tokenize_text(ref.text, args.token),
+                tokenize_text(hyp.text, args.token)
             )
             
             c, s, i, d = CountEdits(alignment)

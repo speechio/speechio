@@ -12,9 +12,9 @@ from pysio.stt import average_model_checkpoints
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n', type = int, default = 20)
-    parser.add_argument('checkpoints_dir', type = str)
-    parser.add_argument('output', type = str)
+    parser.add_argument('-n', '--num_checkpoints', type = int, default = 20)
+    parser.add_argument('-i', '--checkpoints_dir', type = str, required = True)
+    parser.add_argument('-o', '--averaged', type = str, required = True)
     args = parser.parse_args()
 
     checkpoints = glob.glob(os.path.join(args.checkpoints_dir, '*.model'))
@@ -26,7 +26,10 @@ if __name__ == '__main__':
         return int(fname) # 62
 
     checkpoints.sort(key = get_epoch)
-
-    last_n_checkpoints = checkpoints[-args.n:]
-    torch.save(average_model_checkpoints(last_n_checkpoints), args.output)
+    torch.save(
+        average_model_checkpoints(
+            checkpoints[-args.num_checkpoints:] # last n checkpoints
+        ),
+        args.averaged
+    )
 

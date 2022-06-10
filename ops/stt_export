@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import argparse
+import sys, argparse
 from omegaconf import OmegaConf
 
 import torch
@@ -8,13 +8,15 @@ from pysio.stt import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str)
-    parser.add_argument('checkpoint', type=str)
-    parser.add_argument('output', type=str)
+
+    parser.add_argument('-c', '--config', type=str, required = True)
+    parser.add_argument('-i', '--checkpoint', type=str, required = True)
+    parser.add_argument('-o', '--exported', type=str, required = True)
+
     args = parser.parse_args()
+    print(args, file=sys.stderr)
 
     config = OmegaConf.load(args.config)
-
     tokenizer = Tokenizer(**config.tokenizer)
 
     model = create_model(
@@ -23,9 +25,8 @@ if __name__ == '__main__':
         config.fbank_feature_extractor.num_mel_bins, 
         tokenizer,
     )
-
     load_model_checkpoint(model, torch.device('cpu'), args.checkpoint)
 
     script_model = torch.jit.script(model)
-    script_model.save(args.output)
+    script_model.save(args.exported)
 
