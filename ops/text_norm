@@ -11,7 +11,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
 
     parser.add_argument('-n', '--num_workers', type = int, default = 1)
-    parser.add_argument('--opts', type = str, default = "--to_banjiao --to_upper --check_chars --remove_space")
+    parser.add_argument('-x', '--extra_opts', type = str, default = "--to_banjiao --to_upper --check_chars --remove_space")
     parser.add_argument('-i', '--input', type = str, required = True)
     parser.add_argument('-o', '--output', type = str, required = True)
 
@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
     if args.num_workers == 1:
 
-        os.system(f'ops/cn_tn.py {args.opts} {args.input} {args.output}')
+        os.system(f'ops/cn_tn.py {args.extra_opts} {args.input} {args.output}')
 
     else:
         import glob
@@ -36,7 +36,7 @@ if __name__ == '__main__':
             for part in glob.glob(os.path.join(wdir, 'part.*')):
                 out = os.path.join(wdir, os.path.basename(part).replace('part', 'out'))
                 log = os.path.join(wdir, os.path.basename(part).replace('part', 'log'))
-                print(f'ops/cn_tn.py {args.opts} {x} {out} >& {log}', file = f)
+                print(f'ops/cn_tn.py {args.extra_opts} {x} {out} >& {log}', file = f)
         os.system(f'ops/run_para -n {args.num_workers} {os.path.join(wdir, "cmds.sh")}')
 
         print('Merging results of all partitions ...', file = sys.stderr)
