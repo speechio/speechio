@@ -50,7 +50,7 @@ fi
 if [ $stage -le 6 ]; then
     echo "Evaluating error rate ..."
     awk -F'\t' '{print $2"\t"$3}' test.tsv >test.hyp
-    ops/stt_error_rate  --token_type char  --ref test.ref  --hyp test.hyp  RESULT  2>log.eval
+    ops/stt_error_rate  --token char  --ref test.ref  --hyp test.hyp  RESULT  2>log.eval
 fi
 
 
