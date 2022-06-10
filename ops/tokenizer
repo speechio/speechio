@@ -36,7 +36,7 @@ def tokenizer_apply(model_path, mode, token, input_path, output_path):
                 else:
                     raise NotImplementedError
                 print(encoded, file = ostream)
-        else if mode == 'decode':
+        elif mode == 'decode':
             for l in istream:
                 if token == 'piece':
                     pieces = l.strip().split()
