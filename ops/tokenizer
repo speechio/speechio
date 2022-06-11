@@ -21,7 +21,7 @@ def open_stream(fname, mode):
         yield open(fname, mode, encoding='utf8')
 
 
-def tokenizer_apply(model_path, mode, token, input_path, output_path):
+def tokenizer_apply(mode, model_path, token, input_path, output_path):
     model = spm.SentencePieceProcessor()
     model.load(model_path)
     with open_stream(input_path, 'r') as istream, open_stream(output_path, 'w+') as ostream:
@@ -59,8 +59,8 @@ if __name__ == '__main__':
     '''
     parser = argparse.ArgumentParser(description = DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-n', '--num_workers', type = int, default = 1)
-    parser.add_argument('-m', '--model', type = str, required = True)
     parser.add_argument('-x', '--mode', choices=['encode', 'decode'], default = 'encode')
+    parser.add_argument('-m', '--model', type = str, required = True)
     parser.add_argument('-t', '--token', choices=['piece', 'id'], default = 'piece')
     parser.add_argument('-i', '--input', type = str, default = '-')
     parser.add_argument('-o', '--output', type = str, default = '-')
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     print(args, file = sys.stderr)
 
     if args.num_workers == 1:
-        tokenizer_apply(args.model, args.mode, args.token, args.input, args.output)
+        tokenizer_apply(args.mode, args.model, args.token, args.input, args.output)
 
     else:
         import glob
@@ -88,7 +88,7 @@ if __name__ == '__main__':
             for x in glob.glob(os.path.join(wdir, 'part.*')):
                 y = os.path.join(wdir, os.path.basename(x).replace('part', 'out'))
                 z = os.path.join(wdir, os.path.basename(x).replace('part', 'log'))
-                print(f'ops/tokenizer -m {args.model} -x {args.mode} -t {args.token} -i {x} -o {y} >& {z}', file = f)
+                print(f'ops/tokenizer -x {args.mode} -m {args.model} -t {args.token} -i {x} -o {y} >& {z}', file = f)
 
         print('Tokenizing all parts ...', file = sys.stderr)
         os.system(f'ops/run_para -n {args.num_workers} {cmds}')
