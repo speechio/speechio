@@ -4,12 +4,12 @@ import sys, os, argparse
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n', action='store_true', help = 'Do not wrap the input in <s> and </s>.')
-    parser.add_argument('--model', type = str, required = True)
-    parser.add_argument('--text', type = str, required = True)
+    parser.add_argument('--wrap_bos_eos', type = bool, default = True, help = 'Wrap input sentences with <s> & </s>.')
+    parser.add_argument('-m', '--model', type = str, required = True)
+    parser.add_argument('-i', '--text', type = str, required = True)
     args = parser.parse_args()
 
-    cmd = f'cat {args.text} | query {"-n" if args.n else ""} {args.model}'
+    cmd = f'cat {args.text} | query {"" if args.wrap_bos_eos else "-n"} {args.model}'
     print(cmd, file = sys.stderr)
     os.system(cmd)
 
